@@ -1,177 +1,275 @@
 # Grafana Alert Rules Configuration - NPR Environment
-# These override or extend shared alert rules for NPR
+# Uses Grafana's native export format with org name instead of orgId
+# These rules are specific to NPR (non-production) environment
 
-alert_rules:
-  # Main Organization alerts (default org)
-  - name: "High CPU Usage"
-    folder: "alerts"
-    org: "Main Organization"
-    rule_group: "Infrastructure"
-    condition: "C"
-    for: "5m"
-    # NEW PARAMETERS FOR TESTING
-    no_data_state: "OK"
-    exec_err_state: "Alerting"
-    is_paused: false
-    annotations:
-      summary: "High CPU usage detected"
-      description: "CPU usage is above 80% for more than 5 minutes"
-      runbook_url: "https://wiki.example.com/runbooks/high-cpu"
-    labels:
-      severity: "warning"
-      team: "platform"
-    data:
-      - ref_id: "A"
-        datasource_uid: "prometheus"
-        model:
-          expr: "100 - (avg by(instance) (irate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)"
-          interval: ""
-          legendFormat: "{{instance}}"
-      - ref_id: "B"
-        datasource_uid: "__expr__"
-        model:
-          type: "reduce"
-          expression: "A"
-          reducer: "mean"
-      - ref_id: "C"
-        datasource_uid: "__expr__"
-        model:
-          type: "threshold"
-          expression: "B"
-          conditions:
-            - evaluator:
-                type: "gt"
-                params: [80]
+apiVersion: 1
 
-  - name: "High Memory Usage"
-    folder: "alerts"
-    org: "Main Organization"
-    rule_group: "Infrastructure"
-    condition: "C"
-    for: "5m"
-    annotations:
-      summary: "High memory usage detected"
-      description: "Memory usage is above 85%"
-    labels:
-      severity: "warning"
-      team: "platform"
-    data:
-      - ref_id: "A"
-        datasource_uid: "prometheus"
-        model:
-          expr: "(1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100"
-      - ref_id: "B"
-        datasource_uid: "__expr__"
-        model:
-          type: "reduce"
-          expression: "A"
-          reducer: "mean"
-      - ref_id: "C"
-        datasource_uid: "__expr__"
-        model:
-          type: "threshold"
-          expression: "B"
-          conditions:
-            - evaluator:
-                type: "gt"
-                params: [85]
+groups:
+  # =========================================================================
+  # MAIN ORGANIZATION - Infrastructure Alerts
+  # =========================================================================
+  - org: "Main Organization"
+    name: Infrastructure
+    folder: alerts
+    interval: 1m
+    rules:
+      - uid: npr-high-cpu-usage
+        title: High CPU Usage
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)
+              interval: ""
+              legendFormat: "{{instance}}"
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: B
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              reducer: mean
+              type: reduce
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 80
+                    type: gt
+              expression: B
+              intervalMs: 1000
+              maxDataPoints: 43200
+              type: threshold
+        noDataState: OK
+        execErrState: Alerting
+        for: 5m
+        annotations:
+          summary: High CPU usage detected
+          description: CPU usage is above 80% for more than 5 minutes
+          runbook_url: https://wiki.example.com/runbooks/high-cpu
+        labels:
+          severity: warning
+          team: platform
+        isPaused: false
 
-  - name: "Disk Space Low"
-    folder: "alerts"
-    org: "Main Organization"
-    rule_group: "Infrastructure"
-    condition: "C"
-    for: "10m"
-    annotations:
-      summary: "Low disk space"
-      description: "Disk usage is above 90%"
-    labels:
-      severity: "critical"
-      team: "platform"
-    data:
-      - ref_id: "A"
-        datasource_uid: "prometheus"
-        model:
-          expr: "(1 - (node_filesystem_avail_bytes / node_filesystem_size_bytes)) * 100"
-      - ref_id: "B"
-        datasource_uid: "__expr__"
-        model:
-          type: "reduce"
-          expression: "A"
-          reducer: "max"
-      - ref_id: "C"
-        datasource_uid: "__expr__"
-        model:
-          type: "threshold"
-          expression: "B"
-          conditions:
-            - evaluator:
-                type: "gt"
-                params: [90]
+      - uid: npr-high-memory-usage
+        title: High Memory Usage
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: B
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              reducer: mean
+              type: reduce
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 85
+                    type: gt
+              expression: B
+              intervalMs: 1000
+              maxDataPoints: 43200
+              type: threshold
+        noDataState: NoData
+        execErrState: Error
+        for: 5m
+        annotations:
+          summary: High memory usage detected
+          description: Memory usage is above 85%
+        labels:
+          severity: warning
+          team: platform
+        isPaused: false
 
-  # Application alerts
-  - name: "High Error Rate"
-    folder: "alerts"
-    org: "Main Organization"
-    rule_group: "Applications"
-    condition: "C"
-    for: "2m"
-    annotations:
-      summary: "High error rate detected"
-      description: "Error rate is above 5%"
-    labels:
-      severity: "critical"
-      team: "backend"
-    data:
-      - ref_id: "A"
-        datasource_uid: "prometheus"
-        model:
-          expr: "sum(rate(http_requests_total{status=~\"5..\"}[5m])) / sum(rate(http_requests_total[5m])) * 100"
-      - ref_id: "B"
-        datasource_uid: "__expr__"
-        model:
-          type: "reduce"
-          expression: "A"
-          reducer: "mean"
-      - ref_id: "C"
-        datasource_uid: "__expr__"
-        model:
-          type: "threshold"
-          expression: "B"
-          conditions:
-            - evaluator:
-                type: "gt"
-                params: [5]
+      - uid: npr-disk-space-low
+        title: Disk Space Low
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: (1 - (node_filesystem_avail_bytes / node_filesystem_size_bytes)) * 100
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: B
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              reducer: max
+              type: reduce
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 90
+                    type: gt
+              expression: B
+              intervalMs: 1000
+              maxDataPoints: 43200
+              type: threshold
+        noDataState: NoData
+        execErrState: Error
+        for: 10m
+        annotations:
+          summary: Low disk space
+          description: Disk usage is above 90%
+        labels:
+          severity: critical
+          team: platform
+        isPaused: false
 
-  - name: "High Latency"
-    folder: "alerts"
-    org: "Main Organization"
-    rule_group: "Applications"
-    condition: "C"
-    for: "5m"
-    annotations:
-      summary: "High latency detected"
-      description: "P99 latency is above 1 second"
-    labels:
-      severity: "warning"
-      team: "backend"
-    data:
-      - ref_id: "A"
-        datasource_uid: "prometheus"
-        model:
-          expr: "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))"
-      - ref_id: "B"
-        datasource_uid: "__expr__"
-        model:
-          type: "reduce"
-          expression: "A"
-          reducer: "mean"
-      - ref_id: "C"
-        datasource_uid: "__expr__"
-        model:
-          type: "threshold"
-          expression: "B"
-          conditions:
-            - evaluator:
-                type: "gt"
-                params: [1]
+  # =========================================================================
+  # MAIN ORGANIZATION - Application Alerts
+  # =========================================================================
+  - org: "Main Organization"
+    name: Applications
+    folder: alerts
+    interval: 1m
+    rules:
+      - uid: npr-high-error-rate
+        title: High Error Rate
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: sum(rate(http_requests_total{status=~"5.."}[5m])) / sum(rate(http_requests_total[5m])) * 100
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: B
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              reducer: mean
+              type: reduce
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 5
+                    type: gt
+              expression: B
+              intervalMs: 1000
+              maxDataPoints: 43200
+              type: threshold
+        noDataState: NoData
+        execErrState: Error
+        for: 2m
+        annotations:
+          summary: High error rate detected
+          description: Error rate is above 5%
+        labels:
+          severity: critical
+          team: backend
+        isPaused: false
+
+      - uid: npr-high-latency
+        title: High Latency
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: B
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              reducer: mean
+              type: reduce
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 1
+                    type: gt
+              expression: B
+              intervalMs: 1000
+              maxDataPoints: 43200
+              type: threshold
+        noDataState: NoData
+        execErrState: Error
+        for: 5m
+        annotations:
+          summary: High latency detected
+          description: P99 latency is above 1 second
+        labels:
+          severity: warning
+          team: backend
+        isPaused: false
