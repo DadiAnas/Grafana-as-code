@@ -1,0 +1,100 @@
+# Keycloak SSO Configuration
+# These settings configure Grafana's OAuth integration with Keycloak
+
+keycloak:
+  # Keycloak server settings
+  server_url: "https://keycloak.example.com"
+  realm: "grafana"
+  
+  # OAuth client settings
+  client_id: "grafana"
+  client_secret: "${KEYCLOAK_CLIENT_SECRET}"
+  
+  # Scopes to request
+  scopes: "openid profile email groups"
+  
+  # Attribute mappings
+  attribute_mappings:
+    login: "preferred_username"
+    email: "email"
+    name: "name"
+    groups: "groups"
+  
+  # Role mappings - map Keycloak roles/groups to Grafana roles
+  role_attribute_path: "contains(groups[*], 'grafana-admin') && 'Admin' || contains(groups[*], 'grafana-editor') && 'Editor' || 'Viewer'"
+  
+  # Organization mapping - map Keycloak groups to Grafana organizations
+  org_mapping:
+    enabled: true
+    org_attribute_path: "org"  # Keycloak attribute containing org name
+    
+    # Map Keycloak groups to Grafana organizations
+    mappings:
+      - keycloak_group: "platform-team"
+        grafana_org: "Platform Team"
+        role: "Editor"
+      
+      - keycloak_group: "platform-admins"
+        grafana_org: "Platform Team"
+        role: "Admin"
+      
+      - keycloak_group: "app-team"
+        grafana_org: "Application Team"
+        role: "Editor"
+      
+      - keycloak_group: "app-admins"
+        grafana_org: "Application Team"
+        role: "Admin"
+      
+      - keycloak_group: "bi-team"
+        grafana_org: "Business Intelligence"
+        role: "Viewer"
+      
+      - keycloak_group: "bi-admins"
+        grafana_org: "Business Intelligence"
+        role: "Admin"
+      
+      # Default org for users without specific group
+      - keycloak_group: "grafana-users"
+        grafana_org: "Main Organization"
+        role: "Viewer"
+
+      # Public organization - ALL authenticated users get Viewer access
+      # This allows everyone to view shared dashboards in the Public org
+      - keycloak_group: "platform-team"
+        grafana_org: "Public"
+        role: "Viewer"
+      
+      - keycloak_group: "platform-admins"
+        grafana_org: "Public"
+        role: "Viewer"
+      
+      - keycloak_group: "app-team"
+        grafana_org: "Public"
+        role: "Viewer"
+      
+      - keycloak_group: "app-admins"
+        grafana_org: "Public"
+        role: "Viewer"
+      
+      - keycloak_group: "bi-team"
+        grafana_org: "Public"
+        role: "Viewer"
+      
+      - keycloak_group: "bi-admins"
+        grafana_org: "Public"
+        role: "Viewer"
+      
+      - keycloak_group: "grafana-users"
+        grafana_org: "Public"
+        role: "Viewer"
+
+  # Auto-assign users to orgs based on groups
+  auto_assign_org: true
+  auto_assign_org_role: "Viewer"
+  
+  # Allow users to be in multiple orgs
+  allow_assign_grafana_admin: true
+  
+  # Skip org role sync for specific users (e.g., service accounts)
+  skip_org_role_sync: false

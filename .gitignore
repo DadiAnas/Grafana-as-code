@@ -1,0 +1,73 @@
+# Terraform
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+.terraform/
+.terraform.lock.hcl
+crash.log
+crash.*.log
+
+# Terraform variable files (may contain secrets)
+*.tfvars
+!*.tfvars.example
+!environments/*.tfvars
+
+# Backend configs with secrets
+!backends/*.tfbackend
+
+# Override files
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Ignore CLI configuration files
+.terraformrc
+terraform.rc
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+
+# Backup files
+*.bak
+*.backup
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Secrets - NEVER commit these
+secrets/
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+
+# Vault tokens
+.vault-token
+vault-token
+token.txt
+
+# Terraform plan output
+*.tfplan
+plan.out
+
+# Dashboard exports (if auto-generated)
+dashboards/*.json.bak

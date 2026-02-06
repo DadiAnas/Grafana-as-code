@@ -1,0 +1,34 @@
+# PreProd Environment SSO Configuration
+# Overrides shared SSO config for PreProd
+
+sso:
+  enabled: true
+  name: "Keycloak PreProd"
+  
+  # PreProd-specific OAuth2 endpoints
+  auth_url: "https://keycloak-preprod.example.com/realms/grafana/protocol/openid-connect/auth"
+  token_url: "https://keycloak-preprod.example.com/realms/grafana/protocol/openid-connect/token"
+  api_url: "https://keycloak-preprod.example.com/realms/grafana/protocol/openid-connect/userinfo"
+  
+  # PreProd client
+  client_id: "grafana-preprod"
+  
+  # PreProd settings
+  allow_sign_up: true
+  auto_login: false
+  scopes: "openid profile email groups"
+  use_pkce: true
+  use_refresh_token: true
+  
+  # Role mapping
+  role_attribute_path: "contains(groups[*], 'grafana-admin') && 'Admin' || contains(groups[*], 'grafana-editor') && 'Editor' || 'Viewer'"
+  
+  # Organization mapping for PreProd
+  org_mapping: |
+    Main Organization:1
+    Platform Team:*
+    Application Team:*
+    Business Intelligence:*
+  
+  # Sign out redirect
+  signout_redirect_url: "https://keycloak-preprod.example.com/realms/grafana/protocol/openid-connect/logout"

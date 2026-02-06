@@ -1,0 +1,61 @@
+# Shared Datasources Configuration
+# These datasources are deployed to ALL environments
+# Environment-specific datasources in config/{env}/datasources.yaml will override these
+
+datasources:
+  # Platform Team Organization Datasources
+  - name: "Platform-Prometheus"
+    type: "prometheus"
+    uid: "platform-prometheus"
+    url: "http://prometheus.platform.local:9090"
+    org: "Platform Team"
+    is_default: false
+    access_mode: "proxy"
+    json_data:
+      httpMethod: "POST"
+      timeInterval: "15s"
+
+  - name: "Platform-Loki"
+    type: "loki"
+    uid: "platform-loki"
+    url: "http://loki.platform.local:3100"
+    org: "Platform Team"
+    access_mode: "proxy"
+    json_data:
+      maxLines: 1000
+
+  # Business Intelligence Organization Datasources
+  - name: "BI-PostgreSQL"
+    type: "postgres"
+    uid: "bi-postgres"
+    url: "postgres.bi.local:5432"
+    org: "Business Intelligence"
+    use_vault: true
+    json_data:
+      database: "analytics"
+      sslmode: "require"
+      maxOpenConns: 100
+
+  # Public Organization Datasources (read-only metrics)
+  - name: "Public-Metrics"
+    type: "prometheus"
+    uid: "public-prometheus"
+    url: "http://prometheus.public.local:9090"
+    org: "Public"
+    is_default: true
+    access_mode: "proxy"
+    json_data:
+      httpMethod: "GET"
+      timeInterval: "60s"
+
+  # Application Team Datasources
+  - name: "App-Prometheus"
+    type: "prometheus"
+    uid: "app-prometheus"
+    url: "http://prometheus.apps.local:9090"
+    org: "Application Team"
+    is_default: true
+    access_mode: "proxy"
+    json_data:
+      httpMethod: "POST"
+      timeInterval: "15s"

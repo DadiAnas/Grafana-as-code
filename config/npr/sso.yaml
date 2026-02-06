@@ -1,0 +1,88 @@
+# NPR Environment SSO Configuration
+# Overrides shared SSO config for NPR
+
+sso:
+  enabled: true
+  name: "Keycloak NPR"
+  
+  # NPR-specific OAuth2 endpoints
+  auth_url: "https://auth.dadispace.com/realms/grafana-realm/protocol/openid-connect/auth"
+  token_url: "https://auth.dadispace.com/realms/grafana-realm/protocol/openid-connect/token"
+  api_url: "https://auth.dadispace.com/realms/grafana-realm/protocol/openid-connect/userinfo"
+  
+  # NPR client (managed by Terraform)
+  client_id: "grafana-terraform"
+  
+  # NPR settings - allow auto_login for development convenience
+  allow_sign_up: true
+  auto_login: false
+  scopes: "openid profile email groups"
+  use_pkce: true
+  use_refresh_token: true
+  
+  # Restrict login to only users in these Keycloak groups
+  # Users not in any of these groups will be denied access entirely
+  allowed_groups: "grafana-admins,grafana-platform-team,grafana-app-team,grafana-bi-team,grafana-developers,grafana-viewers"
+  
+  # Role mapping - skip_org_role_sync lets org_mapping control all access
+  # Users get roles ONLY from org_mapping, not from a default role
+  skip_org_role_sync: false
+  allow_assign_grafana_admin: true
+  
+  # Sign out redirect
+  signout_redirect_url: "https://auth.dadispace.com/realms/grafana-realm/protocol/openid-connect/logout"
+  
+  # Team sync
+  teams_url: "https://auth.dadispace.com/realms/grafana-realm/protocol/openid-connect/userinfo"
+  team_ids_attribute_path: "groups[*]"
+  
+  # ==========================================================================
+  # GROUP TO ORG ROLE MAPPINGS
+  # Maps IdP groups to Grafana organizations with specific roles
+  # This works regardless of whether Keycloak is managed by Terraform or not
+  # ==========================================================================
+  # Roles: Admin, Editor, Viewer (for org access)
+  # Special: GrafanaAdmin grants SERVER-WIDE super admin access (handled via role_attribute_path)
+  # If a group has any GrafanaAdmin mapping, members get server admin rights automatically
+  # Users ONLY get access to orgs explicitly listed in their group's org_mappings
+  groups:
+    - name: "grafana-admins"
+      org_mappings:
+        # GrafanaAdmin = server-wide super admin (auto-enabled via role_attribute_path)
+        - org: "Main Organization"
+          role: "Admin"
+        - org: "Platform Team"
+          role: "Admin"
+        - org: "Application Team"
+          role: "Admin"
+        - org: "Business Intelligence"
+          role: "Admin"
+        - org: "Public"
+          role: "Viewer"
+        - org: "Development"
+          role: "Editor"
+    
+    - name: "grafana-platform-team"
+      org_mappings:
+        - org: "Platform Team"
+          role: "Admin"
+    
+    - name: "grafana-app-team"
+      org_mappings:
+        - org: "Application Team"
+          role: "Admin"
+    
+    - name: "grafana-bi-team"
+      org_mappings:
+        - org: "Business Intelligence"
+          role: "Admin"
+    
+    - name: "grafana-developers"
+      org_mappings:
+        - org: "Development"
+          role: "Editor"
+    
+    - name: "grafana-viewers"
+      org_mappings:
+        - org: "Public"
+          role: "Viewer"

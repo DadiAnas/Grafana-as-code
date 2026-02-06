@@ -1,0 +1,9 @@
+# Backend configuration for NPR environment
+# Use with: terraform init -backend-config=backends/npr.tfbackend
+
+# S3 Backend Example
+bucket         = "grafana-terraform-state"
+key            = "npr/terraform.tfstate"
+region         = "us-east-1"
+encrypt        = true
+dynamodb_table = "grafana-terraform-locks"

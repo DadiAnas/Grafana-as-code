@@ -1,0 +1,89 @@
+{
+  "uid": "alerts-overview",
+  "title": "Alerts Overview",
+  "description": "Overview of all active and recent alerts",
+  "tags": ["alerts", "monitoring"],
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "30s",
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": {}
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Active Alerts",
+      "type": "alertlist",
+      "gridPos": { "h": 12, "w": 12, "x": 0, "y": 0 },
+      "options": {
+        "alertInstanceLabelFilter": "",
+        "alertName": "",
+        "dashboardAlerts": false,
+        "maxItems": 20,
+        "sortOrder": 1,
+        "stateFilter": {
+          "error": true,
+          "firing": true,
+          "noData": true,
+          "normal": false,
+          "pending": true
+        },
+        "viewMode": "list"
+      }
+    },
+    {
+      "id": 2,
+      "title": "Alert History",
+      "type": "timeseries",
+      "gridPos": { "h": 12, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "expr": "sum by (alertname) (ALERTS{alertstate=\"firing\"})",
+          "legendFormat": "{{alertname}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Alerts by Severity",
+      "type": "piechart",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "expr": "count by (severity) (ALERTS{alertstate=\"firing\"})",
+          "legendFormat": "{{severity}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Alerts by Team",
+      "type": "piechart",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "expr": "count by (team) (ALERTS{alertstate=\"firing\"})",
+          "legendFormat": "{{team}}",
+          "refId": "A"
+        }
+      ]
+    }
+  ]
+}

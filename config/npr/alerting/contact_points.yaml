@@ -1,0 +1,65 @@
+# Grafana Contact Points Configuration - NPR Environment
+# These override or extend shared contact points for NPR
+# Only webhook and email channels are supported
+
+contact_points:
+  # Main Organization Contact Points
+  - name: "email-npr"
+    org: "Main Organization"
+    type: "email"
+    settings:
+      addresses: "oncall-npr@example.com,platform-npr@example.com"
+      singleEmail: true
+      subject: "[NPR] [{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}"
+      message: |
+        Environment: NPR
+        {{ range .Alerts }}
+        Alert: {{ .Labels.alertname }}
+        Status: {{ .Status }}
+        Severity: {{ .Labels.severity }}
+        Summary: {{ .Annotations.summary }}
+        Description: {{ .Annotations.description }}
+        {{ if .Annotations.runbook_url }}Runbook: {{ .Annotations.runbook_url }}{{ end }}
+        {{ end }}
+
+  - name: "webhook-npr"
+    org: "Main Organization"
+    type: "webhook"
+    use_vault: true
+    settings:
+      url: "https://api.npr.example.com/alerts"
+      httpMethod: "POST"
+      authorization_scheme: "Bearer"
+      # authorization_credentials fetched from Vault
+
+  # Platform Team Organization Contact Points
+  - name: "platform-email-npr"
+    org: "Platform Team"
+    type: "email"
+    settings:
+      addresses: "platform-team-npr@example.com"
+      singleEmail: true
+      subject: "[NPR-Platform] [{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}"
+
+  - name: "platform-webhook-npr"
+    org: "Platform Team"
+    type: "webhook"
+    settings:
+      url: "https://hooks.platform.example.com/npr/alerts"
+      httpMethod: "POST"
+
+  # Application Team Organization Contact Points
+  - name: "app-email-npr"
+    org: "Application Team"
+    type: "email"
+    settings:
+      addresses: "app-team-npr@example.com"
+      singleEmail: true
+      subject: "[NPR-App] [{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}"
+
+  - name: "app-webhook-npr"
+    org: "Application Team"
+    type: "webhook"
+    settings:
+      url: "https://hooks.app.example.com/npr/alerts"
+      httpMethod: "POST"

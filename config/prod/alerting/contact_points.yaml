@@ -1,0 +1,65 @@
+# Grafana Contact Points Configuration - PROD Environment
+# These override or extend shared contact points for PROD
+# Only webhook and email channels are supported
+
+contact_points:
+  # Main Organization Contact Points
+  - name: "email-prod"
+    org: "Main Organization"
+    type: "email"
+    settings:
+      addresses: "oncall-prod@example.com,platform-prod@example.com"
+      singleEmail: true
+      subject: "[PROD] [{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}"
+      message: |
+        Environment: PROD
+        {{ range .Alerts }}
+        Alert: {{ .Labels.alertname }}
+        Status: {{ .Status }}
+        Severity: {{ .Labels.severity }}
+        Summary: {{ .Annotations.summary }}
+        Description: {{ .Annotations.description }}
+        {{ if .Annotations.runbook_url }}Runbook: {{ .Annotations.runbook_url }}{{ end }}
+        {{ end }}
+
+  - name: "webhook-prod"
+    org: "Main Organization"
+    type: "webhook"
+    use_vault: true
+    settings:
+      url: "https://api.prod.example.com/alerts"
+      httpMethod: "POST"
+      authorization_scheme: "Bearer"
+      # authorization_credentials fetched from Vault
+
+  # Platform Team Organization Contact Points
+  - name: "platform-email-prod"
+    org: "Platform Team"
+    type: "email"
+    settings:
+      addresses: "platform-team-prod@example.com"
+      singleEmail: true
+      subject: "[PROD-Platform] [{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}"
+
+  - name: "platform-webhook-prod"
+    org: "Platform Team"
+    type: "webhook"
+    settings:
+      url: "https://hooks.platform.example.com/prod/alerts"
+      httpMethod: "POST"
+
+  # Application Team Organization Contact Points
+  - name: "app-email-prod"
+    org: "Application Team"
+    type: "email"
+    settings:
+      addresses: "app-team-prod@example.com"
+      singleEmail: true
+      subject: "[PROD-App] [{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}"
+
+  - name: "app-webhook-prod"
+    org: "Application Team"
+    type: "webhook"
+    settings:
+      url: "https://hooks.app.example.com/prod/alerts"
+      httpMethod: "POST"

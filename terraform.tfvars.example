@@ -1,0 +1,5 @@
+# Copy this file to terraform.tfvars and update with your values
+
+grafana_url  = "http://localhost:3000"
+grafana_auth = "admin:admin"  # or use API key: "glsa_xxxx"
+environment  = "dev"

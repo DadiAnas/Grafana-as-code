@@ -1,0 +1,42 @@
+# Shared Notification Policies Configuration
+# These policies are deployed to ALL environments
+# Environment-specific policies in config/{env}/alerting/notification_policies.yaml will override these
+
+notification_policies:
+  # Platform Team Organization Policy
+  - org: "Platform Team"
+    contact_point: "platform-email"
+    group_by: ["alertname", "severity"]
+    group_wait: "30s"
+    group_interval: "5m"
+    repeat_interval: "4h"
+    routes:
+      - match:
+          severity: "critical"
+        contact_point: "platform-webhook"
+        continue: true
+      - match:
+          severity: "warning"
+        contact_point: "platform-email"
+        group_wait: "1m"
+
+  # Application Team Organization Policy
+  - org: "Application Team"
+    contact_point: "app-email"
+    group_by: ["alertname", "service"]
+    group_wait: "30s"
+    group_interval: "5m"
+    repeat_interval: "4h"
+    routes:
+      - match:
+          severity: "critical"
+        contact_point: "app-webhook"
+        continue: true
+
+  # Business Intelligence Organization Policy
+  - org: "Business Intelligence"
+    contact_point: "bi-email"
+    group_by: ["alertname"]
+    group_wait: "1m"
+    group_interval: "10m"
+    repeat_interval: "12h"

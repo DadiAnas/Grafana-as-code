@@ -1,0 +1,42 @@
+# Grafana Teams Configuration - Shared across environments
+
+teams:
+  - name: "Platform Team"
+    email: "platform@example.com"
+    members:
+      - email: "user1@example.com"
+      - email: "user2@example.com"
+    preferences:
+      theme: "dark"
+      home_dashboard_uid: ""
+
+  - name: "Backend Team"
+    email: "backend@example.com"
+    members:
+      - email: "dev1@example.com"
+      - email: "dev2@example.com"
+    preferences:
+      theme: "dark"
+
+  - name: "Frontend Team"
+    email: "frontend@example.com"
+    members:
+      - email: "fe1@example.com"
+    preferences:
+      theme: "light"
+
+  - name: "SRE Team"
+    email: "sre@example.com"
+    members:
+      - email: "sre1@example.com"
+      - email: "sre2@example.com"
+      - email: "sre3@example.com"
+    preferences:
+      theme: "dark"
+
+  - name: "Data Team"
+    email: "data@example.com"
+    members:
+      - email: "data1@example.com"
+    preferences:
+      theme: "dark"

@@ -1,0 +1,91 @@
+# Grafana Folders Configuration - Shared across environments
+# 
+# Each folder can be assigned to a specific organization using the 'org' field.
+# If no org is specified, the folder is created in the default organization.
+#
+# Organizations available:
+#   - Main Organization (default)
+#   - Public (read-only for all users)
+#   - Platform Team
+#   - Application Team
+#   - Business Intelligence
+
+folders:
+  # =====================================================
+  # MAIN ORGANIZATION - Default dashboards
+  # =====================================================
+  - name: "Infrastructure"
+    uid: "infrastructure"
+    org: "Main Organization"
+    
+  - name: "Applications"
+    uid: "applications"
+    org: "Main Organization"
+    
+  - name: "Business"
+    uid: "business"
+    org: "Main Organization"
+    
+  - name: "SLOs"
+    uid: "slos"
+    org: "Main Organization"
+    
+  - name: "Alerts"
+    uid: "alerts"
+    org: "Main Organization"
+
+  # =====================================================
+  # PUBLIC ORGANIZATION - Shared dashboards (read-only)
+  # =====================================================
+  - name: "Company Overview"
+    uid: "public-overview"
+    org: "Public"
+    
+  - name: "System Status"
+    uid: "public-status"
+    org: "Public"
+
+  # =====================================================
+  # PLATFORM TEAM - Infrastructure & platform dashboards
+  # =====================================================
+  - name: "Kubernetes"
+    uid: "platform-kubernetes"
+    org: "Platform Team"
+    
+  - name: "Infrastructure"
+    uid: "platform-infrastructure"
+    org: "Platform Team"
+    
+  - name: "CI/CD Pipelines"
+    uid: "platform-cicd"
+    org: "Platform Team"
+
+  # =====================================================
+  # APPLICATION TEAM - Application-specific dashboards
+  # =====================================================
+  - name: "API Services"
+    uid: "app-api"
+    org: "Application Team"
+    
+  - name: "Frontend"
+    uid: "app-frontend"
+    org: "Application Team"
+    
+  - name: "Backend Services"
+    uid: "app-backend"
+    org: "Application Team"
+
+  # =====================================================
+  # BUSINESS INTELLIGENCE - Business metrics & KPIs
+  # =====================================================
+  - name: "Revenue Metrics"
+    uid: "bi-revenue"
+    org: "Business Intelligence"
+    
+  - name: "Customer Analytics"
+    uid: "bi-customers"
+    org: "Business Intelligence"
+    
+  - name: "Operational KPIs"
+    uid: "bi-kpis"
+    org: "Business Intelligence"

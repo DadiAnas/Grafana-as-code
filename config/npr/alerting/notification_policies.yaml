@@ -1,0 +1,67 @@
+# Grafana Notification Policies Configuration - NPR Environment
+# These override or extend shared notification policies for NPR
+
+notification_policies:
+  # Main Organization Policy
+  - org: "Main Organization"
+    contact_point: "email-npr"
+    group_by:
+      - "alertname"
+      - "team"
+    group_wait: "30s"
+    group_interval: "5m"
+    repeat_interval: "4h"
+    routes:
+      # Critical severity goes to webhook
+      - match:
+          severity: "critical"
+        contact_point: "webhook-npr"
+        group_wait: "10s"
+        group_interval: "1m"
+        repeat_interval: "1h"
+        continue: true
+      # Platform team alerts
+      - match:
+          team: "platform"
+        contact_point: "email-npr"
+        group_wait: "30s"
+        group_interval: "5m"
+        repeat_interval: "2h"
+      # Backend team alerts
+      - match:
+          team: "backend"
+        contact_point: "email-npr"
+        group_wait: "30s"
+        group_interval: "5m"
+
+  # Platform Team Organization Policy
+  - org: "Platform Team"
+    contact_point: "platform-email-npr"
+    group_by:
+      - "alertname"
+      - "namespace"
+    group_wait: "30s"
+    group_interval: "5m"
+    repeat_interval: "4h"
+    routes:
+      - match:
+          severity: "critical"
+        contact_point: "platform-webhook-npr"
+        group_wait: "10s"
+        continue: true
+
+  # Application Team Organization Policy
+  - org: "Application Team"
+    contact_point: "app-email-npr"
+    group_by:
+      - "alertname"
+      - "service"
+    group_wait: "30s"
+    group_interval: "5m"
+    repeat_interval: "4h"
+    routes:
+      - match:
+          severity: "critical"
+        contact_point: "app-webhook-npr"
+        group_wait: "10s"
+        continue: true

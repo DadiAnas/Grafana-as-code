@@ -1,0 +1,38 @@
+# =============================================================================
+# KEYCLOAK CLIENT CONFIGURATION (NPR)
+# Environment-specific overrides for NPR
+# =============================================================================
+
+keycloak:
+  # Enable Keycloak management for this environment
+  # Set to true when you want Terraform to manage the Keycloak client
+  enabled: false
+  
+  # NPR-specific Grafana URL
+  root_url: "http://localhost:3000"
+  base_url: "http://localhost:3000"
+  admin_url: ""
+  
+  # Redirect URIs for NPR (allow multiple for flexibility)
+  valid_redirect_uris:
+    - "http://localhost:3000/*"
+
+  
+  # Post logout redirect URIs
+  valid_post_logout_redirect_uris:
+    - "http://localhost:3000/*"
+
+  # CORS origins
+  web_origins:
+    - "http://localhost:3000"
+    - "+"
+  
+  # Groups to create in Keycloak (only used when keycloak.enabled = true)
+  # The actual org role mappings are in sso.yaml - these just create the groups in Keycloak
+  groups:
+    - name: "grafana-admins"
+    - name: "grafana-platform-team"
+    - name: "grafana-app-team"
+    - name: "grafana-bi-team"
+    - name: "grafana-developers"
+    - name: "grafana-viewers"

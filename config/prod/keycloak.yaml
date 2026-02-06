@@ -1,0 +1,23 @@
+# =============================================================================
+# KEYCLOAK CLIENT CONFIGURATION (PROD)
+# Environment-specific overrides for Production
+# =============================================================================
+
+keycloak:
+  # Enable Keycloak management for this environment
+  # CAUTION: Enable only if you want Terraform to manage production Keycloak
+  enabled: false
+  
+  # Production Grafana URL
+  root_url: "https://grafana.example.com"
+  
+  # Strict redirect URIs for Production
+  valid_redirect_uris:
+    - "https://grafana.example.com/login/generic_oauth"
+  
+  # CORS origins - production only
+  web_origins:
+    - "https://grafana.example.com"
+  
+  # Shorter token lifespan for security
+  access_token_lifespan: 180

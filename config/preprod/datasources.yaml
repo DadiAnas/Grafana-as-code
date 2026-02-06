@@ -1,0 +1,103 @@
+# Grafana Datasources Configuration - PREPROD Environment
+# These override or extend shared datasources for PREPROD
+# Set use_vault: true to fetch credentials from HashiCorp Vault
+
+datasources:
+  # Main Organization Datasources (default org)
+  - name: "Prometheus"
+    type: "prometheus"
+    uid: "prometheus"
+    url: "http://prometheus-preprod.example.com:9090"
+    org: "Main Organization"
+    is_default: true
+    access_mode: "proxy"
+    basic_auth_enabled: false
+    json_data:
+      httpMethod: "POST"
+      timeInterval: "15s"
+
+  - name: "Loki"
+    type: "loki"
+    uid: "loki"
+    url: "http://loki-preprod.example.com:3100"
+    org: "Main Organization"
+    is_default: false
+    access_mode: "proxy"
+    json_data:
+      maxLines: 1000
+
+  - name: "InfluxDB"
+    type: "influxdb"
+    uid: "influxdb"
+    url: "http://influxdb-preprod.example.com:8086"
+    org: "Main Organization"
+    is_default: false
+    access_mode: "proxy"
+    use_vault: true
+    json_data:
+      version: "Flux"
+      organization: "my-org"
+      defaultBucket: "my-bucket"
+
+  - name: "PostgreSQL"
+    type: "postgres"
+    uid: "postgres"
+    url: "postgres-preprod.example.com:5432"
+    org: "Main Organization"
+    is_default: false
+    use_vault: true
+    json_data:
+      database: "grafana_preprod"
+      sslmode: "disable"
+      maxOpenConns: 50
+      maxIdleConns: 50
+      connMaxLifetime: 14400
+
+  - name: "Elasticsearch"
+    type: "elasticsearch"
+    uid: "elasticsearch"
+    url: "http://elasticsearch-preprod.example.com:9200"
+    org: "Main Organization"
+    is_default: false
+    access_mode: "proxy"
+    json_data:
+      esVersion: "8.0.0"
+      timeField: "@timestamp"
+      logMessageField: "message"
+      logLevelField: "level"
+
+  - name: "Tempo"
+    type: "tempo"
+    uid: "tempo"
+    url: "http://tempo-preprod.example.com:3200"
+    org: "Main Organization"
+    is_default: false
+    access_mode: "proxy"
+    json_data:
+      tracesToLogsV2:
+        datasourceUid: "loki"
+        spanStartTimeShift: "-1h"
+        spanEndTimeShift: "1h"
+        filterByTraceID: true
+        filterBySpanID: true
+      tracesToMetrics:
+        datasourceUid: "prometheus"
+        spanStartTimeShift: "-1h"
+        spanEndTimeShift: "1h"
+      serviceMap:
+        datasourceUid: "prometheus"
+      nodeGraph:
+        enabled: true
+
+  # PREPROD-specific: Debug datasource (only in PREPROD)
+  - name: "Debug-Prometheus"
+    type: "prometheus"
+    uid: "debug-prometheus"
+    url: "http://prometheus-debug-preprod.example.com:9090"
+    org: "Platform Team"
+    is_default: false
+    access_mode: "proxy"
+    json_data:
+      httpMethod: "POST"
+      timeInterval: "5s"
+

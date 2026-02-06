@@ -1,0 +1,65 @@
+# Grafana Contact Points Configuration - PREPROD Environment
+# These override or extend shared contact points for PREPROD
+# Only webhook and email channels are supported
+
+contact_points:
+  # Main Organization Contact Points
+  - name: "email-preprod"
+    org: "Main Organization"
+    type: "email"
+    settings:
+      addresses: "oncall-preprod@example.com,platform-preprod@example.com"
+      singleEmail: true
+      subject: "[PREPROD] [{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}"
+      message: |
+        Environment: PREPROD
+        {{ range .Alerts }}
+        Alert: {{ .Labels.alertname }}
+        Status: {{ .Status }}
+        Severity: {{ .Labels.severity }}
+        Summary: {{ .Annotations.summary }}
+        Description: {{ .Annotations.description }}
+        {{ if .Annotations.runbook_url }}Runbook: {{ .Annotations.runbook_url }}{{ end }}
+        {{ end }}
+
+  - name: "webhook-preprod"
+    org: "Main Organization"
+    type: "webhook"
+    use_vault: true
+    settings:
+      url: "https://api.preprod.example.com/alerts"
+      httpMethod: "POST"
+      authorization_scheme: "Bearer"
+      # authorization_credentials fetched from Vault
+
+  # Platform Team Organization Contact Points
+  - name: "platform-email-preprod"
+    org: "Platform Team"
+    type: "email"
+    settings:
+      addresses: "platform-team-preprod@example.com"
+      singleEmail: true
+      subject: "[PREPROD-Platform] [{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}"
+
+  - name: "platform-webhook-preprod"
+    org: "Platform Team"
+    type: "webhook"
+    settings:
+      url: "https://hooks.platform.example.com/preprod/alerts"
+      httpMethod: "POST"
+
+  # Application Team Organization Contact Points
+  - name: "app-email-preprod"
+    org: "Application Team"
+    type: "email"
+    settings:
+      addresses: "app-team-preprod@example.com"
+      singleEmail: true
+      subject: "[PREPROD-App] [{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}"
+
+  - name: "app-webhook-preprod"
+    org: "Application Team"
+    type: "webhook"
+    settings:
+      url: "https://hooks.app.example.com/preprod/alerts"
+      httpMethod: "POST"

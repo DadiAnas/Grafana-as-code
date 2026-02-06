@@ -1,0 +1,13 @@
+# PreProd Environment Teams
+# These override or extend shared teams for PreProd
+
+teams:
+  # PreProd-specific: Performance Team
+  - name: "Performance Team"
+    org: "Main Organization"
+    email: "perf-team@example.com"
+    members:
+      - email: "perf-lead@example.com"
+        role: "Admin"
+      - email: "perf-engineer@example.com"
+        role: "Member"

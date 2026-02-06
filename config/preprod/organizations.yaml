@@ -1,0 +1,6 @@
+# PreProd Environment Organizations
+# These override or extend shared organizations for PreProd
+
+organizations:
+  # PreProd typically mirrors prod structure
+  # Add any preprod-specific orgs here

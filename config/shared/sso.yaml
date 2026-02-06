@@ -1,0 +1,41 @@
+# Shared SSO Configuration
+# Environment-specific configs can override these values
+
+sso:
+  enabled: true
+  name: "Keycloak"
+  
+  # OAuth2 endpoints (will be overridden per environment)
+  auth_url: "https://keycloak.example.com/realms/grafana/protocol/openid-connect/auth"
+  token_url: "https://keycloak.example.com/realms/grafana/protocol/openid-connect/token"
+  api_url: "https://keycloak.example.com/realms/grafana/protocol/openid-connect/userinfo"
+  
+  # Client configuration (client_secret from Vault)
+  client_id: "grafana"
+  
+  # OAuth settings
+  allow_sign_up: true
+  auto_login: false
+  scopes: "openid profile email groups"
+  use_pkce: true
+  use_refresh_token: true
+  
+  # Role mapping - disabled, using org_mapping for per-org role control
+  # role_attribute_path is not set, roles come from org_mapping
+  role_attribute_strict: false
+  
+  # Organization mapping
+  org_attribute_path: "org"
+  org_mapping: |
+    Main Organization:1
+    Platform Team:*
+    Application Team:*
+    Business Intelligence:*
+    Public:*
+  
+  # Team sync
+  teams_url: "https://keycloak.example.com/realms/grafana/protocol/openid-connect/userinfo"
+  team_ids_attribute_path: "groups[*]"
+  
+  # Sign out redirect
+  signout_redirect_url: "https://keycloak.example.com/realms/grafana/protocol/openid-connect/logout"
