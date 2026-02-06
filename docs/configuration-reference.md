@@ -297,54 +297,115 @@ service_accounts:
 - Shared: `config/shared/alerting/alert_rules.yaml`
 - Environment: `config/{env}/alerting/alert_rules.yaml`
 
-Defines alert rules with full parameter support. Environment-specific rules override shared ones with the same `name`.
+Uses **Grafana's native YAML export format** with `org` name instead of `orgId`. This makes it easy to:
+- Export alerts from Grafana UI and use directly
+- Copy/paste between environments
+- Use familiar Grafana format
 
-### All Parameters
+### Format Overview
 
 ```yaml
-alert_rules:
-  - name: "Alert Name"              # Required: Display name
-    folder: "folder-uid"            # Required: Parent folder UID
-    org: "Organization Name"        # Required: Parent organization
-    rule_group: "Group Name"        # Required: Rule group name
-    condition: "C"                  # Required: Condition reference (ref_id)
-    for: "5m"                       # Optional: Pending duration before firing
-    interval_seconds: 60            # Optional: Evaluation interval (default: 60)
-    
-    # State handling parameters
-    no_data_state: "NoData"         # Optional: NoData, OK, Alerting, KeepLast
-    exec_err_state: "Error"         # Optional: Error, OK, Alerting, KeepLast
-    is_paused: false                # Optional: Pause alert evaluation
-    disable_provenance: false       # Optional: Allow UI modification
-    
-    # Annotations and labels
-    annotations:                    # Optional: Alert annotations
-      summary: "Alert summary"
-      description: "Detailed description"
-      runbook_url: "https://..."
-    labels:                         # Optional: Alert labels
-      severity: "critical"
-      team: "platform"
-    
-    # Notification override (optional)
-    notification_settings:
-      contact_point: "critical-alerts"
-      group_by: ["alertname", "severity"]
-      group_wait: "30s"
-      group_interval: "5m"
-      repeat_interval: "4h"
-      mute_timings: ["maintenance-window"]
-    
-    # Query data
-    data:                           # Required: Query definitions
-      - ref_id: "A"
-        datasource_uid: "prometheus"
-        relative_time_range:        # Optional: Time range override
-          from: 600                 # Seconds from now (600 = 10 min ago)
-          to: 0
-        model:
-          expr: "up == 0"
+apiVersion: 1
+
+groups:
+  - org: "Organization Name"    # Use org name instead of orgId
+    name: GroupName             # Rule group name
+    folder: folder-uid          # Parent folder UID
+    interval: 1m                # Evaluation interval
+    rules:
+      - uid: unique-rule-id     # Optional: Rule UID
+        title: Alert Title      # Display name
+        condition: C            # Condition reference
+        for: 5m                 # Pending duration
+        noDataState: NoData     # NoData, OK, Alerting, KeepLast
+        execErrState: Error     # Error, OK, Alerting, KeepLast
+        isPaused: false         # Pause evaluation
+        annotations:
+          summary: "..."
+          description: "..."
+        labels:
+          severity: critical
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            relativeTimeRange:
+              from: 600
+              to: 0
+            model:
+              expr: "your_query_here"
 ```
+
+### Complete Example
+
+```yaml
+apiVersion: 1
+
+groups:
+  - org: "Platform Team"
+    name: Infrastructure
+    folder: platform-alerts
+    interval: 1m
+    rules:
+      - uid: high-cpu-usage
+        title: High CPU Usage
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: B
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              reducer: mean
+              type: reduce
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 80
+                    type: gt
+              expression: B
+              intervalMs: 1000
+              maxDataPoints: 43200
+              type: threshold
+        noDataState: OK
+        execErrState: Alerting
+        for: 5m
+        annotations:
+          summary: High CPU usage detected
+          description: CPU usage is above 80% for more than 5 minutes
+          runbook_url: https://wiki.example.com/runbooks/high-cpu
+        labels:
+          severity: warning
+          team: platform
+        isPaused: false
+```
+
+### Exporting from Grafana
+
+1. Go to **Alerting > Alert rules** in Grafana
+2. Click the export button (download icon)
+3. Select **YAML** format
+4. Replace `orgId: 1` with `org: "Your Org Name"`
+5. Save to your config file
+
 
 ### State Handling Options
 

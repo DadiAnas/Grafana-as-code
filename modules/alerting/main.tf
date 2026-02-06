@@ -382,22 +382,45 @@ resource "grafana_contact_point" "contact_points" {
 
 # =============================================================================
 # ALERT RULE GROUPS
-# Full support for all alert rule parameters
+# Supports Grafana's native export format with org name instead of orgId
 # =============================================================================
 
 locals {
-  # Group alerts by folder, rule_group for unique keys
-  rule_groups = {
-    for rule in var.alert_rules.alert_rules :
-    "${rule.folder}-${rule.rule_group}" => rule...
-  }
+  # Support both new format (groups) and legacy format (alert_rules)
+  alert_groups = try(var.alert_rules.groups, [])
 
-  # Create a map to get org and interval from first rule in each group
-  rule_group_meta = {
-    for key, rules in local.rule_groups :
-    key => {
-      org              = try(rules[0].org, null)
-      interval_seconds = try(rules[0].interval_seconds, 60)
+  # Convert groups to rule_groups map
+  # Key: "folder-groupname", Value: list of rules with org metadata
+  rule_groups = {
+    for group in local.alert_groups :
+    "${group.folder}-${group.name}" => {
+      org              = try(group.org, null)
+      folder           = group.folder
+      name             = group.name
+      interval_seconds = try(tonumber(trimsuffix(group.interval, "m")) * 60, try(tonumber(trimsuffix(group.interval, "s")), 60))
+      rules = [
+        for rule in try(group.rules, []) : {
+          name                  = try(rule.title, rule.name)
+          uid                   = try(rule.uid, null)
+          condition             = rule.condition
+          for                   = try(rule.for, "5m")
+          annotations           = try(rule.annotations, {})
+          labels                = try(rule.labels, {})
+          no_data_state         = try(rule.noDataState, try(rule.no_data_state, "NoData"))
+          exec_err_state        = try(rule.execErrState, try(rule.exec_err_state, "Error"))
+          is_paused             = try(rule.isPaused, try(rule.is_paused, false))
+          notification_settings = try(rule.notification_settings, try(rule.notificationSettings, null))
+          data = [
+            for d in rule.data : {
+              ref_id              = try(d.refId, d.ref_id)
+              datasource_uid      = try(d.datasourceUid, d.datasource_uid)
+              query_type          = try(d.queryType, try(d.query_type, null))
+              model               = d.model
+              relative_time_range = try(d.relativeTimeRange, try(d.relative_time_range, { from = 600, to = 0 }))
+            }
+          ]
+        }
+      ]
     }
   }
 }
@@ -405,29 +428,29 @@ locals {
 resource "grafana_rule_group" "rule_groups" {
   for_each = local.rule_groups
 
-  name               = split("-", each.key)[1]
-  folder_uid         = split("-", each.key)[0]
-  interval_seconds   = local.rule_group_meta[each.key].interval_seconds
-  org_id             = try(var.org_ids[local.rule_group_meta[each.key].org], null)
-  disable_provenance = try(each.value[0].disable_provenance, false)
+  name               = each.value.name
+  folder_uid         = each.value.folder
+  interval_seconds   = each.value.interval_seconds
+  org_id             = try(var.org_ids[each.value.org], null)
+  disable_provenance = false
 
   dynamic "rule" {
-    for_each = each.value
+    for_each = each.value.rules
     content {
       name        = rule.value.name
-      for         = try(rule.value.for, "5m")
+      for         = rule.value.for
       condition   = rule.value.condition
-      annotations = try(rule.value.annotations, {})
-      labels      = try(rule.value.labels, {})
+      annotations = rule.value.annotations
+      labels      = rule.value.labels
 
       # Alert state configurations
-      no_data_state  = try(rule.value.no_data_state, "NoData")
-      exec_err_state = try(rule.value.exec_err_state, "Error")
-      is_paused      = try(rule.value.is_paused, false)
+      no_data_state  = rule.value.no_data_state
+      exec_err_state = rule.value.exec_err_state
+      is_paused      = rule.value.is_paused
 
       # Notification settings
       dynamic "notification_settings" {
-        for_each = try(rule.value.notification_settings, null) != null ? [rule.value.notification_settings] : []
+        for_each = rule.value.notification_settings != null ? [rule.value.notification_settings] : []
         content {
           contact_point   = notification_settings.value.contact_point
           group_by        = try(notification_settings.value.group_by, null)
@@ -444,21 +467,19 @@ resource "grafana_rule_group" "rule_groups" {
         content {
           ref_id         = data.value.ref_id
           datasource_uid = data.value.datasource_uid
-          query_type     = try(data.value.query_type, null)
+          query_type     = data.value.query_type
           model          = jsonencode(data.value.model)
 
-          dynamic "relative_time_range" {
-            for_each = try(data.value.relative_time_range, null) != null ? [data.value.relative_time_range] : [{ from = 600, to = 0 }]
-            content {
-              from = relative_time_range.value.from
-              to   = relative_time_range.value.to
-            }
+          relative_time_range {
+            from = data.value.relative_time_range.from
+            to   = data.value.relative_time_range.to
           }
         }
       }
     }
   }
 }
+
 
 # =============================================================================
 # NOTIFICATION POLICIES

@@ -1,153 +1,180 @@
 # =============================================================================
-# SHARED ALERT RULES CONFIGURATION
+# SHARED ALERT RULES CONFIGURATION (Grafana Export Format)
 # =============================================================================
-# These alert rules are deployed to ALL environments
-# Environment-specific rules in config/{env}/alerting/alert_rules.yaml will override these
+# Uses Grafana's native export format with org name instead of orgId
+# This format is compatible with Grafana's YAML export feature
+# Simply export from Grafana UI and replace orgId with org name
 #
-# AVAILABLE PARAMETERS:
-# - name: (required) Display name for the alert rule
-# - folder: (required) Folder UID where the rule resides
-# - org: (required) Organization name
-# - rule_group: (required) Name of the rule group
-# - condition: (required) Ref ID of the query to use as alert condition
-# - for: Duration before alert fires (e.g., "5m", "1h")
-# - interval_seconds: Evaluation interval for the rule group (default: 60)
-# - annotations: Key-value pairs for alert annotations
-# - labels: Key-value pairs for alert labels
-# - no_data_state: State when query returns no data ["NoData", "OK", "Alerting", "KeepLast"]
-# - exec_err_state: State on query error ["Error", "OK", "Alerting", "KeepLast"]
-# - is_paused: Whether the alert is paused (true/false)
-# - disable_provenance: Allow modification from Grafana UI
-# - notification_settings: Override notification routing
-#   - contact_point: Contact point to use
-#   - group_by: Labels to group by
-#   - group_wait: Wait before first notification
-#   - group_interval: Interval between grouped notifications
-#   - repeat_interval: Interval before repeating
-#   - mute_timings: List of mute timing names to apply
-# - data: List of queries/expressions
-#   - ref_id: Reference ID for the query
-#   - datasource_uid: UID of the datasource (use "__expr__" for expressions)
-#   - query_type: Type of query
-#   - model: Query model as object
-#   - relative_time_range: Optional time range override
-#     - from: Seconds from now (negative = past)
-#     - to: Seconds from now
+# Environment-specific rules in config/{env}/alerting/alert_rules.yaml 
+# will be merged with these shared rules
 # =============================================================================
 
-alert_rules:
-  # Platform Team Organization Alerts
-  - name: "Kubernetes Node Not Ready"
-    folder: "platform-kubernetes"
-    org: "Platform Team"
-    rule_group: "Kubernetes"
-    condition: "C"
-    for: "5m"
-    interval_seconds: 60
-    no_data_state: "NoData"
-    exec_err_state: "Alerting"
-    is_paused: false
-    annotations:
-      summary: "Kubernetes node not ready"
-      description: "Node {{ $labels.node }} is not ready"
-      runbook_url: "https://wiki.example.com/runbooks/k8s-node-not-ready"
-    labels:
-      severity: "critical"
-      team: "platform"
-    data:
-      - ref_id: "A"
-        datasource_uid: "platform-prometheus"
-        relative_time_range:
-          from: 600
-          to: 0
-        model:
-          expr: "kube_node_status_condition{condition=\"Ready\",status=\"true\"} == 0"
-      - ref_id: "B"
-        datasource_uid: "__expr__"
-        model:
-          type: "reduce"
-          expression: "A"
-          reducer: "last"
-      - ref_id: "C"
-        datasource_uid: "__expr__"
-        model:
-          type: "threshold"
-          expression: "B"
-          conditions:
-            - evaluator:
-                type: "gt"
-                params: [0]
+apiVersion: 1
 
-  - name: "High Pod Restart Count"
-    folder: "platform-kubernetes"
-    org: "Platform Team"
-    rule_group: "Kubernetes"
-    condition: "C"
-    for: "10m"
-    no_data_state: "OK"
-    exec_err_state: "Error"
-    annotations:
-      summary: "Pod restarting frequently"
-      description: "Pod {{ $labels.pod }} has restarted more than 5 times in 1 hour"
-    labels:
-      severity: "warning"
-      team: "platform"
-    data:
-      - ref_id: "A"
-        datasource_uid: "platform-prometheus"
-        model:
-          expr: "increase(kube_pod_container_status_restarts_total[1h]) > 5"
-      - ref_id: "B"
-        datasource_uid: "__expr__"
-        model:
-          type: "reduce"
-          expression: "A"
-          reducer: "last"
-      - ref_id: "C"
-        datasource_uid: "__expr__"
-        model:
-          type: "threshold"
-          expression: "B"
-          conditions:
-            - evaluator:
-                type: "gt"
-                params: [0]
+groups:
+  # =========================================================================
+  # PLATFORM TEAM - Infrastructure Alerts
+  # =========================================================================
+  - org: "Platform Team"
+    name: Kubernetes
+    folder: platform-kubernetes
+    interval: 1m
+    rules:
+      - uid: platform-k8s-node-not-ready
+        title: Kubernetes Node Not Ready
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: platform-prometheus
+            model:
+              expr: kube_node_status_condition{condition="Ready",status="true"} == 0
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: B
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              reducer: last
+              type: reduce
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                    type: gt
+              expression: B
+              intervalMs: 1000
+              maxDataPoints: 43200
+              type: threshold
+        noDataState: NoData
+        execErrState: Alerting
+        for: 5m
+        annotations:
+          summary: Kubernetes node not ready
+          description: Node {{ $labels.node }} is not ready
+          runbook_url: https://wiki.example.com/runbooks/k8s-node-not-ready
+        labels:
+          severity: critical
+          team: platform
+        isPaused: false
 
-  # Application Team Organization Alerts
-  - name: "API Response Time High"
-    folder: "app-api"
-    org: "Application Team"
-    rule_group: "API"
-    condition: "C"
-    for: "5m"
-    # Example: Override notification settings for this rule
-    # notification_settings:
-    #   contact_point: "app-critical-alerts"
-    #   group_by: ["alertname", "service"]
-    #   mute_timings: ["maintenance-window"]
-    annotations:
-      summary: "API response time is high"
-      description: "P95 response time is above 500ms"
-    labels:
-      severity: "warning"
-      team: "application"
-    data:
-      - ref_id: "A"
-        datasource_uid: "app-prometheus"
-        model:
-          expr: "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))"
-      - ref_id: "B"
-        datasource_uid: "__expr__"
-        model:
-          type: "reduce"
-          expression: "A"
-          reducer: "mean"
-      - ref_id: "C"
-        datasource_uid: "__expr__"
-        model:
-          type: "threshold"
-          expression: "B"
-          conditions:
-            - evaluator:
-                type: "gt"
-                params: [0.5]
+      - uid: platform-k8s-pod-restart
+        title: High Pod Restart Count
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: platform-prometheus
+            model:
+              expr: increase(kube_pod_container_status_restarts_total[1h]) > 5
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: B
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              reducer: last
+              type: reduce
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                    type: gt
+              expression: B
+              intervalMs: 1000
+              maxDataPoints: 43200
+              type: threshold
+        noDataState: OK
+        execErrState: Error
+        for: 10m
+        annotations:
+          summary: Pod restarting frequently
+          description: Pod {{ $labels.pod }} has restarted more than 5 times in 1 hour
+        labels:
+          severity: warning
+          team: platform
+        isPaused: false
+
+  # =========================================================================
+  # APPLICATION TEAM - API Alerts
+  # =========================================================================
+  - org: "Application Team"
+    name: API
+    folder: app-api
+    interval: 1m
+    rules:
+      - uid: app-api-response-time
+        title: API Response Time High
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: app-prometheus
+            model:
+              expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: B
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              reducer: mean
+              type: reduce
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0.5
+                    type: gt
+              expression: B
+              intervalMs: 1000
+              maxDataPoints: 43200
+              type: threshold
+        noDataState: NoData
+        execErrState: Error
+        for: 5m
+        annotations:
+          summary: API response time is high
+          description: P95 response time is above 500ms
+        labels:
+          severity: warning
+          team: application
+        isPaused: false
