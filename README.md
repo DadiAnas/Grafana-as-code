@@ -3,8 +3,11 @@
 [![Terraform](https://img.shields.io/badge/Terraform-%3E%3D1.0.0-623CE4?logo=terraform)](https://terraform.io)
 [![Grafana](https://img.shields.io/badge/Grafana-Provider%204.25.0-F46800?logo=grafana)](https://registry.terraform.io/providers/grafana/grafana)
 [![Vault](https://img.shields.io/badge/Vault-Integrated-FFD814?logo=vault)](https://www.vaultproject.io/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 Manage Grafana infrastructure as code using Terraform. This project provides a complete framework for managing multiple Grafana environments with multi-organization support, Keycloak SSO integration, and HashiCorp Vault for secrets management.
+
+![Architecture Overview](docs/images/architecture.png)
 
 ## 🎯 Features
 
@@ -107,6 +110,8 @@ grafana-as-code/
 
 All resources support a **shared + environment-specific** pattern:
 
+![Configuration Merge Pattern](docs/images/merge-workflow.png)
+
 | Resource | Shared Location | Env Location | Merge Key |
 |----------|----------------|--------------|-----------|
 | Datasources | `config/shared/datasources.yaml` | `config/{env}/datasources.yaml` | `uid` |
@@ -138,6 +143,8 @@ All resources support a **shared + environment-specific** pattern:
 | **npr** | Non-Production/Development | `http://localhost:3000` | Low |
 | **preprod** | Pre-Production/Staging | `https://grafana-preprod.example.com` | Medium |
 | **prod** | Production | `https://grafana.example.com` | High |
+
+![Multi-Environment Deployment](docs/images/environments.png)
 
 ## 📋 Prerequisites
 
