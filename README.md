@@ -3,6 +3,7 @@
 [![Terraform](https://img.shields.io/badge/Terraform-%3E%3D1.0.0-623CE4?logo=terraform)](https://terraform.io)
 [![Grafana](https://img.shields.io/badge/Grafana-Provider%204.25.0-F46800?logo=grafana)](https://registry.terraform.io/providers/grafana/grafana)
 [![Vault](https://img.shields.io/badge/Vault-Integrated-FFD814?logo=vault)](https://www.vaultproject.io/)
+[![GitLab CI](https://img.shields.io/badge/GitLab%20CI-Enabled-FC6D26?logo=gitlab)](https://gitlab.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 Manage Grafana infrastructure as code using Terraform. This project provides a complete framework for managing multiple Grafana environments with multi-organization support, Keycloak SSO integration, and HashiCorp Vault for secrets management.
@@ -22,6 +23,8 @@ Manage Grafana infrastructure as code using Terraform. This project provides a c
   - Complete alert rule parameters (no_data_state, exec_err_state, is_paused, notification_settings)
   - Mute timings configuration
 - **Dynamic Datasources**: Full parameter support for all datasource types with type-specific json_data
+- **GitLab CI/CD**: Complete pipeline with validation, security scanning, multi-environment deployments, and drift detection
+
 
 ## 📁 Project Structure
 
@@ -294,6 +297,59 @@ contact_points:
 | Datasources | `config/{env}/` | Different URLs/credentials per environment |
 | Alert Rules | `config/{env}/alerting/` | Different thresholds per environment |
 | Contact Points | `config/{env}/alerting/` | Different recipients per environment |
+
+## 🔄 GitLab CI/CD Pipeline
+
+This project includes a complete GitLab CI/CD pipeline (`.gitlab-ci.yml`) for automated deployments.
+
+### Pipeline Stages
+
+```
+┌─────────────┐    ┌──────────────┐    ┌────────┐    ┌─────────┐    ┌──────────┐
+│  Validate   │ → │   Security   │ → │  Plan  │ → │  Apply  │ → │  Cleanup │
+└─────────────┘    └──────────────┘    └────────┘    └─────────┘    └──────────┘
+     │                   │                │              │
+     ├─ fmt:check        ├─ tfsec         ├─ plan:npr    ├─ apply:npr (auto)
+     ├─ validate         └─ checkov       ├─ plan:preprod├─ apply:preprod (manual)
+     └─ lint:yaml                         └─ plan:prod   └─ apply:prod (manual)
+```
+
+### Deployment Flow
+
+| Environment | Trigger | Approval |
+|-------------|---------|----------|
+| **NPR** | Automatic on merge to main | None |
+| **PreProd** | Manual after NPR succeeds | Click to deploy |
+| **Prod** | Manual after PreProd succeeds | Click to deploy |
+
+### Required GitLab CI/CD Variables
+
+Configure these in **Settings > CI/CD > Variables**:
+
+| Variable | Type | Description |
+|----------|------|-------------|
+| `VAULT_ADDR` | Variable | Vault server URL |
+| `VAULT_TOKEN` | Variable (masked) | Vault authentication token |
+| `GRAFANA_URL` | Variable | Grafana instance URL |
+| `GRAFANA_AUTH` | Variable (masked) | Grafana API key or service account token |
+
+### Pipeline Features
+
+- **🔍 Validation**: Terraform fmt, validate, and YAML linting
+- **🔒 Security Scanning**: tfsec and Checkov for infrastructure security
+- **📋 Plan Previews**: Terraform plans for all environments on MRs
+- **🚀 Progressive Deployment**: NPR → PreProd → Prod with manual gates
+- **⏰ Drift Detection**: Scheduled pipeline to detect configuration drift
+- **🗑️ Environment Cleanup**: Manual destroy jobs for NPR
+
+### Running Locally vs CI/CD
+
+| Command | Local (Make) | GitLab CI |
+|---------|-------------|-----------|
+| Plan | `make plan-npr` | Automatic on MR |
+| Apply | `make apply-npr` | Automatic/Manual |
+| Destroy | `make destroy-npr` | Manual job |
+
 
 ## 🔐 SSO Configuration
 
