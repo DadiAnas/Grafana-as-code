@@ -26,6 +26,9 @@ contact_points:
     org: "Main Organization"
     type: "webhook"
     use_vault: true
+    headers:
+      - name: "Content-Type"
+        value: "application/json"
     settings:
       url: "https://api.npr.example.com/alerts"
       httpMethod: "POST"

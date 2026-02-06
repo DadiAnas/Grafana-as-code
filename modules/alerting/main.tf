@@ -51,6 +51,7 @@ resource "grafana_contact_point" "contact_points" {
       max_alerts                = lookup(webhook.value, "max_alerts", null)
       message                   = lookup(webhook.value, "message", null)
       title                     = lookup(webhook.value, "title", null)
+      headers                   = { for h in lookup(each.value, "headers", []) : h.name => h.value } # map(string)
       disable_resolve_message   = lookup(webhook.value, "disable_resolve_message", false)
     }
   }
