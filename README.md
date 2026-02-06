@@ -146,6 +146,28 @@ All resources support a **shared + environment-specific** pattern:
 
 ![Multi-Environment Deployment](docs/images/environments.png)
 
+## 📸 Screenshots
+
+### Multi-Organization Support
+Manage multiple isolated organizations from a single Terraform configuration:
+
+![Organizations](docs/images/multi-org.png)
+
+### SSO Integration with Keycloak
+Single Sign-On login page with Keycloak integration:
+
+![SSO Login](docs/images/sso.png)
+
+### Datasources Management
+Configured datasources deployed via Terraform:
+
+![Datasources](docs/images/grafana.png)
+
+### Keycloak Group Mapping
+Map Keycloak groups to Grafana organizations and roles:
+
+![Keycloak Mapping](docs/images/keycloak%20multi-team%20org%20mapping.png)
+
 ## 📋 Prerequisites
 
 - **Terraform** >= 1.0.0
