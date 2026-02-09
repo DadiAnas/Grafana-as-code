@@ -1,0 +1,2 @@
+# myenv alert rules overrides (groups with same folder-name override shared)
+groups: []

@@ -1,5 +1,13 @@
-# GitLab CI/CD for Grafana as Code
-# This pipeline manages Terraform deployments across NPR, PreProd, and Prod environments
+# =============================================================================
+# GITLAB CI/CD — Grafana as Code
+# =============================================================================
+# This pipeline validates and deploys Grafana configuration via Terraform.
+# Adapt the ENVIRONMENTS list and job definitions for your setup.
+#
+# Required CI/CD Variables (set in GitLab Settings > CI/CD > Variables):
+#   VAULT_ADDR    — Vault server address
+#   VAULT_TOKEN   — Vault authentication token (masked)
+# =============================================================================
 
 stages:
   - validate
@@ -11,12 +19,11 @@ stages:
 variables:
   TF_VERSION: "1.6.0"
   TF_ROOT: ${CI_PROJECT_DIR}
-  TF_STATE_NAME: default
   # Vault configuration (set in GitLab CI/CD variables)
   # VAULT_ADDR: "https://vault.example.com"
   # VAULT_TOKEN: (masked variable)
 
-# Default settings
+# Default settings for all jobs
 default:
   image:
     name: hashicorp/terraform:${TF_VERSION}
@@ -30,7 +37,7 @@ default:
       - ${TF_ROOT}/.terraform/
 
 # =============================================================================
-# VALIDATE STAGE - Run on all branches
+# VALIDATE STAGE — Run on all branches and merge requests
 # =============================================================================
 
 fmt:check:
@@ -63,7 +70,7 @@ lint:yaml:
     - if: $CI_COMMIT_BRANCH
 
 # =============================================================================
-# SECURITY STAGE - Security scanning
+# SECURITY STAGE — Static analysis
 # =============================================================================
 
 tfsec:
@@ -86,29 +93,16 @@ tfsec:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
-checkov:
-  stage: security
-  image:
-    name: bridgecrew/checkov:latest
-    entrypoint: [""]
-  before_script: []
-  script:
-    - checkov -d . --framework terraform --output cli --output junitxml --output-file-path . || true
-  artifacts:
-    reports:
-      junit: results_junitxml.xml
-    expire_in: 1 week
-  allow_failure: true
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-
 # =============================================================================
-# PLAN STAGE - Generate Terraform plans
+# PLAN STAGE — Generate Terraform plan
+# =============================================================================
+# Duplicate or modify this job for each environment you add.
 # =============================================================================
 
-.plan_template: &plan_template
+plan:myenv:
   stage: plan
+  variables:
+    ENVIRONMENT: myenv
   script:
     - |
       echo "Initializing Terraform for ${ENVIRONMENT}..."
@@ -121,55 +115,28 @@ checkov:
         -out="${ENVIRONMENT}.tfplan" \
         -input=false
     - |
-      echo "Generating plan summary..."
+      echo "Saving plan summary..."
       terraform show -no-color "${ENVIRONMENT}.tfplan" > "${ENVIRONMENT}-plan.txt"
   artifacts:
     paths:
       - "${ENVIRONMENT}.tfplan"
       - "${ENVIRONMENT}-plan.txt"
     expire_in: 1 day
-    reports:
-      terraform: "${ENVIRONMENT}-plan.txt"
-
-plan:npr:
-  <<: *plan_template
-  variables:
-    ENVIRONMENT: npr
   environment:
-    name: npr
-    action: prepare
-  rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-
-plan:preprod:
-  <<: *plan_template
-  variables:
-    ENVIRONMENT: preprod
-  environment:
-    name: preprod
-    action: prepare
-  rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-
-plan:prod:
-  <<: *plan_template
-  variables:
-    ENVIRONMENT: prod
-  environment:
-    name: production
+    name: myenv
     action: prepare
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
 
 # =============================================================================
-# APPLY STAGE - Deploy Terraform changes
+# APPLY STAGE — Deploy Terraform changes
 # =============================================================================
 
-.apply_template: &apply_template
+apply:myenv:
   stage: apply
+  variables:
+    ENVIRONMENT: myenv
   script:
     - |
       echo "Initializing Terraform for ${ENVIRONMENT}..."
@@ -184,67 +151,29 @@ plan:prod:
     - |
       echo "Deployment Summary:"
       terraform output -json > "${ENVIRONMENT}-outputs.json"
-      cat "${ENVIRONMENT}-outputs.json" | jq '.deployment_summary.value'
   artifacts:
     paths:
       - "${ENVIRONMENT}-outputs.json"
     expire_in: 1 week
-
-apply:npr:
-  <<: *apply_template
-  variables:
-    ENVIRONMENT: npr
   environment:
-    name: npr
-    url: http://localhost:3000
-    on_stop: destroy:npr
+    name: myenv
+    # url: https://grafana.example.com
+    on_stop: destroy:myenv
   needs:
-    - job: plan:npr
+    - job: plan:myenv
       artifacts: true
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       when: on_success
 
-apply:preprod:
-  <<: *apply_template
-  variables:
-    ENVIRONMENT: preprod
-  environment:
-    name: preprod
-    url: https://grafana-preprod.example.com
-  needs:
-    - job: plan:preprod
-      artifacts: true
-    - job: apply:npr
-  rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      when: manual
-  allow_failure: false
-
-apply:prod:
-  <<: *apply_template
-  variables:
-    ENVIRONMENT: prod
-  environment:
-    name: production
-    url: https://grafana.example.com
-  needs:
-    - job: plan:prod
-      artifacts: true
-    - job: apply:preprod
-  rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      when: manual
-  allow_failure: false
-
 # =============================================================================
-# CLEANUP STAGE - Destroy environments (manual)
+# CLEANUP STAGE — Destroy environments (manual trigger only)
 # =============================================================================
 
-destroy:npr:
+destroy:myenv:
   stage: cleanup
   variables:
-    ENVIRONMENT: npr
+    ENVIRONMENT: myenv
   script:
     - |
       echo "Initializing Terraform for ${ENVIRONMENT}..."
@@ -256,7 +185,7 @@ destroy:npr:
         -var-file="environments/${ENVIRONMENT}.tfvars" \
         -auto-approve
   environment:
-    name: npr
+    name: myenv
     action: stop
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
@@ -264,62 +193,24 @@ destroy:npr:
   allow_failure: true
 
 # =============================================================================
-# SCHEDULED JOBS - Drift detection
+# SCHEDULED JOBS — Drift detection (optional)
 # =============================================================================
+# Enable this by creating a scheduled pipeline in GitLab.
 
 drift:detection:
   stage: validate
   script:
     - |
-      for ENV in npr preprod prod; do
-        echo "Checking drift for ${ENV}..."
-        terraform init -backend-config="backends/${ENV}.tfbackend" -reconfigure
-        terraform plan \
-          -var-file="environments/${ENV}.tfvars" \
-          -detailed-exitcode \
-          -input=false \
-          || if [ $? -eq 2 ]; then
-            echo "WARNING: DRIFT DETECTED in ${ENV}!"
-            exit 1
-          fi
-      done
+      echo "Checking drift for myenv..."
+      terraform init -backend-config="backends/myenv.tfbackend" -reconfigure
+      terraform plan \
+        -var-file="environments/myenv.tfvars" \
+        -detailed-exitcode \
+        -input=false \
+        || if [ $? -eq 2 ]; then
+          echo "WARNING: DRIFT DETECTED in myenv!"
+          exit 1
+        fi
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule"
   allow_failure: true
-
-# =============================================================================
-# MERGE REQUEST JOBS - Summary comment
-# =============================================================================
-
-mr:plan-summary:
-  stage: apply
-  image: alpine:latest
-  before_script:
-    - apk add --no-cache curl jq
-  script:
-    - |
-      echo "## Terraform Plan Summary" > summary.md
-      echo "" >> summary.md
-      for ENV in npr preprod prod; do
-        if [ -f "${ENV}-plan.txt" ]; then
-          echo "### ${ENV^^}" >> summary.md
-          echo '```' >> summary.md
-          grep -E "Plan:|No changes" "${ENV}-plan.txt" || echo "See full plan" >> summary.md
-          echo '```' >> summary.md
-          echo "" >> summary.md
-        fi
-      done
-      cat summary.md
-  needs:
-    - job: plan:npr
-      artifacts: true
-    - job: plan:preprod
-      artifacts: true
-    - job: plan:prod
-      artifacts: true
-  artifacts:
-    paths:
-      - summary.md
-    expire_in: 1 day
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"

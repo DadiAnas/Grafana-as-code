@@ -1,38 +1,30 @@
 # =============================================================================
-# GRAFANA TEAMS CONFIGURATION - Shared across environments
+# TEAMS — Shared across all environments
 # =============================================================================
-# Teams are organization-scoped - each team must specify which org it belongs to.
-# Teams can only be granted folder permissions within the SAME organization.
+# Teams are organization-scoped groups of users. Each team must specify
+# which organization it belongs to via the "org" field.
+#
+# Teams can be assigned folder permissions (see folders.yaml).
+# Teams can only access folders within the SAME organization.
 # =============================================================================
 
-teams:
-  - name: "Platform Team"
-    org: "Main Organization"
-    email: "platform@example.com"
-    preferences:
-      theme: "dark"
-      home_dashboard_uid: ""
-
-  - name: "Backend Team"
-    org: "Main Organization"
-    email: "backend@example.com"
-    preferences:
-      theme: "dark"
-
-  - name: "Frontend Team"
-    org: "Main Organization"
-    email: "frontend@example.com"
-    preferences:
-      theme: "light"
-
-  - name: "SRE Team"
-    org: "Main Organization"
-    email: "sre@example.com"
-    preferences:
-      theme: "dark"
-
-  - name: "Data Team"
-    org: "Main Organization"
-    email: "data@example.com"
-    preferences:
-      theme: "dark"
+teams: []
+  # --- Example: Define teams ---
+  # - name: "Backend Team"
+  #   org: "Main Organization"
+  #   email: "backend@example.com"
+  #   preferences:
+  #     theme: "dark"
+  #     # home_dashboard_uid: "my-dashboard"
+  #
+  # - name: "Frontend Team"
+  #   org: "Main Organization"
+  #   email: "frontend@example.com"
+  #   preferences:
+  #     theme: "light"
+  #
+  # - name: "SRE Team"
+  #   org: "Main Organization"
+  #   email: "sre@example.com"
+  #   preferences:
+  #     theme: "dark"

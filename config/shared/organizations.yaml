@@ -1,35 +1,29 @@
-# Grafana Organizations Configuration
+# =============================================================================
+# ORGANIZATIONS — Shared across all environments
+# =============================================================================
+# Grafana supports multi-tenancy via Organizations. Each org is an isolated
+# workspace with its own dashboards, datasources, teams, and users.
+#
+# "Main Organization" (id: 1) exists by default in every Grafana instance.
+# Add more organizations below if you need multi-tenant separation.
+# =============================================================================
 
 organizations:
+  # Default organization — always exists in Grafana (id: 1)
   - name: "Main Organization"
-    id: 1  # Default org
+    id: 1
 
-  - name: "Public"
-    # All authenticated users get Viewer role via auto_assign_org
-    admins: []
-    editors: []
-    viewers: []
-
-  - name: "Platform Team"
-    admins:
-      - "platform-admin@example.com"
-    editors:
-      - "platform-dev@example.com"
-    viewers: []
-
-  - name: "Application Team"
-    admins:
-      - "app-admin@example.com"
-    editors:
-      - "app-dev1@example.com"
-      - "app-dev2@example.com"
-    viewers:
-      - "app-viewer@example.com"
-
-  - name: "Business Intelligence"
-    admins:
-      - "bi-admin@example.com"
-    editors: []
-    viewers:
-      - "bi-viewer@example.com"
-      - "analyst@example.com"
+  # --- Example: Add more organizations ---
+  # - name: "Platform Team"
+  #   admins:
+  #     - "platform-admin@example.com"
+  #   editors:
+  #     - "platform-dev@example.com"
+  #   viewers: []
+  #
+  # - name: "Business Intelligence"
+  #   admins:
+  #     - "bi-admin@example.com"
+  #   editors: []
+  #   viewers:
+  #     - "analyst@example.com"

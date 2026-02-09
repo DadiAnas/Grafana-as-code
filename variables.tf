@@ -1,26 +1,40 @@
+# =============================================================================
+# TERRAFORM VARIABLES
+# =============================================================================
+# These variables are required for connecting to Grafana and Vault.
+# Set values in environments/<env>.tfvars or via CLI flags.
+# =============================================================================
+
 variable "grafana_url" {
-  description = "The URL of the Grafana instance"
+  description = "The URL of your Grafana instance (e.g., http://localhost:3000)"
   type        = string
 }
 
 variable "environment" {
-  description = "Environment name (npr, preprod, prod)"
+  description = "Environment name — must match a directory under config/ and dashboards/"
   type        = string
-
+  # Add your environment names here. You can add as many as you need.
   validation {
-    condition     = contains(["npr", "preprod", "prod"], var.environment)
-    error_message = "Environment must be one of: npr, preprod, prod."
+    condition     = length(var.environment) > 0
+    error_message = "Environment name must not be empty."
   }
 }
 
-# Vault configuration
+# =============================================================================
+# VAULT CONFIGURATION
+# =============================================================================
+# HashiCorp Vault is used to store sensitive credentials (Grafana auth,
+# datasource passwords, SSO secrets, etc.) instead of in plaintext.
+# See vault/ directory for setup scripts.
+# =============================================================================
+
 variable "vault_address" {
-  description = "The address of the Vault server"
+  description = "The address of the Vault server (e.g., http://localhost:8200)"
   type        = string
 }
 
 variable "vault_token" {
-  description = "Vault token for authentication (use environment variable VAULT_TOKEN in production)"
+  description = "Vault token for authentication — prefer setting via VAULT_TOKEN env var"
   type        = string
   sensitive   = true
   default     = ""
@@ -34,25 +48,26 @@ variable "vault_mount" {
 
 # =============================================================================
 # KEYCLOAK CONFIGURATION (OPTIONAL)
-# These variables are only used when keycloak.enabled = true in config
+# =============================================================================
+# Only needed if you enable Keycloak-based SSO management.
+# Set keycloak.enabled: true in config/shared/keycloak.yaml to activate.
 # Credentials are fetched from Vault at: <env>/keycloak/provider-auth
 # =============================================================================
 
 variable "keycloak_url" {
-  description = "The URL of the Keycloak server (e.g., http://localhost:8080)"
+  description = "The URL of the Keycloak server (e.g., https://keycloak.example.com)"
   type        = string
   default     = ""
 }
 
-# Fallback values - these are overridden by Vault secrets if present
 variable "keycloak_realm" {
-  description = "Default realm for provider auth (can be overridden in Vault secret)"
+  description = "Keycloak realm for provider auth (can be overridden by Vault secret)"
   type        = string
   default     = "master"
 }
 
 variable "keycloak_client_id" {
-  description = "Default client ID for provider auth (can be overridden in Vault secret)"
+  description = "Keycloak client ID for provider auth (can be overridden by Vault secret)"
   type        = string
   default     = "admin-cli"
 }

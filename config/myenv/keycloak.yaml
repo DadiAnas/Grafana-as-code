@@ -1,0 +1,9 @@
+# =============================================================================
+# KEYCLOAK — myenv environment overrides
+# =============================================================================
+# Override shared Keycloak config for this environment.
+# =============================================================================
+
+keycloak: {}
+  # --- Example: Different realm for this environment ---
+  # realm_id: "myenv-realm"

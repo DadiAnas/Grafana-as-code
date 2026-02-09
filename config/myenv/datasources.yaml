@@ -1,0 +1,28 @@
+# =============================================================================
+# DATASOURCES — myenv environment overrides
+# =============================================================================
+# Datasources here OVERRIDE shared ones with the same UID.
+# Use this for environment-specific URLs, credentials, or extra datasources.
+# =============================================================================
+
+datasources: []
+  # --- Example: Override Prometheus URL for this environment ---
+  # - name: "Prometheus"
+  #   type: "prometheus"
+  #   uid: "prometheus"
+  #   url: "http://prometheus-myenv.internal:9090"
+  #   org: "Main Organization"
+  #   is_default: true
+  #   json_data:
+  #     httpMethod: "POST"
+  #     timeInterval: "15s"
+  #
+  # --- Example: Environment-only datasource (not in shared) ---
+  # - name: "Debug-Prometheus"
+  #   type: "prometheus"
+  #   uid: "debug-prometheus"
+  #   url: "http://prometheus-debug:9090"
+  #   org: "Main Organization"
+  #   json_data:
+  #     httpMethod: "POST"
+  #     timeInterval: "5s"

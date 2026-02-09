@@ -1,0 +1,14 @@
+# =============================================================================
+# FOLDERS — myenv environment overrides
+# =============================================================================
+# Folder permission overrides for this environment.
+# Override shared ones with the same UID.
+# =============================================================================
+
+folders: []
+  # --- Example: Different permissions for this environment ---
+  # - name: "Infrastructure"
+  #   uid: "infrastructure"
+  #   permissions:
+  #     - role: "Editor"
+  #       permission: "Edit"

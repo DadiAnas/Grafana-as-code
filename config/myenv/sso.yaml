@@ -1,0 +1,10 @@
+# =============================================================================
+# SSO — myenv environment overrides
+# =============================================================================
+# Override shared SSO config for this environment (e.g., different endpoints).
+# =============================================================================
+
+sso: {}
+  # --- Example: Override auth URLs for this environment ---
+  # auth_url: "https://keycloak-myenv.example.com/realms/grafana/protocol/openid-connect/auth"
+  # token_url: "https://keycloak-myenv.example.com/realms/grafana/protocol/openid-connect/token"

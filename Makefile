@@ -1,124 +1,95 @@
-# Grafana as Code - Makefile
+# =============================================================================
+# Grafana as Code — Makefile
+# =============================================================================
+# Manage your Grafana infrastructure with Terraform.
+#
+# Quick Start:
+#   make init ENV=myenv
+#   make plan ENV=myenv
+#   make apply ENV=myenv
+# =============================================================================
+
+.PHONY: help init plan apply destroy fmt validate clean output vault-setup vault-verify
+
+# Default environment — change this or override with: make plan ENV=staging
+ENV ?= myenv
+
+TF_VAR_FILE = environments/$(ENV).tfvars
+TF_BACKEND  = backends/$(ENV).tfbackend
+
+# ============================
+# Help
 # ============================
 
-.PHONY: help init plan apply destroy fmt validate clean
-
-# Default target
 help:
-	@echo "Grafana as Code - Terraform Management"
+	@echo "Grafana as Code — Terraform Management"
 	@echo "======================================="
 	@echo ""
-	@echo "Usage: make <target> [ENV=npr|preprod|prod]"
+	@echo "Usage: make <target> [ENV=myenv]"
 	@echo ""
-	@echo "Initialization:"
-	@echo "  init              Initialize Terraform for specified environment"
-	@echo "  init-npr          Initialize for NPR environment"
-	@echo "  init-preprod      Initialize for PreProd environment"
-	@echo "  init-prod         Initialize for Production environment"
+	@echo "Targets:"
+	@echo "  init          Initialize Terraform for the specified environment"
+	@echo "  plan          Generate and show an execution plan"
+	@echo "  apply         Apply the planned changes"
+	@echo "  destroy       Destroy all managed resources (requires confirmation)"
 	@echo ""
-	@echo "Planning:"
-	@echo "  plan              Plan changes for specified environment"
-	@echo "  plan-npr          Plan for NPR environment"
-	@echo "  plan-preprod      Plan for PreProd environment"
-	@echo "  plan-prod         Plan for Production environment"
+	@echo "  fmt           Format all Terraform files"
+	@echo "  validate      Validate Terraform configuration"
+	@echo "  clean         Remove Terraform cache and plan files"
+	@echo "  output        Show Terraform outputs"
+	@echo "  state-list    List all resources in state"
 	@echo ""
-	@echo "Applying:"
-	@echo "  apply             Apply changes for specified environment"
-	@echo "  apply-npr         Apply for NPR environment"
-	@echo "  apply-preprod     Apply for PreProd environment"
-	@echo "  apply-prod        Apply for Production environment"
+	@echo "  vault-setup   Setup Vault secrets for the environment"
+	@echo "  vault-verify  Verify Vault secrets exist"
 	@echo ""
-	@echo "Destruction:"
-	@echo "  destroy           Destroy resources (requires confirmation)"
-	@echo ""
-	@echo "Utilities:"
-	@echo "  fmt               Format Terraform files"
-	@echo "  validate          Validate Terraform configuration"
-	@echo "  clean             Clean Terraform cache"
-	@echo "  output            Show Terraform outputs"
-	@echo ""
-	@echo "Vault:"
-	@echo "  vault-setup-npr   Setup Vault secrets for NPR"
-	@echo "  vault-setup-preprod Setup Vault secrets for PreProd"
-	@echo "  vault-setup-prod  Setup Vault secrets for Production"
-	@echo "  vault-verify      Verify Vault secrets exist"
+	@echo "  ci-init       Initialize (CI/CD, non-interactive)"
+	@echo "  ci-plan       Plan (CI/CD, non-interactive)"
+	@echo "  ci-apply      Apply (CI/CD, auto-approve)"
+	@echo "  ci-destroy    Destroy (CI/CD, auto-approve)"
 	@echo ""
 	@echo "Examples:"
-	@echo "  make init-npr"
-	@echo "  make plan ENV=preprod"
-	@echo "  make apply-prod"
-
-# ============================
-# Environment Variables
-# ============================
-
-ENV ?= npr
-TF_VAR_FILE = environments/$(ENV).tfvars
-TF_BACKEND = backends/$(ENV).tfbackend
+	@echo "  make init ENV=myenv"
+	@echo "  make plan ENV=myenv"
+	@echo "  make apply ENV=myenv"
+	@echo "  make vault-setup ENV=myenv"
+	@echo ""
+	@echo "Adding a new environment:"
+	@echo "  1. Create environments/<name>.tfvars"
+	@echo "  2. Create backends/<name>.tfbackend"
+	@echo "  3. Create config/<name>/ (copy from config/myenv/)"
+	@echo "  4. Create dashboards/<name>/ with org subdirectories"
+	@echo "  5. Run: make init ENV=<name>"
 
 # ============================
 # Initialization
 # ============================
 
 init:
-	@echo "Initializing Terraform for $(ENV) environment..."
+	@echo "Initializing Terraform for $(ENV)..."
 	terraform init -backend-config=$(TF_BACKEND) -reconfigure
-
-init-npr:
-	@$(MAKE) init ENV=npr
-
-init-preprod:
-	@$(MAKE) init ENV=preprod
-
-init-prod:
-	@$(MAKE) init ENV=prod
 
 # ============================
 # Planning
 # ============================
 
 plan:
-	@echo "Planning changes for $(ENV) environment..."
+	@echo "Planning changes for $(ENV)..."
 	terraform plan -var-file=$(TF_VAR_FILE) -out=tfplan-$(ENV)
-
-plan-npr:
-	@$(MAKE) plan ENV=npr
-
-plan-preprod:
-	@$(MAKE) plan ENV=preprod
-
-plan-prod:
-	@$(MAKE) plan ENV=prod
 
 # ============================
 # Applying
 # ============================
 
 apply:
-	@echo "Applying changes for $(ENV) environment..."
+	@echo "Applying changes for $(ENV)..."
 	@if [ -f tfplan-$(ENV) ]; then \
 		terraform apply tfplan-$(ENV); \
 	else \
 		terraform apply -var-file=$(TF_VAR_FILE); \
 	fi
 
-apply-npr:
-	@$(MAKE) apply ENV=npr
-
-apply-preprod:
-	@$(MAKE) apply ENV=preprod
-
-apply-prod:
-	@echo "WARNING: You are applying to PRODUCTION!"
-	@read -p "Are you sure? (yes/no): " confirm && [ "$$confirm" = "yes" ]
-	@$(MAKE) apply ENV=prod
-
-# ============================
-# Auto-approve (for CI/CD)
-# ============================
-
 apply-auto:
-	@echo "Auto-applying changes for $(ENV) environment..."
+	@echo "Auto-applying changes for $(ENV)..."
 	terraform apply -var-file=$(TF_VAR_FILE) -auto-approve
 
 # ============================
@@ -126,7 +97,7 @@ apply-auto:
 # ============================
 
 destroy:
-	@echo "WARNING: This will destroy all resources in $(ENV)!"
+	@echo "WARNING: This will DESTROY all resources in $(ENV)!"
 	@read -p "Type the environment name to confirm: " confirm && [ "$$confirm" = "$(ENV)" ]
 	terraform destroy -var-file=$(TF_VAR_FILE)
 
@@ -153,13 +124,6 @@ output:
 	@echo "Terraform outputs for $(ENV):"
 	terraform output
 
-output-summary:
-	terraform output deployment_summary
-
-# ============================
-# State Management
-# ============================
-
 state-list:
 	terraform state list
 
@@ -167,28 +131,16 @@ state-list:
 # Vault Operations
 # ============================
 
-vault-setup-npr:
-	@echo "Setting up Vault secrets for NPR..."
-	./vault/scripts/setup-npr-secrets.sh
-
-vault-setup-preprod:
-	@echo "Setting up Vault secrets for PreProd..."
-	./vault/scripts/setup-preprod-secrets.sh
-
-vault-setup-prod:
-	@echo "Setting up Vault secrets for Production..."
-	./vault/scripts/setup-prod-secrets.sh
-
-vault-setup-all:
-	@echo "Setting up Vault secrets for all environments..."
-	./vault/scripts/setup-all-secrets.sh --all
+vault-setup:
+	@echo "Setting up Vault secrets for $(ENV)..."
+	bash vault/scripts/setup-secrets.sh $(ENV)
 
 vault-verify:
 	@echo "Verifying Vault secrets for $(ENV)..."
-	./vault/scripts/verify-secrets.sh $(ENV)
+	bash vault/scripts/verify-secrets.sh $(ENV)
 
 # ============================
-# CI/CD Targets
+# CI/CD Targets (non-interactive)
 # ============================
 
 ci-init:

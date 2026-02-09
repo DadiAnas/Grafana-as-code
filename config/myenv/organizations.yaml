@@ -1,0 +1,13 @@
+# =============================================================================
+# ORGANIZATIONS — myenv environment overrides
+# =============================================================================
+# Organizations listed here OVERRIDE shared ones with the same name.
+# Useful for env-specific role assignments or extra orgs.
+# =============================================================================
+
+organizations: []
+  # --- Example: Override Main Organization with env-specific admins ---
+  # - name: "Main Organization"
+  #   id: 1
+  #   admins:
+  #     - "myenv-admin@example.com"

@@ -1,77 +1,37 @@
 # =============================================================================
-# SHARED NOTIFICATION POLICIES CONFIGURATION
+# NOTIFICATION POLICIES — Shared across all environments
 # =============================================================================
-# Uses Grafana's native export format for easy import/export
-# Supports both 'org' (name) and 'orgId' (numeric) for organization reference
-# These policies are deployed to ALL environments
-# Environment-specific policies in config/{env}/alerting/notification_policies.yaml will override these
+# Defines how alerts are routed to contact points.
+# Uses Grafana's native notification policy format.
+# Environment-specific overrides go in config/<env>/alerting/notification_policies.yaml.
 #
-# FORMAT: This follows Grafana's native YAML export format
-# To export from Grafana: Alerting > Notification policies > Export > YAML
+# Each policy is per-organization and specifies:
+#   - receiver: default contact point
+#   - group_by: labels to group alerts by
+#   - routes: child policies with label matchers
 # =============================================================================
 
-apiVersion: 1
-
-policies:
-  # ===========================================================================
-  # PLATFORM TEAM ORGANIZATION POLICY
-  # ===========================================================================
-  - org: Platform Team
-    receiver: platform-email
-    group_by:
-      - alertname
-      - severity
-    routes:
-      - receiver: platform-webhook
-        object_matchers:
-          - - severity
-            - "="
-            - critical
-        continue: true
-        group_wait: 10s
-        group_interval: 1m
-        repeat_interval: 1h
-      - receiver: platform-email
-        object_matchers:
-          - - severity
-            - "="
-            - warning
-        group_wait: 1m
-        group_interval: 5m
-        repeat_interval: 4h
-    group_wait: 30s
-    group_interval: 5m
-    repeat_interval: 4h
-
-  # ===========================================================================
-  # APPLICATION TEAM ORGANIZATION POLICY
-  # ===========================================================================
-  - org: Application Team
-    receiver: app-email
-    group_by:
-      - alertname
-      - service
-    routes:
-      - receiver: app-webhook
-        object_matchers:
-          - - severity
-            - "="
-            - critical
-        continue: true
-        group_wait: 10s
-        group_interval: 1m
-        repeat_interval: 1h
-    group_wait: 30s
-    group_interval: 5m
-    repeat_interval: 4h
-
-  # ===========================================================================
-  # BUSINESS INTELLIGENCE ORGANIZATION POLICY
-  # ===========================================================================
-  - org: Business Intelligence
-    receiver: bi-email
-    group_by:
-      - alertname
-    group_wait: 1m
-    group_interval: 10m
-    repeat_interval: 12h
+policies: []
+  # --- Example: Basic notification policy ---
+  # - org: "Main Organization"
+  #   receiver: "email-alerts"             # Default contact point name
+  #   group_by:
+  #     - "alertname"
+  #     - "namespace"
+  #   group_wait: "30s"                    # Wait before sending first notification
+  #   group_interval: "5m"                 # Interval between grouped notifications
+  #   repeat_interval: "4h"               # Resend interval for firing alerts
+  #   routes:
+  #     # Route critical alerts to PagerDuty
+  #     - receiver: "pagerduty-critical"
+  #       object_matchers:
+  #         - ["severity", "=", "critical"]
+  #       continue: false
+  #       group_wait: "10s"
+  #
+  #     # Route warnings to Slack
+  #     - receiver: "slack-notifications"
+  #       object_matchers:
+  #         - ["severity", "=", "warning"]
+  #       continue: true
+  #       group_wait: "1m"

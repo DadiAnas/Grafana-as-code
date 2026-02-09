@@ -1,140 +1,37 @@
 # =============================================================================
-# GRAFANA FOLDER PERMISSIONS
+# FOLDER PERMISSIONS — Shared across all environments
 # =============================================================================
-# Folder location (Organization) is inferred from directory structure:
+# Folders are auto-discovered from the dashboards/ directory structure:
 #   dashboards/shared/<org_name>/<folder_uid>/
+#   dashboards/<env>/<org_name>/<folder_uid>/
 #
-# This file is used ONLY for defining permissions and title overrides.
+# This file is used ONLY for:
+#   1. Setting folder display name overrides (name)
+#   2. Defining granular permissions per folder
+#
+# If a folder is not listed here, it gets default permissions (org-level).
 # =============================================================================
 
-folders:
-  # MAIN ORGANIZATION
-  - name: "Infrastructure"
-    uid: "infrastructure"
-    permissions:
-      - team: "SRE Team"
-        permission: "Admin"
-      - team: "Platform Team"
-        permission: "Edit"
-      - role: "Viewer"
-        permission: "View"
-
-  - name: "Applications"
-    uid: "applications"
-    permissions:
-      - team: "Backend Team"
-        permission: "Edit"
-      - team: "Frontend Team"
-        permission: "Edit"
-      - role: "Viewer"
-        permission: "View"
-
-  - name: "Business"
-    uid: "business"
-    permissions:
-      - team: "Data Team"
-        permission: "Edit"
-      - role: "Viewer"
-        permission: "View"
-
-  - name: "SLOs"
-    uid: "slos"
-    permissions:
-      - team: "SRE Team"
-        permission: "Admin"
-      - team: "Platform Team"
-        permission: "Edit"
-      - role: "Viewer"
-        permission: "View"
-
-  - name: "Alerts"
-    uid: "alerts"
-    permissions:
-      - team: "SRE Team"
-        permission: "Admin"
-      - team: "Platform Team"
-        permission: "Edit"
-      - role: "Viewer"
-        permission: "View"
-
-  # PUBLIC ORGANIZATION
-  - name: "Company Overview"
-    uid: "public-overview"
-
-  - name: "System Status"
-    uid: "public-status"
-
-  # PLATFORM TEAM ORG
-  - name: "Kubernetes"
-    uid: "platform-kubernetes"
-    permissions:
-      - role: "Editor"
-        permission: "Edit"
-      - role: "Viewer"
-        permission: "View"
-
-  - name: "Infrastructure"
-    uid: "platform-infrastructure"
-    permissions:
-      - role: "Editor"
-        permission: "Edit"
-      - role: "Viewer"
-        permission: "View"
-
-  - name: "CI/CD Pipelines"
-    uid: "platform-cicd"
-    permissions:
-      - role: "Editor"
-        permission: "Edit"
-      - role: "Viewer"
-        permission: "View"
-
-  # APPLICATION TEAM ORG
-  - name: "API Services"
-    uid: "app-api"
-    permissions:
-      - role: "Editor"
-        permission: "Edit"
-      - role: "Viewer"
-        permission: "View"
-
-  - name: "Frontend"
-    uid: "app-frontend"
-    permissions:
-      - role: "Editor"
-        permission: "Edit"
-      - role: "Viewer"
-        permission: "View"
-
-  - name: "Backend Services"
-    uid: "app-backend"
-    permissions:
-      - role: "Editor"
-        permission: "Edit"
-      - role: "Viewer"
-        permission: "View"
-
-  # BUSINESS INTELLIGENCE ORG
-  - name: "Revenue Metrics"
-    uid: "bi-revenue"
-    permissions:
-      - role: "Editor"
-        permission: "Edit"
-      - role: "Viewer"
-        permission: "View"
-
-  - name: "Customer Analytics"
-    uid: "bi-customers"
-    permissions:
-      - role: "Editor"
-        permission: "Edit"
-      - role: "Viewer"
-        permission: "View"
-
-  - name: "Operational KPIs"
-    uid: "bi-kpis"
-    permissions:
-      - role: "Editor"
-        permission: "Edit"
-      - role: "Viewer"
-        permission: "View"
+folders: []
+  # --- Example: Override folder name and add permissions ---
+  # - name: "Infrastructure Monitoring"    # Display name in Grafana
+  #   uid: "infrastructure"                 # Must match the directory name
+  #   permissions:
+  #     - team: "SRE Team"
+  #       permission: "Admin"              # Admin | Edit | View
+  #     - team: "Backend Team"
+  #       permission: "Edit"
+  #     - role: "Viewer"                   # Built-in role: Viewer | Editor | Admin
+  #       permission: "View"
+  #
+  # - name: "Application Dashboards"
+  #   uid: "applications"
+  #   permissions:
+  #     - role: "Editor"
+  #       permission: "Edit"
+  #     - role: "Viewer"
+  #       permission: "View"
+  #
+  # --- Example: Folder with no explicit permissions (inherits defaults) ---
+  # - name: "Public Status"
+  #   uid: "public-status"

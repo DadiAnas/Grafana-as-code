@@ -1,180 +1,66 @@
 # =============================================================================
-# SHARED ALERT RULES CONFIGURATION (Grafana Export Format)
+# ALERT RULES — Shared across all environments
 # =============================================================================
-# Uses Grafana's native export format with org name instead of orgId
-# This format is compatible with Grafana's YAML export feature
-# Simply export from Grafana UI and replace orgId with org name
+# Uses Grafana's native alert rule group format.
+# Environment-specific overrides go in config/<env>/alerting/alert_rules.yaml.
 #
-# Environment-specific rules in config/{env}/alerting/alert_rules.yaml 
-# will be merged with these shared rules
+# Each group must specify:
+#   - folder: the folder UID where alerts are stored
+#   - name: rule group name
+#   - interval: evaluation interval (e.g., "1m", "5m")
+#   - org / orgId: which organization this alert belongs to
+#   - rules: list of alert rules with queries and conditions
 # =============================================================================
 
-apiVersion: 1
-
-groups:
-  # =========================================================================
-  # PLATFORM TEAM - Infrastructure Alerts
-  # =========================================================================
-  - org: "Platform Team"
-    name: Kubernetes
-    folder: platform-kubernetes
-    interval: 1m
-    rules:
-      - uid: platform-k8s-node-not-ready
-        title: Kubernetes Node Not Ready
-        condition: C
-        data:
-          - refId: A
-            relativeTimeRange:
-              from: 600
-              to: 0
-            datasourceUid: platform-prometheus
-            model:
-              expr: kube_node_status_condition{condition="Ready",status="true"} == 0
-              intervalMs: 1000
-              maxDataPoints: 43200
-          - refId: B
-            relativeTimeRange:
-              from: 600
-              to: 0
-            datasourceUid: __expr__
-            model:
-              expression: A
-              intervalMs: 1000
-              maxDataPoints: 43200
-              reducer: last
-              type: reduce
-          - refId: C
-            relativeTimeRange:
-              from: 600
-              to: 0
-            datasourceUid: __expr__
-            model:
-              conditions:
-                - evaluator:
-                    params:
-                      - 0
-                    type: gt
-              expression: B
-              intervalMs: 1000
-              maxDataPoints: 43200
-              type: threshold
-        noDataState: NoData
-        execErrState: Alerting
-        for: 5m
-        annotations:
-          summary: Kubernetes node not ready
-          description: Node {{ $labels.node }} is not ready
-          runbook_url: https://wiki.example.com/runbooks/k8s-node-not-ready
-        labels:
-          severity: critical
-          team: platform
-        isPaused: false
-
-      - uid: platform-k8s-pod-restart
-        title: High Pod Restart Count
-        condition: C
-        data:
-          - refId: A
-            relativeTimeRange:
-              from: 600
-              to: 0
-            datasourceUid: platform-prometheus
-            model:
-              expr: increase(kube_pod_container_status_restarts_total[1h]) > 5
-              intervalMs: 1000
-              maxDataPoints: 43200
-          - refId: B
-            relativeTimeRange:
-              from: 600
-              to: 0
-            datasourceUid: __expr__
-            model:
-              expression: A
-              intervalMs: 1000
-              maxDataPoints: 43200
-              reducer: last
-              type: reduce
-          - refId: C
-            relativeTimeRange:
-              from: 600
-              to: 0
-            datasourceUid: __expr__
-            model:
-              conditions:
-                - evaluator:
-                    params:
-                      - 0
-                    type: gt
-              expression: B
-              intervalMs: 1000
-              maxDataPoints: 43200
-              type: threshold
-        noDataState: OK
-        execErrState: Error
-        for: 10m
-        annotations:
-          summary: Pod restarting frequently
-          description: Pod {{ $labels.pod }} has restarted more than 5 times in 1 hour
-        labels:
-          severity: warning
-          team: platform
-        isPaused: false
-
-  # =========================================================================
-  # APPLICATION TEAM - API Alerts
-  # =========================================================================
-  - org: "Application Team"
-    name: API
-    folder: app-api
-    interval: 1m
-    rules:
-      - uid: app-api-response-time
-        title: API Response Time High
-        condition: C
-        data:
-          - refId: A
-            relativeTimeRange:
-              from: 600
-              to: 0
-            datasourceUid: app-prometheus
-            model:
-              expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))
-              intervalMs: 1000
-              maxDataPoints: 43200
-          - refId: B
-            relativeTimeRange:
-              from: 600
-              to: 0
-            datasourceUid: __expr__
-            model:
-              expression: A
-              intervalMs: 1000
-              maxDataPoints: 43200
-              reducer: mean
-              type: reduce
-          - refId: C
-            relativeTimeRange:
-              from: 600
-              to: 0
-            datasourceUid: __expr__
-            model:
-              conditions:
-                - evaluator:
-                    params:
-                      - 0.5
-                    type: gt
-              expression: B
-              intervalMs: 1000
-              maxDataPoints: 43200
-              type: threshold
-        noDataState: NoData
-        execErrState: Error
-        for: 5m
-        annotations:
-          summary: API response time is high
-          description: P95 response time is above 500ms
-        labels:
-          severity: warning
-          team: application
-        isPaused: false
+groups: []
+  # --- Example: Alert rule group ---
+  # - folder: "alerts"                    # Must match folder UID (directory name)
+  #   name: "High CPU Usage"
+  #   interval: "1m"
+  #   org: "Main Organization"            # Or use orgId: 1
+  #   rules:
+  #     - title: "CPU Usage Critical"
+  #       condition: "C"                  # Ref ID of the condition expression
+  #       for: "5m"                       # Duration before alert fires
+  #       annotations:
+  #         summary: "CPU usage is above 90%"
+  #         description: "Instance {{ $labels.instance }} has CPU > 90%"
+  #       labels:
+  #         severity: "critical"
+  #       noDataState: "NoData"           # NoData | Alerting | OK
+  #       execErrState: "Error"           # Error | Alerting | OK
+  #       data:
+  #         - refId: "A"
+  #           datasourceUid: "prometheus"
+  #           queryType: ""
+  #           model:
+  #             expr: "100 - (avg by(instance) (rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)"
+  #             intervalMs: 1000
+  #             maxDataPoints: 43200
+  #             refId: "A"
+  #           relativeTimeRange:
+  #             from: 600
+  #             to: 0
+  #         - refId: "B"
+  #           datasourceUid: "__expr__"
+  #           model:
+  #             type: "reduce"
+  #             expression: "A"
+  #             reducer: "last"
+  #             refId: "B"
+  #           relativeTimeRange:
+  #             from: 0
+  #             to: 0
+  #         - refId: "C"
+  #           datasourceUid: "__expr__"
+  #           model:
+  #             type: "threshold"
+  #             expression: "B"
+  #             conditions:
+  #               - evaluator:
+  #                   type: "gt"
+  #                   params: [90]
+  #             refId: "C"
+  #           relativeTimeRange:
+  #             from: 0
+  #             to: 0

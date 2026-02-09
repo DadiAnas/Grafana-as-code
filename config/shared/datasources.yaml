@@ -1,61 +1,71 @@
-# Shared Datasources Configuration
-# These datasources are deployed to ALL environments
-# Environment-specific datasources in config/{env}/datasources.yaml will override these
+# =============================================================================
+# DATASOURCES — Shared across all environments
+# =============================================================================
+# Datasources defined here are deployed to ALL environments.
+# Environment-specific datasources (in config/<env>/datasources.yaml)
+# override shared ones with the same UID.
+#
+# Supported types: prometheus, loki, elasticsearch, influxdb, tempo,
+#   grafana-postgresql-datasource, mysql, graphite, cloudwatch, etc.
+#
+# For secrets (passwords, tokens), set use_vault: true and store credentials
+# in Vault at: <env>/datasources/<datasource-name>
+# =============================================================================
 
-datasources:
-  # Platform Team Organization Datasources
-  - name: "Platform-Prometheus"
-    type: "prometheus"
-    uid: "platform-prometheus"
-    url: "http://prometheus.platform.local:9090"
-    org: "Platform Team"
-    is_default: false
-    access_mode: "proxy"
-    json_data:
-      httpMethod: "POST"
-      timeInterval: "15s"
-
-  - name: "Platform-Loki"
-    type: "loki"
-    uid: "platform-loki"
-    url: "http://loki.platform.local:3100"
-    org: "Platform Team"
-    access_mode: "proxy"
-    json_data:
-      maxLines: 1000
-
-  # Business Intelligence Organization Datasources
-  - name: "BI-PostgreSQL"
-    type: "grafana-postgresql-datasource"
-    uid: "bi-postgres"
-    url: "postgres.bi.local:5432"
-    org: "Business Intelligence"
-    use_vault: true
-    json_data:
-      database: "analytics"
-      sslmode: "require"
-      maxOpenConns: 100
-
-  # Public Organization Datasources (read-only metrics)
-  - name: "Public-Metrics"
-    type: "prometheus"
-    uid: "public-prometheus"
-    url: "http://prometheus.public.local:9090"
-    org: "Public"
-    is_default: true
-    access_mode: "proxy"
-    json_data:
-      httpMethod: "GET"
-      timeInterval: "60s"
-
-  # Application Team Datasources
-  - name: "App-Prometheus"
-    type: "prometheus"
-    uid: "app-prometheus"
-    url: "http://prometheus.apps.local:9090"
-    org: "Application Team"
-    is_default: true
-    access_mode: "proxy"
-    json_data:
-      httpMethod: "POST"
-      timeInterval: "15s"
+datasources: []
+  # --- Example: Prometheus datasource ---
+  # - name: "Prometheus"
+  #   type: "prometheus"
+  #   uid: "prometheus"
+  #   url: "http://prometheus:9090"
+  #   org: "Main Organization"    # Must match an organization name
+  #   is_default: true
+  #   access_mode: "proxy"        # proxy (recommended) | direct
+  #   json_data:
+  #     httpMethod: "POST"
+  #     timeInterval: "15s"
+  #
+  # --- Example: Loki datasource ---
+  # - name: "Loki"
+  #   type: "loki"
+  #   uid: "loki"
+  #   url: "http://loki:3100"
+  #   org: "Main Organization"
+  #   access_mode: "proxy"
+  #   json_data:
+  #     maxLines: 1000
+  #
+  # --- Example: PostgreSQL datasource with Vault credentials ---
+  # - name: "PostgreSQL"
+  #   type: "grafana-postgresql-datasource"
+  #   uid: "postgres"
+  #   url: "postgres.example.com:5432"
+  #   org: "Main Organization"
+  #   use_vault: true             # Fetch user/password from Vault
+  #   json_data:
+  #     database: "mydb"
+  #     sslmode: "require"
+  #
+  # --- Example: Elasticsearch datasource ---
+  # - name: "Elasticsearch"
+  #   type: "elasticsearch"
+  #   uid: "elasticsearch"
+  #   url: "http://elasticsearch:9200"
+  #   org: "Main Organization"
+  #   json_data:
+  #     esVersion: "8.0.0"
+  #     timeField: "@timestamp"
+  #     logMessageField: "message"
+  #     logLevelField: "level"
+  #
+  # --- Example: InfluxDB datasource with Vault ---
+  # - name: "InfluxDB"
+  #   type: "influxdb"
+  #   uid: "influxdb"
+  #   url: "http://influxdb:8086"
+  #   org: "Main Organization"
+  #   use_vault: true
+  #   json_data:
+  #     version: "Flux"
+  #     organization: "my-org"
+  #     defaultBucket: "my-bucket"

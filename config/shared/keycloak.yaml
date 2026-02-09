@@ -1,46 +1,43 @@
 # =============================================================================
-# KEYCLOAK CLIENT CONFIGURATION (SHARED)
-# This configuration is OPTIONAL - set enabled: true to manage Keycloak
+# KEYCLOAK CLIENT MANAGEMENT (OPTIONAL)
+# =============================================================================
+# Set enabled: true to let Terraform manage a Keycloak OAuth client for Grafana.
+# This is separate from SSO — SSO can use any provider, while this specifically
+# manages the Keycloak client configuration.
+#
+# Credentials are fetched from Vault at: <env>/keycloak/provider-auth
 # =============================================================================
 
 keycloak:
   # Set to true to manage Keycloak client via Terraform
   enabled: false
-  
-  # Keycloak realm where the client will be created
-  realm_id: "grafana-realm"
-  
-  # OAuth client ID (must be unique in the realm)
-  client_id: "grafana-terraform"
-  client_name: "Grafana (Terraform Managed)"
-  description: "Grafana Monitoring Platform OAuth Client"
-  
-  # Client access type: CONFIDENTIAL, PUBLIC, or BEARER-ONLY
-  access_type: "CONFIDENTIAL"
-  
-  # OAuth flow settings
-  standard_flow_enabled: true
-  implicit_flow_enabled: true
-  direct_access_grants_enabled: false
-  service_accounts_enabled: false
-  
-  # Token lifespan in seconds
-  access_token_lifespan: 300
-  
-  # Grafana roles to create in Keycloak
-  roles:
-    - name: "grafanaadmin"
-      description: "Grafana Super Admin - Full access across all organizations"
-    - name: "Admin"
-      description: "Grafana Administrator - Full access within org"
-    - name: "Editor"
-      description: "Grafana Editor - Can edit dashboards and alerts"
-    - name: "Viewer"
-      description: "Grafana Viewer - Read-only access"
-  
-  # Groups with granular per-org role mappings (override in env-specific config)
-  # Each group can have different roles in different organizations
-  groups: []
-  
-  # Custom protocol mappers (optional)
-  mappers: []
+
+  # --- Example: Full Keycloak client configuration ---
+  # enabled: true
+  # realm_id: "my-realm"
+  # client_id: "grafana"
+  # client_name: "Grafana (Terraform Managed)"
+  # description: "Grafana OAuth Client"
+  #
+  # # Client settings
+  # access_type: "CONFIDENTIAL"    # CONFIDENTIAL | PUBLIC | BEARER-ONLY
+  # standard_flow_enabled: true
+  # implicit_flow_enabled: false
+  # direct_access_grants_enabled: false
+  # service_accounts_enabled: false
+  # access_token_lifespan: 300     # seconds
+  #
+  # # Keycloak client roles for Grafana
+  # roles:
+  #   - name: "Admin"
+  #     description: "Grafana Administrator"
+  #   - name: "Editor"
+  #     description: "Grafana Editor — can modify dashboards"
+  #   - name: "Viewer"
+  #     description: "Grafana Viewer — read-only access"
+  #
+  # # Keycloak groups (optional)
+  # groups: []
+  #
+  # # Protocol mappers (optional)
+  # mappers: []

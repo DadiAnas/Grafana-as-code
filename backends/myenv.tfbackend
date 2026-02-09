@@ -1,0 +1,25 @@
+# =============================================================================
+# BACKEND CONFIGURATION — myenv
+# =============================================================================
+# Use with: terraform init -backend-config=backends/myenv.tfbackend
+#
+# Uncomment and configure one of the backends below.
+# By default, Terraform uses local state (no backend needed).
+# =============================================================================
+
+# --- AWS S3 Backend ---
+# bucket         = "my-terraform-state"
+# key            = "myenv/grafana/terraform.tfstate"
+# region         = "us-east-1"
+# encrypt        = true
+# dynamodb_table = "terraform-locks"
+
+# --- Azure Blob Storage ---
+# resource_group_name  = "my-rg"
+# storage_account_name = "mytfstate"
+# container_name       = "tfstate"
+# key                  = "myenv/grafana/terraform.tfstate"
+
+# --- Google Cloud Storage ---
+# bucket = "my-terraform-state"
+# prefix = "myenv/grafana"
