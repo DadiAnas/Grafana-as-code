@@ -104,9 +104,11 @@ module "teams" {
 module "folders" {
   source = "./modules/folders"
 
-  folders      = local.folders_config
-  org_ids      = module.organizations.organization_ids
-  team_details = module.teams.team_details # For folder permissions (includes org_id for validation)
+  folder_permissions = local.folders_config
+  dashboards_path    = "${path.module}/dashboards"
+  environment        = var.environment
+  org_ids            = module.organizations.organization_ids
+  team_details       = module.teams.team_details
 
   depends_on = [module.organizations, module.teams]
 }

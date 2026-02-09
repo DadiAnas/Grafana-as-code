@@ -1,28 +1,75 @@
 # =============================================================================
 # GRAFANA FOLDERS MODULE
 # =============================================================================
-# Creates folders and manages granular permissions per team
+# Automatically creates folders based on directory structure in dashboards/
+# Permissions are managed via folders.yaml configuration
 # 
-# PERMISSION INHERITANCE:
-# - By default, teams inherit permissions from their org-level role
-# - Folder-specific permissions OVERRIDE the org-level defaults
-# - Only explicitly defined permissions are managed
+# FOLDER DISCOVERY:
+# - Scans dashboards/shared/ and dashboards/{env}/ for subdirectories
+# - Each subdirectory becomes a Grafana folder
+# - Folder UID = directory name (lowercase with hyphens)
+# - Folder Title = directory name (Title Case)
+#
+# PERMISSION MANAGEMENT:
+# - Permissions are defined in folders.yaml
+# - By default, teams inherit org-level permissions
+# - Use permissions block to override defaults for specific folders
 #
 # IMPORTANT: Teams are organization-scoped in Grafana
 # A team can only be granted permissions on folders within the SAME organization.
-# Cross-org team permissions are automatically skipped with a warning.
-#
-# PERMISSION LEVELS:
-# - View: Can view dashboards in the folder
-# - Edit: Can edit dashboards in the folder
-# - Admin: Full control including managing permissions
 # =============================================================================
 
 # -----------------------------------------------------------------------------
-# FOLDERS
+# AUTO-DISCOVER FOLDERS FROM DASHBOARDS DIRECTORY
+# -----------------------------------------------------------------------------
+locals {
+  # Discover shared dashboard folders
+  shared_folder_dirs = toset([
+    for dir in fileset(var.dashboards_path, "shared/*/") :
+    trimsuffix(replace(dir, "shared/", ""), "/")
+  ])
+
+  # Discover environment-specific dashboard folders
+  env_folder_dirs = toset([
+    for dir in fileset(var.dashboards_path, "${var.environment}/*/") :
+    trimsuffix(replace(dir, "${var.environment}/", ""), "/")
+  ])
+
+  # Combine all discovered folders (env overrides shared)
+  discovered_folders = setunion(local.shared_folder_dirs, local.env_folder_dirs)
+
+  # Build folder configs from discovered directories
+  # Use YAML config to get org and permissions if defined
+  auto_folders = {
+    for folder_uid in local.discovered_folders : folder_uid => {
+      uid = folder_uid
+      name = try(
+        # Look up name from YAML config if defined
+        [for f in try(var.folder_permissions.folders, []) : f.name if f.uid == folder_uid][0],
+        # Default to Title Case of UID
+        title(replace(folder_uid, "-", " "))
+      )
+      org = try(
+        # Look up org from YAML config if defined
+        [for f in try(var.folder_permissions.folders, []) : f.org if f.uid == folder_uid][0],
+        # Default to Main Organization
+        "Main Organization"
+      )
+      permissions = try(
+        # Look up permissions from YAML config if defined
+        [for f in try(var.folder_permissions.folders, []) : f.permissions if f.uid == folder_uid][0],
+        # No explicit permissions = inherit org-level defaults
+        null
+      )
+    }
+  }
+}
+
+# -----------------------------------------------------------------------------
+# CREATE FOLDERS
 # -----------------------------------------------------------------------------
 resource "grafana_folder" "folders" {
-  for_each = { for folder in var.folders.folders : folder.uid => folder }
+  for_each = local.auto_folders
 
   title  = each.value.name
   uid    = each.value.uid
@@ -39,16 +86,15 @@ resource "grafana_folder" "folders" {
 locals {
   # Create a map of folder uid -> resolved org_id
   folder_org_map = {
-    for folder in var.folders.folders : folder.uid => try(var.org_ids[folder.org], 1)
+    for uid, folder in local.auto_folders : uid => try(var.org_ids[folder.org], 1)
   }
 
   # Flatten folder permissions into a list of permission entries
   # Only include folders that have explicit 'permissions' defined
-  # For teams, validate they exist in the same org as the folder
   folder_permissions = flatten([
-    for folder in var.folders.folders : [
+    for uid, folder in local.auto_folders : [
       for perm in try(folder.permissions, []) : {
-        folder_uid = folder.uid
+        folder_uid = uid
         folder_org = try(var.org_ids[folder.org], 1)
         team       = try(perm.team, null)
         user       = try(perm.user, null)
@@ -60,7 +106,7 @@ locals {
         ) : true # Non-team permissions are always valid
       }
     ]
-    if try(folder.permissions, null) != null
+    if folder.permissions != null
   ])
 
   # Filter to only include valid permissions (teams in same org, or roles/users)

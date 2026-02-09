@@ -1,16 +1,21 @@
-variable "folders" {
-  description = "Folders configuration from YAML"
+variable "folder_permissions" {
+  description = "Folder permissions configuration from YAML (optional overrides). Folders are auto-discovered from dashboards directory."
   type        = any
+  default     = {}
+}
+
+variable "dashboards_path" {
+  description = "Path to the dashboards directory for auto-discovery"
+  type        = string
+}
+
+variable "environment" {
+  description = "Current environment (npr, preprod, prod)"
+  type        = string
 }
 
 variable "org_ids" {
   description = "Map of organization names to their IDs"
-  type        = map(number)
-  default     = {}
-}
-
-variable "team_ids" {
-  description = "Map of team names to their numeric IDs (legacy, use team_details instead)"
   type        = map(number)
   default     = {}
 }
