@@ -33,10 +33,20 @@ help:
 	@echo "  Usage: make <target> [ENV=myenv] [NAME=<new-env>]"
 	@echo ""
 	@echo "  ─── Environment Management ────────────────────────────────"
-	@echo "  new-env       Create a new environment         NAME=staging [GRAFANA_URL=...]"
+	@echo "  new-env       Create a new environment         NAME=staging [options]"
 	@echo "  delete-env    Delete an environment             NAME=staging"
 	@echo "  list-envs     List all configured environments"
 	@echo "  check-env     Validate environment is ready     ENV=staging"
+	@echo ""
+	@echo "  new-env options:"
+	@echo "    NAME           (required) Environment name"
+	@echo "    GRAFANA_URL    Grafana URL           (default: http://localhost:3000)"
+	@echo "    VAULT_ADDR     Vault address          (default: http://localhost:8200)"
+	@echo "    VAULT_MOUNT    Vault mount path       (default: grafana)"
+	@echo "    KEYCLOAK_URL   Keycloak URL           (enables SSO config)"
+	@echo "    BACKEND        Backend type           (s3 | azurerm | gcs)"
+	@echo "    ORGS           Organizations          (comma-separated)"
+	@echo "    DATASOURCES    Datasource presets     (prometheus,loki,postgres,...)"
 	@echo ""
 	@echo "  ─── Terraform Workflow ────────────────────────────────────"
 	@echo "  init          Initialize Terraform              ENV=staging"
@@ -63,11 +73,10 @@ help:
 	@echo ""
 	@echo "  ─── Quick Start ──────────────────────────────────────────"
 	@echo "  make new-env NAME=staging GRAFANA_URL=https://grafana.example.com"
+	@echo "  make new-env NAME=prod BACKEND=s3 DATASOURCES=prometheus,loki,postgres"
 	@echo "  make check-env ENV=staging"
 	@echo "  make vault-setup ENV=staging"
-	@echo "  make init ENV=staging"
-	@echo "  make plan ENV=staging"
-	@echo "  make apply ENV=staging"
+	@echo "  make init ENV=staging && make plan ENV=staging && make apply ENV=staging"
 	@echo ""
 
 # =============================================================================
@@ -75,10 +84,17 @@ help:
 # =============================================================================
 
 # Create a new environment (scaffolds all files)
-# Usage: make new-env NAME=staging
-# Usage: make new-env NAME=production GRAFANA_URL=https://grafana.example.com
-NAME ?=
-GRAFANA_URL ?= http://localhost:3000
+#   Required:  NAME
+#   Optional:  GRAFANA_URL, VAULT_ADDR, VAULT_MOUNT, KEYCLOAK_URL,
+#              BACKEND (s3|azurerm|gcs), ORGS, DATASOURCES
+NAME         ?=
+GRAFANA_URL  ?=
+VAULT_ADDR   ?=
+VAULT_MOUNT  ?=
+KEYCLOAK_URL ?=
+BACKEND      ?=
+ORGS         ?=
+DATASOURCES  ?=
 
 new-env:
 	@if [ -z "$(NAME)" ]; then \
@@ -87,11 +103,22 @@ new-env:
 		echo ""; \
 		echo "  Usage:"; \
 		echo "    make new-env NAME=staging"; \
-		echo "    make new-env NAME=production GRAFANA_URL=https://grafana.example.com"; \
+		echo "    make new-env NAME=prod GRAFANA_URL=https://grafana.example.com BACKEND=s3"; \
+		echo "    make new-env NAME=dev DATASOURCES=prometheus,loki KEYCLOAK_URL=https://sso.example.com"; \
+		echo ""; \
+		echo "  Optional params: GRAFANA_URL, VAULT_ADDR, VAULT_MOUNT, KEYCLOAK_URL, BACKEND, ORGS, DATASOURCES"; \
 		echo ""; \
 		exit 1; \
 	fi
-	@bash scripts/new-env.sh "$(NAME)" "$(GRAFANA_URL)"
+	@ENV_NAME_ARG="$(NAME)" \
+	 GRAFANA_URL_ARG="$(GRAFANA_URL)" \
+	 VAULT_ADDR_ARG="$(VAULT_ADDR)" \
+	 VAULT_MOUNT_ARG="$(VAULT_MOUNT)" \
+	 KEYCLOAK_URL_ARG="$(KEYCLOAK_URL)" \
+	 BACKEND_ARG="$(BACKEND)" \
+	 ORGS_ARG="$(ORGS)" \
+	 DATASOURCES_ARG="$(DATASOURCES)" \
+	 bash scripts/new-env.sh "$(NAME)"
 
 # Delete an environment (removes scaffolded files, NOT infrastructure)
 # Usage: make delete-env NAME=staging

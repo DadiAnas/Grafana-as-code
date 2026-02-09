@@ -217,24 +217,65 @@ make check-env ENV=production
 make delete-env NAME=production
 ```
 
+### `new-env` optional parameters
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `NAME` | **(required)** Environment name | — |
+| `GRAFANA_URL` | Grafana instance URL | `http://localhost:3000` |
+| `VAULT_ADDR` | Vault server address | `http://localhost:8200` |
+| `VAULT_MOUNT` | Vault KV mount path | `grafana` |
+| `KEYCLOAK_URL` | Keycloak URL (enables SSO config) | *(disabled)* |
+| `BACKEND` | Backend type: `s3`, `azurerm`, `gcs` | *(all commented)* |
+| `ORGS` | Custom organizations (comma-separated) | *(from shared config)* |
+| `DATASOURCES` | Datasource presets (comma-separated) | *(empty)* |
+
+**Supported datasource presets:** `prometheus`, `loki`, `postgres`, `mysql`, `elasticsearch`, `influxdb`, `tempo`, `mimir`, `cloudwatch`, `graphite`
+
+### Advanced examples
+
+```bash
+# Minimal — just a name
+make new-env NAME=dev
+
+# Full stack — Prometheus, Loki, Postgres with S3 backend and SSO
+make new-env NAME=production \
+  GRAFANA_URL=https://grafana.prod.example.com \
+  BACKEND=s3 \
+  DATASOURCES=prometheus,loki,postgres \
+  KEYCLOAK_URL=https://sso.example.com
+
+# Custom organizations
+make new-env NAME=multi-org \
+  ORGS="Engineering,Product,Business Intelligence" \
+  DATASOURCES=prometheus
+
+# Azure with custom Vault
+make new-env NAME=azure-prod \
+  GRAFANA_URL=https://grafana.azure.example.com \
+  BACKEND=azurerm \
+  VAULT_ADDR=https://vault.azure.example.com \
+  VAULT_MOUNT=grafana-prod
+```
+
 ### What `new-env` creates
 
 ```
 environments/production.tfvars         ← Grafana URL, Vault config
-backends/production.tfbackend          ← S3/Azure/GCS backend (commented)
+backends/production.tfbackend          ← S3/Azure/GCS backend (auto-uncommented if BACKEND set)
 config/production/                     ← 10 YAML override files
   ├── organizations.yaml
-  ├── datasources.yaml
+  ├── datasources.yaml                ← pre-filled if DATASOURCES set
   ├── folders.yaml
   ├── teams.yaml
   ├── service_accounts.yaml
-  ├── sso.yaml
-  ├── keycloak.yaml
+  ├── sso.yaml                        ← pre-filled if KEYCLOAK_URL set
+  ├── keycloak.yaml                   ← pre-filled if KEYCLOAK_URL set
   └── alerting/
       ├── alert_rules.yaml
       ├── contact_points.yaml
       └── notification_policies.yaml
-dashboards/production/                 ← Dashboard dirs per org
+dashboards/production/                 ← Dashboard dirs per org (custom if ORGS set)
   └── Main Organization/
 ```
 
