@@ -1,7 +1,23 @@
-# Grafana Teams Configuration - Shared across environments
+# =============================================================================
+# GRAFANA TEAMS CONFIGURATION - Shared across environments
+# =============================================================================
+# Teams are organization-scoped - each team must specify which org it belongs to.
+# Teams can only be granted folder permissions within the SAME organization.
+#
+# Fields:
+#   - name: Team name (required)
+#   - org: Organization name (required) - must match an org in organizations.yaml
+#   - email: Team contact email (optional)
+#   - preferences: Theme and home dashboard settings
+#   - members: List of team member emails (managed by SSO in most cases)
+# =============================================================================
 
 teams:
+  # =====================================================
+  # MAIN ORGANIZATION TEAMS
+  # =====================================================
   - name: "Platform Team"
+    org: "Main Organization"
     email: "platform@example.com"
     members:
       - email: "user1@example.com"
@@ -11,6 +27,7 @@ teams:
       home_dashboard_uid: ""
 
   - name: "Backend Team"
+    org: "Main Organization"
     email: "backend@example.com"
     members:
       - email: "dev1@example.com"
@@ -19,6 +36,7 @@ teams:
       theme: "dark"
 
   - name: "Frontend Team"
+    org: "Main Organization"
     email: "frontend@example.com"
     members:
       - email: "fe1@example.com"
@@ -26,6 +44,7 @@ teams:
       theme: "light"
 
   - name: "SRE Team"
+    org: "Main Organization"
     email: "sre@example.com"
     members:
       - email: "sre1@example.com"
@@ -35,6 +54,7 @@ teams:
       theme: "dark"
 
   - name: "Data Team"
+    org: "Main Organization"
     email: "data@example.com"
     members:
       - email: "data1@example.com"
