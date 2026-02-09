@@ -195,25 +195,54 @@ cat > "$PROJECT_ROOT/environments/${ENV_NAME}.tfvars" << EOF
 # =============================================================================
 # ${ENV_NAME^^} ENVIRONMENT — Terraform Variables
 # =============================================================================
+# This file contains all Terraform variables for the '${ENV_NAME}' environment.
+#
 # Usage:
+#   make plan  ENV=${ENV_NAME}
+#   make apply ENV=${ENV_NAME}
+#
+# Or directly:
 #   terraform plan  -var-file=environments/${ENV_NAME}.tfvars
 #   terraform apply -var-file=environments/${ENV_NAME}.tfvars
 # =============================================================================
 
-# The URL of your Grafana instance
+# ─── Grafana Connection ─────────────────────────────────────────────────
+# The full URL of your Grafana instance (including protocol and port)
 grafana_url = "${GRAFANA_URL}"
 
-# Environment name — must match directory names under config/ and dashboards/
+# Environment name — used to locate config/ and dashboards/ subdirectories
+# Must match: config/${ENV_NAME}/ and dashboards/${ENV_NAME}/
 environment = "${ENV_NAME}"
 
-# Vault Configuration (HashiCorp Vault for secrets management)
+# ─── Vault Configuration ────────────────────────────────────────────────
+# HashiCorp Vault for secrets management (datasource passwords, SSO secrets)
 vault_address = "${VAULT_ADDR}"
 vault_mount   = "${VAULT_MOUNT}"
-# vault_token — set via VAULT_TOKEN env variable for security:
-#   export VAULT_TOKEN="your-vault-token"
 
-# Keycloak Configuration (optional — only if you enable SSO via Keycloak)
+# The vault token should be set via environment variable for security:
+#   export VAULT_TOKEN="your-vault-token"
+#
+# To set up secrets in Vault:
+#   make vault-setup ENV=${ENV_NAME}
+
+# ─── Keycloak (Optional) ────────────────────────────────────────────────
+# Only needed if you enable SSO via Keycloak (see config/${ENV_NAME}/sso.yaml)
 ${KEYCLOAK_LINE}
+
+# ─── Additional Variables ────────────────────────────────────────────────
+# Uncomment and set any additional variables your Terraform config needs:
+#
+# # Grafana authentication (alternative to Vault-stored API key)
+# # grafana_auth = "admin:admin"          # Only for local dev!
+#
+# # Terraform state locking timeout
+# # lock_timeout = "5m"
+#
+# # Enable/disable specific resource categories
+# # manage_dashboards      = true
+# # manage_datasources     = true
+# # manage_alerting        = true
+# # manage_service_accounts = true
 EOF
 CREATED_FILES+=("environments/${ENV_NAME}.tfvars")
 
@@ -227,7 +256,16 @@ generate_backend() {
     echo "# ============================================================================="
     echo "# BACKEND CONFIGURATION — ${ENV_NAME}"
     echo "# ============================================================================="
-    echo "# Use with: terraform init -backend-config=backends/${ENV_NAME}.tfbackend"
+    echo "# Remote state backends store terraform.tfstate on a shared backend"
+    echo "# instead of the local filesystem, enabling team collaboration."
+    echo "#"
+    echo "# Usage:"
+    echo "#   make init ENV=${ENV_NAME}"
+    echo "# Or:"
+    echo "#   terraform init -backend-config=backends/${ENV_NAME}.tfbackend"
+    echo "#"
+    echo "# Uncomment ONE backend section below (or use BACKEND= when creating the env)."
+    echo "# For local-only state, you can leave everything commented."
     echo "# ============================================================================="
     echo ""
 
@@ -239,6 +277,8 @@ generate_backend() {
     esac
 
     echo "# --- AWS S3 Backend ---"
+    echo "# Prerequisites: S3 bucket + DynamoDB table for state locking"
+    echo "# See: https://developer.hashicorp.com/terraform/language/backend/s3"
     echo "${s3_comment} bucket         = \"my-terraform-state\""
     echo "${s3_comment} key            = \"${ENV_NAME}/grafana/terraform.tfstate\""
     echo "${s3_comment} region         = \"us-east-1\""
@@ -246,12 +286,16 @@ generate_backend() {
     echo "${s3_comment} dynamodb_table = \"terraform-locks\""
     echo ""
     echo "# --- Azure Blob Storage ---"
+    echo "# Prerequisites: Storage account + container"
+    echo "# See: https://developer.hashicorp.com/terraform/language/backend/azurerm"
     echo "${azure_comment} resource_group_name  = \"my-rg\""
     echo "${azure_comment} storage_account_name = \"mytfstate\""
     echo "${azure_comment} container_name       = \"tfstate\""
     echo "${azure_comment} key                  = \"${ENV_NAME}/grafana/terraform.tfstate\""
     echo ""
     echo "# --- Google Cloud Storage ---"
+    echo "# Prerequisites: GCS bucket with versioning enabled"
+    echo "# See: https://developer.hashicorp.com/terraform/language/backend/gcs"
     echo "${gcs_comment} bucket = \"my-terraform-state\""
     echo "${gcs_comment} prefix = \"${ENV_NAME}/grafana\""
 }
@@ -268,23 +312,101 @@ mkdir -p "$PROJECT_ROOT/config/${ENV_NAME}/alerting"
 
 # --- Organizations ---
 cat > "$PROJECT_ROOT/config/${ENV_NAME}/organizations.yaml" << EOF
-# ${ENV_NAME^^} — Organization overrides (override shared by name)
+# =============================================================================
+# ${ENV_NAME^^} — Organization Overrides
+# =============================================================================
+# Override shared organization settings for THIS environment only.
+# Matching is by organization "name" — shared entries with the same name
+# are replaced by entries here.
+#
+# Tip: Organizations are usually identical across environments.
+#      Only add overrides here if ${ENV_NAME} needs different admins/editors.
+# =============================================================================
+
 organizations: []
+
+  # --- Example: Override org admins for this environment ---
+  # - name: "Main Organization"
+  #   id: 1
+  #   admins:
+  #     - "admin-${ENV_NAME}@example.com"
+  #   editors:
+  #     - "dev-${ENV_NAME}@example.com"
+  #   viewers: []
+  #
+  # --- Example: Add an env-specific organization ---
+  # - name: "${ENV_NAME^} QA Team"
+  #   admins:
+  #     - "qa-lead@example.com"
 EOF
 
 # --- Datasources ---
 generate_datasources() {
-    echo "# ${ENV_NAME^^} — Datasource overrides (override shared by UID)"
+    cat << HEADER
+# =============================================================================
+# ${ENV_NAME^^} — Datasource Overrides
+# =============================================================================
+# Override shared datasource settings for THIS environment only.
+# Matching is by datasource "uid" — shared entries with the same UID
+# are replaced by entries here.
+#
+# Common use case: same datasource type, different URL per environment.
+#
+# For secrets (passwords, tokens), set use_vault: true and store credentials
+# in Vault at: ${VAULT_MOUNT}/${ENV_NAME}/datasources/<datasource-name>
+# =============================================================================
+
+HEADER
 
     if [ -z "$DATASOURCES" ]; then
-        echo "# Example: different Prometheus URL for this environment"
-        echo "datasources: []"
-        echo "  # - name: \"Prometheus\""
-        echo "  #   type: \"prometheus\""
-        echo "  #   uid: \"prometheus\""
-        echo "  #   url: \"http://prometheus-${ENV_NAME}:9090\""
-        echo "  #   org: \"Main Organization\""
-        echo "  #   is_default: true"
+        cat << DSEOF
+datasources: []
+
+  # --- Example: Override Prometheus URL for this environment ---
+  # - name: "Prometheus"
+  #   type: "prometheus"
+  #   uid: "prometheus"                    # Must match the shared UID to override
+  #   url: "http://prometheus-${ENV_NAME}:9090"
+  #   org: "Main Organization"
+  #   is_default: true
+  #   access_mode: "proxy"
+  #   json_data:
+  #     httpMethod: "POST"
+  #     timeInterval: "15s"
+  #
+  # --- Example: Loki with environment-specific URL ---
+  # - name: "Loki"
+  #   type: "loki"
+  #   uid: "loki"
+  #   url: "http://loki-${ENV_NAME}:3100"
+  #   org: "Main Organization"
+  #   json_data:
+  #     maxLines: 1000
+  #
+  # --- Example: PostgreSQL with Vault credentials ---
+  # - name: "PostgreSQL"
+  #   type: "grafana-postgresql-datasource"
+  #   uid: "postgres"
+  #   url: "postgres-${ENV_NAME}.example.com:5432"
+  #   org: "Main Organization"
+  #   use_vault: true                      # Reads from: ${VAULT_MOUNT}/${ENV_NAME}/datasources/PostgreSQL
+  #   json_data:
+  #     database: "grafana_${ENV_NAME}"
+  #     sslmode: "require"
+  #     maxOpenConns: 10
+  #
+  # --- Example: Elasticsearch ---
+  # - name: "Elasticsearch"
+  #   type: "elasticsearch"
+  #   uid: "elasticsearch"
+  #   url: "http://elasticsearch-${ENV_NAME}:9200"
+  #   org: "Main Organization"
+  #   json_data:
+  #     esVersion: "8.0.0"
+  #     timeField: "@timestamp"
+  #     logMessageField: "message"
+  #     logLevelField: "level"
+DSEOF
         return
     fi
 
@@ -440,39 +562,168 @@ generate_datasources > "$PROJECT_ROOT/config/${ENV_NAME}/datasources.yaml"
 
 # --- Folders ---
 cat > "$PROJECT_ROOT/config/${ENV_NAME}/folders.yaml" << EOF
-# ${ENV_NAME^^} — Folder permission overrides (override shared by UID)
+# =============================================================================
+# ${ENV_NAME^^} — Folder Permission Overrides
+# =============================================================================
+# Folders are auto-discovered from the dashboards/ directory structure:
+#   dashboards/${ENV_NAME}/<org_name>/<folder_uid>/
+#   dashboards/shared/<org_name>/<folder_uid>/
+#
+# This file is ONLY for setting permissions on those folders.
+# If a folder is not listed here, it gets default (org-level) permissions.
+# =============================================================================
+
 folders: []
+
+  # --- Example: Restrict folder access to specific teams ---
+  # - uid: "infrastructure"               # Must match the directory name
+  #   name: "Infrastructure Monitoring"    # Display name in Grafana
+  #   org: "Main Organization"
+  #   permissions:
+  #     - team: "SRE Team"
+  #       permission: "Admin"              # Admin | Edit | View
+  #     - team: "Backend Team"
+  #       permission: "Edit"
+  #     - role: "Viewer"                   # Built-in role
+  #       permission: "View"
+  #
+  # --- Example: Editor-accessible folder ---
+  # - uid: "applications"
+  #   name: "Application Dashboards"
+  #   org: "Main Organization"
+  #   permissions:
+  #     - role: "Editor"
+  #       permission: "Edit"
+  #     - role: "Viewer"
+  #       permission: "View"
 EOF
 
 # --- Teams ---
 cat > "$PROJECT_ROOT/config/${ENV_NAME}/teams.yaml" << EOF
-# ${ENV_NAME^^} — Team overrides (override shared by name)
+# =============================================================================
+# ${ENV_NAME^^} — Team Overrides
+# =============================================================================
+# Override shared team settings for THIS environment only.
+# Matching is by team "name" — shared entries with the same name
+# are replaced by entries here.
+#
+# Teams are organization-scoped. Each team must specify "org".
+# Teams can be assigned folder permissions (see folders.yaml).
+# =============================================================================
+
 teams: []
+
+  # --- Example: Override team members for this environment ---
+  # - name: "Backend Team"
+  #   org: "Main Organization"
+  #   email: "backend-${ENV_NAME}@example.com"
+  #   members:
+  #     - "dev1@example.com"
+  #     - "dev2@example.com"
+  #   preferences:
+  #     theme: "dark"
+  #     # home_dashboard_uid: "my-dashboard"
+  #
+  # --- Example: Environment-specific team ---
+  # - name: "${ENV_NAME^} On-Call"
+  #   org: "Main Organization"
+  #   email: "oncall-${ENV_NAME}@example.com"
+  #   preferences:
+  #     theme: "dark"
 EOF
 
 # --- Service accounts ---
 cat > "$PROJECT_ROOT/config/${ENV_NAME}/service_accounts.yaml" << EOF
-# ${ENV_NAME^^} — Service account overrides (override shared by name)
+# =============================================================================
+# ${ENV_NAME^^} — Service Account Overrides
+# =============================================================================
+# Override shared service account settings for THIS environment only.
+# Matching is by account "name" — shared entries with the same name
+# are replaced by entries here.
+#
+# Service accounts provide programmatic access to Grafana via API tokens.
+# Tokens are auto-generated and stored in Terraform state (sensitive).
+# =============================================================================
+
 service_accounts: []
+
+  # --- Example: Automation service account for this environment ---
+  # - name: "terraform-${ENV_NAME}"
+  #   org: "Main Organization"
+  #   role: "Admin"                        # Admin | Editor | Viewer
+  #   is_disabled: false
+  #   tokens:
+  #     - name: "main-token"
+  #       seconds_to_live: 0               # 0 = never expires
+  #
+  # --- Example: Read-only CI/CD account ---
+  # - name: "ci-cd-readonly"
+  #   org: "Main Organization"
+  #   role: "Viewer"
+  #   tokens:
+  #     - name: "pipeline-token"
+  #       seconds_to_live: 31536000        # 1 year in seconds
 EOF
 
 # --- SSO ---
 generate_sso() {
-    echo "# ${ENV_NAME^^} — SSO overrides (merged with shared)"
+    cat << HEADER
+# =============================================================================
+# ${ENV_NAME^^} — SSO Configuration Overrides
+# =============================================================================
+# Override shared SSO settings for THIS environment only.
+# Values here are merged with config/shared/sso.yaml.
+#
+# Supported providers: Keycloak, Okta, Azure AD, Google, GitHub
+# Client secrets are fetched from Vault at: ${VAULT_MOUNT}/${ENV_NAME}/sso/keycloak
+# =============================================================================
+
+HEADER
     if [ -n "$KEYCLOAK_URL" ]; then
         cat << SSOEOF
 sso:
   enabled: true
+  name: "Keycloak"
   auth_url: "${KEYCLOAK_URL}/realms/grafana/protocol/openid-connect/auth"
   token_url: "${KEYCLOAK_URL}/realms/grafana/protocol/openid-connect/token"
   api_url: "${KEYCLOAK_URL}/realms/grafana/protocol/openid-connect/userinfo"
   # client_id: "grafana-${ENV_NAME}"
-  # use_vault: true  # client_secret from Vault at: ${VAULT_MOUNT}/${ENV_NAME}/sso/keycloak
+  # use_vault: true                      # client_secret from Vault
+  #
+  # Optional settings:
+  # allow_sign_up: true
+  # auto_login: false
+  # scopes: "openid profile email groups"
+  # role_attribute_path: "contains(groups[*], 'grafana-admin') && 'Admin' || 'Viewer'"
 SSOEOF
     else
         cat << SSOEOF
 sso: {}
+
+  # --- Example: Keycloak SSO for this environment ---
+  # enabled: true
+  # name: "Keycloak"
   # auth_url: "https://keycloak-${ENV_NAME}.example.com/realms/grafana/protocol/openid-connect/auth"
+  # token_url: "https://keycloak-${ENV_NAME}.example.com/realms/grafana/protocol/openid-connect/token"
+  # api_url: "https://keycloak-${ENV_NAME}.example.com/realms/grafana/protocol/openid-connect/userinfo"
+  # client_id: "grafana-${ENV_NAME}"
+  # use_vault: true                        # Reads from: ${VAULT_MOUNT}/${ENV_NAME}/sso/keycloak
+  #
+  # allow_sign_up: true
+  # auto_login: false
+  # scopes: "openid profile email groups"
+  #
+  # # Map Keycloak groups to Grafana roles:
+  # role_attribute_path: "contains(groups[*], 'grafana-admin') && 'Admin' || 'Viewer'"
+  #
+  # --- Example: Azure AD SSO ---
+  # enabled: true
+  # name: "Azure AD"
+  # auth_url: "https://login.microsoftonline.com/<tenant-id>/oauth2/v2.0/authorize"
+  # token_url: "https://login.microsoftonline.com/<tenant-id>/oauth2/v2.0/token"
+  # client_id: "grafana-${ENV_NAME}"
+  # use_vault: true
+  # scopes: "openid profile email"
 SSOEOF
     fi
 }
@@ -480,7 +731,18 @@ generate_sso > "$PROJECT_ROOT/config/${ENV_NAME}/sso.yaml"
 
 # --- Keycloak ---
 generate_keycloak() {
-    echo "# ${ENV_NAME^^} — Keycloak overrides (merged with shared)"
+    cat << HEADER
+# =============================================================================
+# ${ENV_NAME^^} — Keycloak Client Management (Optional)
+# =============================================================================
+# Set enabled: true to let Terraform manage a Keycloak OAuth client
+# for Grafana. This is SEPARATE from SSO — SSO can use any provider,
+# while this manages the Keycloak client configuration itself.
+#
+# Credentials from Vault at: ${VAULT_MOUNT}/${ENV_NAME}/keycloak/provider-auth
+# =============================================================================
+
+HEADER
     if [ -n "$KEYCLOAK_URL" ]; then
         cat << KCEOF
 keycloak:
@@ -488,27 +750,194 @@ keycloak:
   url: "${KEYCLOAK_URL}"
   realm: "grafana"
   # client_id: "grafana-${ENV_NAME}"
+  # client_name: "Grafana ${ENV_NAME^} (Terraform Managed)"
+  # description: "Grafana OAuth Client for ${ENV_NAME}"
+  #
+  # --- OAuth Settings ---
+  # access_type: "CONFIDENTIAL"           # CONFIDENTIAL | PUBLIC
+  # standard_flow_enabled: true
+  # valid_redirect_uris:
+  #   - "https://grafana-${ENV_NAME}.example.com/login/generic_oauth"
+  # web_origins:
+  #   - "https://grafana-${ENV_NAME}.example.com"
 KCEOF
     else
-        echo "keycloak: {}"
+        cat << KCEOF
+keycloak: {}
+
+  # --- Example: Manage Keycloak client via Terraform ---
+  # enabled: true
+  # url: "https://keycloak.example.com"
+  # realm: "grafana"
+  # client_id: "grafana-${ENV_NAME}"
+  # client_name: "Grafana ${ENV_NAME^}"
+  #
+  # access_type: "CONFIDENTIAL"
+  # standard_flow_enabled: true
+  # valid_redirect_uris:
+  #   - "https://grafana-${ENV_NAME}.example.com/login/generic_oauth"
+  # web_origins:
+  #   - "https://grafana-${ENV_NAME}.example.com"
+KCEOF
     fi
 }
 generate_keycloak > "$PROJECT_ROOT/config/${ENV_NAME}/keycloak.yaml"
 
-# --- Alerting ---
+# --- Alerting: Alert Rules ---
 cat > "$PROJECT_ROOT/config/${ENV_NAME}/alerting/alert_rules.yaml" << EOF
-# ${ENV_NAME^^} — Alert rule overrides (override shared by folder-name)
+# =============================================================================
+# ${ENV_NAME^^} — Alert Rule Overrides
+# =============================================================================
+# Override shared alert rules for THIS environment only.
+# Matching is by folder + rule group name.
+#
+# Each group must specify:
+#   - folder: the folder UID (must match a directory in dashboards/)
+#   - name: rule group name
+#   - interval: evaluation interval (e.g., "1m", "5m")
+#   - org: which organization this alert belongs to
+#   - rules: list of alert rules
+# =============================================================================
+
 groups: []
+
+  # --- Example: Environment-specific alert thresholds ---
+  # - folder: "alerts"                    # Must exist in dashboards/${ENV_NAME}/
+  #   name: "High CPU Usage"
+  #   interval: "1m"
+  #   org: "Main Organization"
+  #   rules:
+  #     - title: "CPU Usage Critical"
+  #       condition: "C"
+  #       for: "5m"
+  #       annotations:
+  #         summary: "CPU usage is above 90% on ${ENV_NAME}"
+  #         description: "Instance {{ \$labels.instance }} has CPU > 90%"
+  #       labels:
+  #         severity: "critical"
+  #         environment: "${ENV_NAME}"
+  #       noDataState: "NoData"           # NoData | Alerting | OK
+  #       execErrState: "Error"           # Error | Alerting | OK
+  #       data:
+  #         - refId: "A"
+  #           datasourceUid: "prometheus"
+  #           model:
+  #             expr: "100 - (avg by(instance) (rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)"
+  #         - refId: "C"
+  #           datasourceUid: "-100"       # __expr__ (expression)
+  #           model:
+  #             type: "threshold"
+  #             conditions:
+  #               - evaluator:
+  #                   type: "gt"
+  #                   params: [90]         # Alert when > 90%
 EOF
 
+# --- Alerting: Contact Points ---
 cat > "$PROJECT_ROOT/config/${ENV_NAME}/alerting/contact_points.yaml" << EOF
-# ${ENV_NAME^^} — Contact point overrides (override shared by name)
+# =============================================================================
+# ${ENV_NAME^^} — Contact Point Overrides
+# =============================================================================
+# Override shared contact points for THIS environment only.
+# Matching is by contact point "name".
+#
+# Supported receiver types: email, webhook, slack, pagerduty, opsgenie,
+#   discord, telegram, teams, googlechat, victorops, pushover, sns,
+#   sensugo, threema, webex, line, kafka, oncall, alertmanager
+# =============================================================================
+
 contactPoints: []
+
+  # --- Example: Email alerts for this environment ---
+  # - name: "${ENV_NAME}-email-alerts"
+  #   org: "Main Organization"
+  #   receivers:
+  #     - type: "email"
+  #       settings:
+  #         addresses: "oncall-${ENV_NAME}@example.com;team@example.com"
+  #         singleEmail: false
+  #
+  # --- Example: Slack channel per environment ---
+  # - name: "${ENV_NAME}-slack"
+  #   org: "Main Organization"
+  #   receivers:
+  #     - type: "slack"
+  #       settings:
+  #         url: "https://hooks.slack.com/services/xxx/yyy/zzz"
+  #         recipient: "#alerts-${ENV_NAME}"
+  #         username: "Grafana ${ENV_NAME^}"
+  #         icon_emoji: ":grafana:"
+  #         title: '{{ template "slack.default.title" . }}'
+  #         text: '{{ template "slack.default.text" . }}'
+  #
+  # --- Example: PagerDuty ---
+  # - name: "${ENV_NAME}-pagerduty"
+  #   org: "Main Organization"
+  #   receivers:
+  #     - type: "pagerduty"
+  #       settings:
+  #         integrationKey: "your-pagerduty-key"  # Store in Vault for security
+  #         severity: "critical"
+  #         class: "grafana"
+  #
+  # --- Example: Webhook (generic HTTP endpoint) ---
+  # - name: "${ENV_NAME}-webhook"
+  #   org: "Main Organization"
+  #   receivers:
+  #     - type: "webhook"
+  #       settings:
+  #         url: "https://alerts-${ENV_NAME}.example.com/webhook"
+  #         httpMethod: "POST"
+  #         username: "grafana"
+  #         # password from Vault: use_vault: true
 EOF
 
+# --- Alerting: Notification Policies ---
 cat > "$PROJECT_ROOT/config/${ENV_NAME}/alerting/notification_policies.yaml" << EOF
-# ${ENV_NAME^^} — Notification policy overrides (override shared by org)
+# =============================================================================
+# ${ENV_NAME^^} — Notification Policy Overrides
+# =============================================================================
+# Override shared notification policies for THIS environment only.
+# Matching is by organization.
+#
+# Policies define HOW alerts are routed to contact points:
+#   - receiver: the default contact point
+#   - group_by: labels to group alerts by
+#   - routes: child policies with label matchers
+# =============================================================================
+
 policies: []
+
+  # --- Example: Route alerts by severity ---
+  # - org: "Main Organization"
+  #   receiver: "${ENV_NAME}-email-alerts"     # Default contact point
+  #   group_by:
+  #     - "alertname"
+  #     - "namespace"
+  #   group_wait: "30s"
+  #   group_interval: "5m"
+  #   repeat_interval: "4h"
+  #   routes:
+  #     # Critical alerts → PagerDuty
+  #     - receiver: "${ENV_NAME}-pagerduty"
+  #       matchers:
+  #         - "severity = critical"
+  #       continue: false
+  #       group_wait: "10s"                    # Alert faster for critical
+  #
+  #     # Warning alerts → Slack
+  #     - receiver: "${ENV_NAME}-slack"
+  #       matchers:
+  #         - "severity = warning"
+  #       continue: true                       # Also send to default receiver
+  #       repeat_interval: "1h"
+  #
+  #     # Mute notifications for specific labels
+  #     # - receiver: "${ENV_NAME}-email-alerts"
+  #     #   matchers:
+  #     #     - "alertname = Watchdog"
+  #     #   mute_time_intervals:
+  #     #     - "weekends"
 EOF
 
 CREATED_FILES+=("config/${ENV_NAME}/ (10 files)")
