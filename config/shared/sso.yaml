@@ -24,15 +24,6 @@ sso:
   # role_attribute_path is not set, roles come from org_mapping
   role_attribute_strict: false
   
-  # Organization mapping
-  org_attribute_path: "org"
-  org_mapping: |
-    Main Organization:1
-    Platform Team:*
-    Application Team:*
-    Business Intelligence:*
-    Public:*
-  
   # Team sync
   teams_url: "https://keycloak.example.com/realms/grafana/protocol/openid-connect/userinfo"
   team_ids_attribute_path: "groups[*]"

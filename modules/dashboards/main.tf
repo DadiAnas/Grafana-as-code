@@ -10,17 +10,24 @@
 locals {
   # Find shared dashboard files (deployed to all environments)
   # Pattern: shared/<org>/<folder>/<file>.json
-  shared_dashboard_files = fileset(var.dashboards_path, "shared/*/*/*.json")
+  # We use recursive glob to support nested folders (depth >= 3: shared/org/folder/file)
+  shared_dashboard_files = [
+    for f in fileset(var.dashboards_path, "shared/**/*.json") : f
+    if length(split("/", f)) >= 4
+  ]
 
   # Find environment-specific dashboard files
   # Pattern: <env>/<org>/<folder>/<file>.json
-  env_dashboard_files = fileset(var.dashboards_path, "${var.environment}/*/*/*.json")
+  env_dashboard_files = [
+    for f in fileset(var.dashboards_path, "${var.environment}/**/*.json") : f
+    if length(split("/", f)) >= 4
+  ]
 
   # Parse shared dashboards
   shared_dashboards = {
     for file in local.shared_dashboard_files :
     replace(replace(file, "shared/", ""), "/", "-") => {
-      folder_uid    = basename(dirname(file))
+      folder_uid    = dirname(replace(file, "shared/", ""))
       file_path     = "${var.dashboards_path}/${file}"
       dashboard_uid = replace(basename(file), ".json", "")
       source        = "shared"
@@ -31,7 +38,7 @@ locals {
   env_dashboards = {
     for file in local.env_dashboard_files :
     replace(replace(file, "${var.environment}/", ""), "/", "-") => {
-      folder_uid    = basename(dirname(file))
+      folder_uid    = dirname(replace(file, "${var.environment}/", ""))
       file_path     = "${var.dashboards_path}/${file}"
       dashboard_uid = replace(basename(file), ".json", "")
       source        = var.environment

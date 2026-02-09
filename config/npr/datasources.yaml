@@ -41,7 +41,7 @@ datasources:
       defaultBucket: "my-bucket"
 
   - name: "PostgreSQL"
-    type: "postgres"
+    type: "grafana-postgresql-datasource"
     uid: "postgres"
     url: "postgres-npr.example.com:5432"
     org: "Main Organization"

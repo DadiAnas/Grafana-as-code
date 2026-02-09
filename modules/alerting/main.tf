@@ -529,16 +529,20 @@ locals {
     )
   }
 
-  # Create map for notification policies with resolved org IDs
+  # Create map for notification policies
+  # Keys must be known at plan time, so we use the Org Name (or static Org ID from config)
+  # We do NOT resolve to the dynamic Grafana Org ID for the map key
   notification_policies_map = {
     for np in try(var.notification_policies.policies, []) : (
-      # If orgId is provided and is a number, use it as key
-      try(tonumber(np.orgId), null) != null ? tostring(tonumber(np.orgId)) :
-      # If org name is provided, resolve it to ID and use as key
-      try(np.org, null) != null ? tostring(try(var.org_ids[np.org], 1)) :
-      # Default to "1"
-      "1"
+      # Use org name if provided (static string from YAML)
+      try(np.org, null) != null ? np.org :
+      # If orgId is provided, use it (static string/number from YAML)
+      try(tostring(np.orgId), "default")
       ) => merge(np, {
+        # meaningful_id is used for the key
+        meaningful_id = try(np.org, try(tostring(np.orgId), "default"))
+
+        # resolved_org_id is used for the resource attribute (can be dynamic)
         resolved_org_id = (
           try(tonumber(np.orgId), null) != null ? tonumber(np.orgId) :
           try(np.org, null) != null ? try(var.org_ids[np.org], 1) :

@@ -5,12 +5,10 @@ organizations:
     id: 1  # Default org
 
   - name: "Public"
-    description: "Public organization - all teams have viewer access only"
     # All authenticated users get Viewer role via auto_assign_org
-    # No admins or editors - read-only access for everyone
     admins: []
     editors: []
-    viewers: []  # Managed via SSO org_mapping - all teams mapped as Viewer
+    viewers: []
 
   - name: "Platform Team"
     admins:

@@ -30,8 +30,8 @@ locals {
   env_folders    = try(yamldecode(file("${path.module}/config/${local.env}/folders.yaml")), { folders = [] })
 
   # Create maps by uid for merging (env overrides shared)
-  shared_folder_map = { for f in local.shared_folders.folders : f.uid => f }
-  env_folder_map    = { for f in local.env_folders.folders : f.uid => f }
+  shared_folder_map = { for f in try(local.shared_folders.folders, []) : f.uid => f }
+  env_folder_map    = { for f in try(local.env_folders.folders, []) : f.uid => f }
   merged_folder_map = merge(local.shared_folder_map, local.env_folder_map)
 
   folders_config = {

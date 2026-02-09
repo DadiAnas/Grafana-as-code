@@ -1,0 +1,92 @@
+{
+    "uid": "npr-debug-dashboard",
+    "title": "NPR Debug Dashboard2",
+    "description": "Debug dashboard only available in NPR environment",
+    "tags": [
+        "npr",
+        "debug",
+        "development"
+    ],
+    "timezone": "browser",
+    "schemaVersion": 39,
+    "refresh": "10s",
+    "templating": {
+        "list": [
+            {
+                "name": "datasource",
+                "type": "datasource",
+                "query": "prometheus",
+                "current": {},
+                "hide": 0
+            }
+        ]
+    },
+    "panels": [
+        {
+            "id": 1,
+            "title": "Debug Panel - Request Latency Distribution",
+            "type": "heatmap",
+            "gridPos": {
+                "h": 10,
+                "w": 24,
+                "x": 0,
+                "y": 0
+            },
+            "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+            },
+            "targets": [
+                {
+                    "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))",
+                    "legendFormat": "p99",
+                    "refId": "A"
+                }
+            ]
+        },
+        {
+            "id": 2,
+            "title": "Debug - Memory Allocation Details",
+            "type": "timeseries",
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 10
+            },
+            "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+            },
+            "targets": [
+                {
+                    "expr": "go_memstats_alloc_bytes",
+                    "legendFormat": "{{instance}}",
+                    "refId": "A"
+                }
+            ]
+        },
+        {
+            "id": 3,
+            "title": "Debug - Goroutines",
+            "type": "timeseries",
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 10
+            },
+            "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+            },
+            "targets": [
+                {
+                    "expr": "go_goroutines",
+                    "legendFormat": "{{instance}}",
+                    "refId": "A"
+                }
+            ]
+        }
+    ]
+}
