@@ -306,8 +306,9 @@ datasources:
     type: prometheus
     uid: prometheus-main
     url: http://prometheus:9090
+    org: "Main Organization"          # Organization name
     is_default: true
-    http_headers:                    # Custom HTTP headers
+    http_headers:                      # Custom HTTP headers
       X-Custom-Header: "my-value"
     json_data:
       httpMethod: POST
@@ -318,9 +319,10 @@ datasources:
     type: postgres
     uid: postgres
     url: postgres-npr.example.com:5432
-    use_vault: true                  # Credentials from Vault
-    database_name: grafana_npr
+    org: "Main Organization"
+    use_vault: true                    # Credentials from Vault
     json_data:
+      database: grafana_npr
       sslmode: require
       maxOpenConns: 10
 ```
@@ -329,13 +331,15 @@ datasources:
 
 ```yaml
 # config/npr/alerting/contact_points.yaml
-contact_points:
-  - name: webhook-npr
-    type: webhook
-    use_vault: true  # Token from Vault
-    settings:
-      url: https://alerts.example.com/webhook
-      authorization_scheme: Bearer
+contactPoints:
+  - org: "Main Organization"         # Organization name (or use orgId: 1)
+    name: webhook-npr
+    receivers:
+      - type: webhook
+        settings:
+          url: https://alerts.example.com/webhook
+          authorization_scheme: Bearer
+        use_vault: true              # Token from Vault
 ```
 
 ## 📊 Shared vs Environment-Specific
