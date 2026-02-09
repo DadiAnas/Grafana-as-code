@@ -1,241 +1,165 @@
 # =============================================================================
 # SHARED CONTACT POINTS CONFIGURATION
 # =============================================================================
+# Uses Grafana's native export format for easy import/export
+# Supports both 'org' (name) and 'orgId' (numeric) for organization reference
 # These contact points are deployed to ALL environments
 # Environment-specific contact points in config/{env}/alerting/contact_points.yaml will override these
 #
-# SUPPORTED CONTACT POINT TYPES:
-# - email: Email notifications
-# - webhook: Generic HTTP webhook
-# - slack: Slack notifications
-# - pagerduty: PagerDuty incidents
-# - opsgenie: Opsgenie alerts
-# - discord: Discord notifications
-# - telegram: Telegram messages
-# - teams: Microsoft Teams messages
-# - googlechat: Google Chat notifications
-# - victorops: Splunk On-Call (VictorOps)
-# - pushover: Pushover notifications
-# - sns: AWS SNS
-# - sensugo: Sensu Go
-# - threema: Threema messages
-# - webex: Cisco Webex
-# - line: LINE notifications
-# - kafka: Kafka events
-# - oncall: Grafana OnCall
-# - alertmanager: Alertmanager integration
-# - dingding: DingTalk
-# - wecom: WeChat Work
+# FORMAT: This follows Grafana's native YAML export format
+# To export from Grafana: Alerting > Contact Points > Export > YAML
 #
-# COMMON PARAMETERS (all types):
-# - name: (required) Name of the contact point
-# - org: (required) Organization name
-# - type: (required) Contact point type from list above
-# - disable_provenance: Allow modification from Grafana UI
-# - use_vault: Set to true to load secrets from Vault
-# - settings: Type-specific configuration (see examples below)
+# SUPPORTED RECEIVER TYPES:
+# - email, webhook, slack, pagerduty, opsgenie, discord, telegram
+# - teams, googlechat, victorops, pushover, sns, sensugo, threema
+# - webex, line, kafka, oncall, alertmanager, dingding, wecom
 # =============================================================================
 
-contact_points:
+apiVersion: 1
+
+contactPoints:
   # ===========================================================================
-  # EMAIL CONTACT POINTS
+  # PLATFORM TEAM ORGANIZATION
   # ===========================================================================
-  # Settings:
-  #   addresses: Comma-separated list of email addresses
-  #   single_email: Send one email to all (true) or separate emails (false)
-  #   message: Email body template
-  #   subject: Email subject template
-  #   disable_resolve_message: Don't send resolution emails
-  # ===========================================================================
-  - name: "platform-email"
-    org: "Platform Team"
-    type: "email"
-    settings:
-      addresses: "platform-team@example.com"
-      single_email: true
-      subject: "[{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}"
-      message: |
-        {{ range .Alerts }}
-        Alert: {{ .Labels.alertname }}
-        Status: {{ .Status }}
-        Severity: {{ .Labels.severity }}
-        Summary: {{ .Annotations.summary }}
-        Description: {{ .Annotations.description }}
-        {{ end }}
+  - org: Platform Team
+    name: platform-email
+    receivers:
+      - type: email
+        settings:
+          addresses: platform-team@example.com
+          singleEmail: true
+          subject: "[{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}"
+          message: |
+            {{ range .Alerts }}
+            Alert: {{ .Labels.alertname }}
+            Status: {{ .Status }}
+            Severity: {{ .Labels.severity }}
+            Summary: {{ .Annotations.summary }}
+            Description: {{ .Annotations.description }}
+            {{ end }}
+        disableResolveMessage: false
+
+  - org: Platform Team
+    name: platform-webhook
+    receivers:
+      - type: webhook
+        settings:
+          url: https://api.platform.example.com/alerts
+          httpMethod: POST
+        disableResolveMessage: false
 
   # ===========================================================================
-  # WEBHOOK CONTACT POINTS
+  # APPLICATION TEAM ORGANIZATION
   # ===========================================================================
-  # Settings:
-  #   url: Webhook URL
-  #   http_method: HTTP method (POST, PUT, GET)
-  #   basic_auth_user: Basic auth username
-  #   basic_auth_password: Basic auth password
-  #   authorization_scheme: Auth scheme (Bearer, etc.)
-  #   authorization_credentials: Auth credentials/token
-  #   max_alerts: Max alerts per webhook call
-  #   message: Message template
-  #   title: Title template
-  #   disable_resolve_message: Don't send resolution notifications
-  # ===========================================================================
-  - name: "platform-webhook"
-    org: "Platform Team"
-    type: "webhook"
-    settings:
-      url: "https://api.platform.example.com/alerts"
-      http_method: "POST"
+  - org: Application Team
+    name: app-email
+    receivers:
+      - type: email
+        settings:
+          addresses: app-team@example.com
+          singleEmail: true
+          subject: "[{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}"
+        disableResolveMessage: false
+
+  - org: Application Team
+    name: app-webhook
+    receivers:
+      - type: webhook
+        settings:
+          url: https://api.app.example.com/alerts
+          httpMethod: POST
+        disableResolveMessage: false
 
   # ===========================================================================
-  # SLACK CONTACT POINTS
+  # BUSINESS INTELLIGENCE ORGANIZATION
   # ===========================================================================
-  # Settings:
-  #   url: Slack webhook URL
-  #   token: Slack API token (alternative to webhook)
-  #   recipient: Channel or user to notify
-  #   text: Message text template
-  #   title: Message title template
-  #   username: Bot username
-  #   icon_emoji: Bot icon emoji
-  #   icon_url: Bot icon URL
-  #   mention_channel: Mention channel ("here", "channel")
-  #   mention_users: Comma-separated user IDs to mention
-  #   mention_groups: Comma-separated group IDs to mention
-  #   endpoint_url: Custom Slack API endpoint
-  #   disable_resolve_message: Don't send resolution notifications
-  # ===========================================================================
-  # Example (commented out - uncomment and configure to use):
-  # - name: "slack-alerts"
-  #   org: "Platform Team"
-  #   type: "slack"
-  #   use_vault: true  # Token stored in Vault
-  #   settings:
-  #     recipient: "#alerts"
-  #     title: "{{ .CommonLabels.alertname }}"
-  #     text: "{{ .CommonAnnotations.summary }}"
-  #     username: "Grafana Alerts"
-  #     icon_emoji: ":warning:"
+  - org: Business Intelligence
+    name: bi-email
+    receivers:
+      - type: email
+        settings:
+          addresses: bi-team@example.com;analysts@example.com
+          singleEmail: false
+        disableResolveMessage: false
 
-  # ===========================================================================
-  # PAGERDUTY CONTACT POINTS
-  # ===========================================================================
-  # Settings:
-  #   integration_key: PagerDuty integration/routing key (sensitive)
-  #   severity: Severity level (critical, error, warning, info)
-  #   class: Event class
-  #   component: Affected component
-  #   group: Component group
-  #   summary: Alert summary template
-  #   source: Alert source
-  #   client: Monitoring client name
-  #   client_url: Monitoring client URL
-  #   details: Additional key-value details
-  #   url: Custom PagerDuty Events API URL
-  #   disable_resolve_message: Don't send resolution events
-  # ===========================================================================
-  # Example (commented out - uncomment and configure to use):
-  # - name: "pagerduty-critical"
-  #   org: "Platform Team"
-  #   type: "pagerduty"
-  #   use_vault: true  # integration_key stored in Vault
-  #   settings:
-  #     severity: "critical"
-  #     class: "infrastructure"
-  #     component: "kubernetes"
-  #     group: "platform"
+# =============================================================================
+# EXAMPLES (Commented out - uncomment and configure to use)
+# =============================================================================
 
-  # ===========================================================================
-  # OPSGENIE CONTACT POINTS
-  # ===========================================================================
-  # Settings:
-  #   api_key: Opsgenie API key (sensitive)
-  #   url: Opsgenie API URL (use api.eu.opsgenie.com for EU)
-  #   message: Alert message template
-  #   description: Alert description template
-  #   auto_close: Auto-close alerts on resolve
-  #   override_priority: Override alert priority
-  #   send_tags_as: How to send tags (both, teams, tags)
-  #   responders: List of responders
-  #     - type: team/user/escalation/schedule
-  #       id: Responder ID
-  #       name: Responder name
-  #       username: User username
-  #   disable_resolve_message: Don't send resolution notifications
-  # ===========================================================================
-  # Example (commented out - uncomment and configure to use):
-  # - name: "opsgenie-alerts"
-  #   org: "Platform Team"
-  #   type: "opsgenie"
-  #   use_vault: true  # api_key stored in Vault
-  #   settings:
-  #     message: "{{ .CommonLabels.alertname }}"
-  #     auto_close: true
-  #     responders:
-  #       - type: "team"
-  #         name: "Platform Team"
+# SLACK EXAMPLE:
+# - org: Platform Team
+#   name: platform-slack
+#   receivers:
+#     - type: slack
+#       settings:
+#         recipient: "#alerts"
+#         token: "{{ vault:alerting/slack:token }}"
+#         title: "{{ .CommonLabels.alertname }}"
+#         text: "{{ .CommonAnnotations.summary }}"
+#         username: "Grafana Alerts"
+#         icon_emoji: ":warning:"
+#       disableResolveMessage: false
 
-  # ===========================================================================
-  # TELEGRAM CONTACT POINTS
-  # ===========================================================================
-  # Settings:
-  #   token: Telegram bot token (sensitive)
-  #   chat_id: Telegram chat ID
-  #   message: Message template
-  #   message_thread_id: Thread ID for topic-based groups
-  #   parse_mode: Message parse mode (HTML, MarkdownV2)
-  #   disable_web_page_preview: Disable link previews
-  #   protect_content: Protect content from forwarding
-  #   disable_notifications: Send silently
-  #   disable_resolve_message: Don't send resolution notifications
-  # ===========================================================================
-  # Example (commented out - uncomment and configure to use):
-  # - name: "telegram-alerts"
-  #   org: "Platform Team"
-  #   type: "telegram"
-  #   use_vault: true  # token stored in Vault
-  #   settings:
-  #     chat_id: "-1001234567890"
-  #     parse_mode: "HTML"
-  #     message: "<b>{{ .CommonLabels.alertname }}</b>\n{{ .CommonAnnotations.summary }}"
+# PAGERDUTY EXAMPLE:
+# - org: Platform Team
+#   name: platform-pagerduty
+#   receivers:
+#     - type: pagerduty
+#       settings:
+#         integrationKey: "{{ vault:alerting/pagerduty:integration_key }}"
+#         severity: critical
+#         class: infrastructure
+#         component: kubernetes
+#         group: platform
+#       disableResolveMessage: false
 
-  # ===========================================================================
-  # MICROSOFT TEAMS CONTACT POINTS
-  # ===========================================================================
-  # Settings:
-  #   url: Teams webhook URL (sensitive)
-  #   message: Message template
-  #   title: Message title template
-  #   section_title: Section title template
-  #   disable_resolve_message: Don't send resolution notifications
-  # ===========================================================================
-  # Example (commented out - uncomment and configure to use):
-  # - name: "teams-alerts"
-  #   org: "Platform Team"
-  #   type: "teams"
-  #   use_vault: true  # url stored in Vault
-  #   settings:
-  #     title: "{{ .CommonLabels.alertname }}"
-  #     message: "{{ .CommonAnnotations.summary }}"
+# OPSGENIE EXAMPLE:
+# - org: Platform Team
+#   name: platform-opsgenie
+#   receivers:
+#     - type: opsgenie
+#       settings:
+#         apiKey: "{{ vault:alerting/opsgenie:api_key }}"
+#         apiUrl: https://api.opsgenie.com
+#         message: "{{ .CommonLabels.alertname }}"
+#         autoClose: true
+#         overridePriority: true
+#         sendTagsAs: tags
+#       disableResolveMessage: false
 
-  # Application Team Organization Contact Points
-  - name: "app-email"
-    org: "Application Team"
-    type: "email"
-    settings:
-      addresses: "app-team@example.com"
-      single_email: true
-      subject: "[{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}"
+# TELEGRAM EXAMPLE:
+# - org: Platform Team
+#   name: platform-telegram
+#   receivers:
+#     - type: telegram
+#       settings:
+#         bottoken: "{{ vault:alerting/telegram:bot_token }}"
+#         chatid: "-1001234567890"
+#         parse_mode: HTML
+#         message: "<b>{{ .CommonLabels.alertname }}</b>\n{{ .CommonAnnotations.summary }}"
+#       disableResolveMessage: false
 
-  - name: "app-webhook"
-    org: "Application Team"
-    type: "webhook"
-    settings:
-      url: "https://api.app.example.com/alerts"
-      http_method: "POST"
+# MICROSOFT TEAMS EXAMPLE:
+# - org: Platform Team
+#   name: platform-teams
+#   receivers:
+#     - type: teams
+#       settings:
+#         url: "{{ vault:alerting/teams:webhook_url }}"
+#         title: "{{ .CommonLabels.alertname }}"
+#         message: "{{ .CommonAnnotations.summary }}"
+#       disableResolveMessage: false
 
-  # Business Intelligence Organization Contact Points
-  - name: "bi-email"
-    org: "Business Intelligence"
-    type: "email"
-    settings:
-      addresses: "bi-team@example.com,analysts@example.com"
-      single_email: false
+# MULTIPLE RECEIVERS IN ONE CONTACT POINT:
+# - org: Main Organization
+#   name: multi-channel-alerts
+#   receivers:
+#     - type: email
+#       settings:
+#         addresses: alerts@example.com
+#       disableResolveMessage: false
+#     - type: webhook
+#       settings:
+#         url: https://api.example.com/alerts
+#         httpMethod: POST
+#       disableResolveMessage: false

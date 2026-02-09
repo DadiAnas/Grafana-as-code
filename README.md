@@ -14,6 +14,8 @@ Manage Grafana infrastructure as code using Terraform. This project provides a c
 
 - **Multi-Environment Support**: Separate configurations for NPR, PreProd, and Production
 - **Multi-Organization**: Manage multiple Grafana organizations with role-based access
+- **Granular Folder Permissions**: Per-folder access control for teams and users (View/Edit/Admin)
+- **Organization Name Support**: Use human-readable org names instead of numeric IDs in alerting configs
 - **SSO Integration**: Keycloak authentication with organization and role mapping (including GrafanaAdmin support)
 - **Secrets Management**: HashiCorp Vault integration for all sensitive credentials
 - **Template-Based Configuration**: YAML/JSON templates for all Grafana resources
@@ -22,6 +24,7 @@ Manage Grafana infrastructure as code using Terraform. This project provides a c
   - 20+ contact point types (email, webhook, Slack, PagerDuty, Opsgenie, Teams, Discord, Telegram, and more)
   - Complete alert rule parameters (no_data_state, exec_err_state, is_paused, notification_settings)
   - Mute timings configuration
+  - Use `org` (name) or `orgId` (numeric) for organization reference
 - **Dynamic Datasources**: Full parameter support for all datasource types with type-specific json_data
 - **GitLab CI/CD**: Complete pipeline with validation, security scanning, multi-environment deployments, and drift detection
 
@@ -44,7 +47,7 @@ grafana-as-code/
 ├── config/                          # Configuration files (YAML)
 │   ├── shared/                     # Shared across ALL environments
 │   │   ├── organizations.yaml      # Organization definitions
-│   │   ├── folders.yaml            # Folder structure (with org assignment)
+│   │   ├── folders.yaml            # Folder structure (with org assignment & permissions)
 │   │   ├── teams.yaml              # Team definitions (with org assignment)
 │   │   ├── service_accounts.yaml   # Service accounts (with org assignment)
 │   │   ├── datasources.yaml        # Shared datasources (org-specific)
@@ -149,7 +152,57 @@ All resources support a **shared + environment-specific** pattern:
 
 ![Multi-Environment Deployment](docs/images/environments.png)
 
-## 📸 Screenshots
+## � Folder Permissions
+
+Manage granular access control per folder. Teams inherit org-level permissions by default, override when needed:
+
+```yaml
+folders:
+  - name: "Infrastructure"
+    uid: "infrastructure"
+    org: "Main Organization"
+    permissions:
+      - team: "SRE Team"
+        permission: "Admin"      # Full control
+      - team: "Platform Team"
+        permission: "Edit"       # Can edit dashboards
+      - role: "Viewer"
+        permission: "View"       # Read-only
+```
+
+| Permission | Description |
+|------------|-------------|
+| `View` | Can view dashboards in the folder |
+| `Edit` | Can edit dashboards in the folder |
+| `Admin` | Full control including managing permissions |
+
+> **Note**: Teams are organization-scoped. A team can only be granted permissions on folders within the same organization.
+
+## 🔔 Alerting with Organization Names
+
+Use human-readable organization names instead of numeric IDs in alerting configs:
+
+```yaml
+# Contact Points - use 'org' instead of 'orgId'
+contactPoints:
+  - org: Main Organization    # ✅ Human-readable
+    name: email-alerts
+    receivers:
+      - type: email
+        settings:
+          addresses: alerts@example.com
+
+# Notification Policies
+policies:
+  - org: Platform Team        # ✅ Easy to understand
+    receiver: platform-email
+    group_by: [alertname]
+```
+
+Both `org` (name) and `orgId` (numeric) are supported for backward compatibility.
+
+
+## �📸 Screenshots
 
 ### Multi-Organization Support
 Manage multiple isolated organizations from a single Terraform configuration:

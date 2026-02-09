@@ -1,389 +1,407 @@
 # =============================================================================
 # CONTACT POINTS
+# Uses Grafana's native export format with receivers array
+# Supports both 'org' (name) and 'orgId' (numeric) for organization reference
 # Supports: email, webhook, slack, pagerduty, opsgenie, discord, telegram, teams, googlechat, victorops, pushover, sns, sensugo, threema, webex, line, kafka, oncall
 # =============================================================================
 
 locals {
-  # Merge Vault credentials with contact point settings
-  contact_points_with_credentials = {
-    for cp in var.contact_points.contact_points : cp.name => merge(cp, {
-      settings = try(cp.use_vault, false) ? merge(
-        cp.settings,
-        try(var.vault_credentials[cp.name], {})
-      ) : cp.settings
-    })
+  # Helper function to resolve org name or ID to numeric ID
+  # Priority: orgId (if numeric) > org (name lookup) > default to 1
+  resolve_org_id = {
+    for cp in try(var.contact_points.contactPoints, []) : cp.name => (
+      # If orgId is provided and is a number, use it directly
+      try(tonumber(cp.orgId), null) != null ? tonumber(cp.orgId) :
+      # If org name is provided, look it up in org_ids map
+      try(cp.org, null) != null ? try(var.org_ids[cp.org], 1) :
+      # Default to org 1 (Main Organization)
+      1
+    )
+  }
+
+  # Create map for contact points - group by name to create single contact point with all receivers
+  contact_points_by_name = {
+    for cp in try(var.contact_points.contactPoints, []) : cp.name => {
+      name      = cp.name
+      org_id    = local.resolve_org_id[cp.name]
+      receivers = cp.receivers
+    }
   }
 }
 
+
 resource "grafana_contact_point" "contact_points" {
-  for_each = local.contact_points_with_credentials
+  for_each = local.contact_points_by_name
 
   name               = each.value.name
-  org_id             = try(var.org_ids[each.value.org], null)
-  disable_provenance = try(each.value.disable_provenance, false)
+  org_id             = each.value.org_id
+  disable_provenance = false
 
   # ==========================================================================
-  # EMAIL
+  # EMAIL RECEIVERS
   # ==========================================================================
   dynamic "email" {
-    for_each = each.value.type == "email" ? [each.value.settings] : []
+    for_each = [for r in each.value.receivers : r if r.type == "email"]
     content {
-      addresses               = split(",", lookup(email.value, "addresses", ""))
-      single_email            = lookup(email.value, "single_email", lookup(email.value, "singleEmail", false))
-      message                 = lookup(email.value, "message", null)
-      subject                 = lookup(email.value, "subject", null)
-      disable_resolve_message = lookup(email.value, "disable_resolve_message", false)
+      addresses               = split(";", try(email.value.settings.addresses, ""))
+      single_email            = try(email.value.settings.singleEmail, email.value.settings.single_email, false)
+      message                 = try(email.value.settings.message, null)
+      subject                 = try(email.value.settings.subject, null)
+      disable_resolve_message = try(email.value.disableResolveMessage, email.value.disable_resolve_message, false)
     }
   }
 
   # ==========================================================================
-  # WEBHOOK
+  # WEBHOOK RECEIVERS
   # ==========================================================================
   dynamic "webhook" {
-    for_each = each.value.type == "webhook" ? [each.value.settings] : []
+    for_each = [for r in each.value.receivers : r if r.type == "webhook"]
     content {
-      url                       = lookup(webhook.value, "url", null)
-      http_method               = lookup(webhook.value, "http_method", lookup(webhook.value, "httpMethod", "POST"))
-      basic_auth_user           = lookup(webhook.value, "basic_auth_user", lookup(webhook.value, "username", null))
-      basic_auth_password       = lookup(webhook.value, "basic_auth_password", lookup(webhook.value, "password", null))
-      authorization_scheme      = lookup(webhook.value, "authorization_scheme", null)
-      authorization_credentials = lookup(webhook.value, "authorization_credentials", null)
-      max_alerts                = lookup(webhook.value, "max_alerts", null)
-      message                   = lookup(webhook.value, "message", null)
-      title                     = lookup(webhook.value, "title", null)
-      headers                   = { for h in lookup(each.value, "headers", []) : h.name => h.value } # map(string)
-      disable_resolve_message   = lookup(webhook.value, "disable_resolve_message", false)
+      url                       = try(webhook.value.settings.url, null)
+      http_method               = try(webhook.value.settings.httpMethod, webhook.value.settings.http_method, "POST")
+      basic_auth_user           = try(webhook.value.settings.basic_auth_user, webhook.value.settings.username, null)
+      basic_auth_password       = try(webhook.value.settings.basic_auth_password, webhook.value.settings.password, null)
+      authorization_scheme      = try(webhook.value.settings.authorization_scheme, null)
+      authorization_credentials = try(webhook.value.settings.authorization_credentials, null)
+      max_alerts                = try(webhook.value.settings.maxAlerts, webhook.value.settings.max_alerts, null)
+      message                   = try(webhook.value.settings.message, null)
+      title                     = try(webhook.value.settings.title, null)
+      headers                   = try(webhook.value.settings.headers, {})
+      disable_resolve_message   = try(webhook.value.disableResolveMessage, webhook.value.disable_resolve_message, false)
     }
   }
 
   # ==========================================================================
-  # SLACK
+  # SLACK RECEIVERS
   # ==========================================================================
   dynamic "slack" {
-    for_each = each.value.type == "slack" ? [each.value.settings] : []
+    for_each = [for r in each.value.receivers : r if r.type == "slack"]
     content {
-      url                     = lookup(slack.value, "url", null)
-      token                   = lookup(slack.value, "token", null)
-      recipient               = lookup(slack.value, "recipient", null)
-      text                    = lookup(slack.value, "text", null)
-      title                   = lookup(slack.value, "title", null)
-      username                = lookup(slack.value, "username", null)
-      icon_emoji              = lookup(slack.value, "icon_emoji", null)
-      icon_url                = lookup(slack.value, "icon_url", null)
-      mention_channel         = lookup(slack.value, "mention_channel", null)
-      mention_users           = lookup(slack.value, "mention_users", null)
-      mention_groups          = lookup(slack.value, "mention_groups", null)
-      endpoint_url            = lookup(slack.value, "endpoint_url", null)
-      disable_resolve_message = lookup(slack.value, "disable_resolve_message", false)
+      url                     = try(slack.value.settings.url, null)
+      token                   = try(slack.value.settings.token, null)
+      recipient               = try(slack.value.settings.recipient, null)
+      text                    = try(slack.value.settings.text, null)
+      title                   = try(slack.value.settings.title, null)
+      username                = try(slack.value.settings.username, null)
+      icon_emoji              = try(slack.value.settings.icon_emoji, null)
+      icon_url                = try(slack.value.settings.icon_url, null)
+      mention_channel         = try(slack.value.settings.mention_channel, null)
+      mention_users           = try(slack.value.settings.mention_users, null)
+      mention_groups          = try(slack.value.settings.mention_groups, null)
+      endpoint_url            = try(slack.value.settings.endpoint_url, null)
+      disable_resolve_message = try(slack.value.disableResolveMessage, false)
     }
   }
 
   # ==========================================================================
-  # PAGERDUTY
+  # PAGERDUTY RECEIVERS
   # ==========================================================================
   dynamic "pagerduty" {
-    for_each = each.value.type == "pagerduty" ? [each.value.settings] : []
+    for_each = [for r in each.value.receivers : r if r.type == "pagerduty"]
     content {
-      integration_key         = lookup(pagerduty.value, "integration_key", null)
-      severity                = lookup(pagerduty.value, "severity", "critical")
-      class                   = lookup(pagerduty.value, "class", null)
-      component               = lookup(pagerduty.value, "component", null)
-      group                   = lookup(pagerduty.value, "group", null)
-      summary                 = lookup(pagerduty.value, "summary", null)
-      source                  = lookup(pagerduty.value, "source", null)
-      client                  = lookup(pagerduty.value, "client", null)
-      client_url              = lookup(pagerduty.value, "client_url", null)
-      details                 = lookup(pagerduty.value, "details", null)
-      url                     = lookup(pagerduty.value, "url", null)
-      disable_resolve_message = lookup(pagerduty.value, "disable_resolve_message", false)
+      integration_key         = try(pagerduty.value.settings.integrationKey, pagerduty.value.settings.integration_key, null)
+      severity                = try(pagerduty.value.settings.severity, "critical")
+      class                   = try(pagerduty.value.settings.class, null)
+      component               = try(pagerduty.value.settings.component, null)
+      group                   = try(pagerduty.value.settings.group, null)
+      summary                 = try(pagerduty.value.settings.summary, null)
+      source                  = try(pagerduty.value.settings.source, null)
+      client                  = try(pagerduty.value.settings.client, null)
+      client_url              = try(pagerduty.value.settings.client_url, null)
+      details                 = try(pagerduty.value.settings.details, null)
+      url                     = try(pagerduty.value.settings.url, null)
+      disable_resolve_message = try(pagerduty.value.disableResolveMessage, false)
     }
   }
 
   # ==========================================================================
-  # OPSGENIE
+  # OPSGENIE RECEIVERS
   # ==========================================================================
   dynamic "opsgenie" {
-    for_each = each.value.type == "opsgenie" ? [each.value.settings] : []
+    for_each = [for r in each.value.receivers : r if r.type == "opsgenie"]
     content {
-      api_key                 = lookup(opsgenie.value, "api_key", null)
-      url                     = lookup(opsgenie.value, "url", lookup(opsgenie.value, "api_url", null))
-      message                 = lookup(opsgenie.value, "message", null)
-      description             = lookup(opsgenie.value, "description", null)
-      auto_close              = lookup(opsgenie.value, "auto_close", null)
-      override_priority       = lookup(opsgenie.value, "override_priority", null)
-      send_tags_as            = lookup(opsgenie.value, "send_tags_as", null)
-      disable_resolve_message = lookup(opsgenie.value, "disable_resolve_message", false)
-
-      dynamic "responders" {
-        for_each = try(opsgenie.value.responders, [])
-        content {
-          type     = lookup(responders.value, "type", null)
-          id       = lookup(responders.value, "id", null)
-          name     = lookup(responders.value, "name", null)
-          username = lookup(responders.value, "username", null)
-        }
-      }
+      api_key                 = try(opsgenie.value.settings.apiKey, opsgenie.value.settings.api_key, null)
+      url                     = try(opsgenie.value.settings.apiUrl, opsgenie.value.settings.url, null)
+      message                 = try(opsgenie.value.settings.message, null)
+      description             = try(opsgenie.value.settings.description, null)
+      auto_close              = try(opsgenie.value.settings.autoClose, opsgenie.value.settings.auto_close, null)
+      override_priority       = try(opsgenie.value.settings.overridePriority, opsgenie.value.settings.override_priority, null)
+      send_tags_as            = try(opsgenie.value.settings.sendTagsAs, opsgenie.value.settings.send_tags_as, null)
+      disable_resolve_message = try(opsgenie.value.disableResolveMessage, false)
     }
   }
 
   # ==========================================================================
-  # DISCORD
+  # DISCORD RECEIVERS
   # ==========================================================================
   dynamic "discord" {
-    for_each = each.value.type == "discord" ? [each.value.settings] : []
+    for_each = [for r in each.value.receivers : r if r.type == "discord"]
     content {
-      url                     = lookup(discord.value, "url", null)
-      title                   = lookup(discord.value, "title", null)
-      message                 = lookup(discord.value, "message", null)
-      avatar_url              = lookup(discord.value, "avatar_url", null)
-      use_discord_username    = lookup(discord.value, "use_discord_username", null)
-      disable_resolve_message = lookup(discord.value, "disable_resolve_message", false)
+      url                     = try(discord.value.settings.url, null)
+      title                   = try(discord.value.settings.title, null)
+      message                 = try(discord.value.settings.message, null)
+      avatar_url              = try(discord.value.settings.avatar_url, null)
+      use_discord_username    = try(discord.value.settings.use_discord_username, null)
+      disable_resolve_message = try(discord.value.disableResolveMessage, false)
     }
   }
 
   # ==========================================================================
-  # TELEGRAM
+  # TELEGRAM RECEIVERS
   # ==========================================================================
   dynamic "telegram" {
-    for_each = each.value.type == "telegram" ? [each.value.settings] : []
+    for_each = [for r in each.value.receivers : r if r.type == "telegram"]
     content {
-      token                    = lookup(telegram.value, "token", lookup(telegram.value, "bot_token", null))
-      chat_id                  = lookup(telegram.value, "chat_id", null)
-      message                  = lookup(telegram.value, "message", null)
-      message_thread_id        = lookup(telegram.value, "message_thread_id", null)
-      parse_mode               = lookup(telegram.value, "parse_mode", null)
-      disable_web_page_preview = lookup(telegram.value, "disable_web_page_preview", null)
-      protect_content          = lookup(telegram.value, "protect_content", null)
-      disable_notifications    = lookup(telegram.value, "disable_notifications", lookup(telegram.value, "disable_notification", null))
-      disable_resolve_message  = lookup(telegram.value, "disable_resolve_message", false)
+      token                    = try(telegram.value.settings.bottoken, telegram.value.settings.token, null)
+      chat_id                  = try(telegram.value.settings.chatid, telegram.value.settings.chat_id, null)
+      message                  = try(telegram.value.settings.message, null)
+      message_thread_id        = try(telegram.value.settings.message_thread_id, null)
+      parse_mode               = try(telegram.value.settings.parse_mode, null)
+      disable_web_page_preview = try(telegram.value.settings.disable_web_page_preview, null)
+      protect_content          = try(telegram.value.settings.protect_content, null)
+      disable_notifications    = try(telegram.value.settings.disable_notifications, null)
+      disable_resolve_message  = try(telegram.value.disableResolveMessage, false)
     }
   }
 
   # ==========================================================================
-  # MICROSOFT TEAMS
+  # MICROSOFT TEAMS RECEIVERS
   # ==========================================================================
   dynamic "teams" {
-    for_each = each.value.type == "teams" ? [each.value.settings] : []
+    for_each = [for r in each.value.receivers : r if r.type == "teams"]
     content {
-      url                     = lookup(teams.value, "url", null)
-      message                 = lookup(teams.value, "message", null)
-      title                   = lookup(teams.value, "title", null)
-      section_title           = lookup(teams.value, "section_title", null)
-      disable_resolve_message = lookup(teams.value, "disable_resolve_message", false)
+      url                     = try(teams.value.settings.url, null)
+      message                 = try(teams.value.settings.message, null)
+      title                   = try(teams.value.settings.title, null)
+      section_title           = try(teams.value.settings.section_title, null)
+      disable_resolve_message = try(teams.value.disableResolveMessage, false)
     }
   }
 
   # ==========================================================================
-  # GOOGLE CHAT
+  # GOOGLE CHAT RECEIVERS
   # ==========================================================================
   dynamic "googlechat" {
-    for_each = each.value.type == "googlechat" ? [each.value.settings] : []
+    for_each = [for r in each.value.receivers : r if r.type == "googlechat"]
     content {
-      url                     = lookup(googlechat.value, "url", null)
-      message                 = lookup(googlechat.value, "message", null)
-      title                   = lookup(googlechat.value, "title", null)
-      disable_resolve_message = lookup(googlechat.value, "disable_resolve_message", false)
+      url                     = try(googlechat.value.settings.url, null)
+      message                 = try(googlechat.value.settings.message, null)
+      title                   = try(googlechat.value.settings.title, null)
+      disable_resolve_message = try(googlechat.value.disableResolveMessage, false)
     }
   }
 
   # ==========================================================================
-  # VICTOROPS (Splunk On-Call)
+  # VICTOROPS (Splunk On-Call) RECEIVERS
   # ==========================================================================
   dynamic "victorops" {
-    for_each = each.value.type == "victorops" ? [each.value.settings] : []
+    for_each = [for r in each.value.receivers : r if r.type == "victorops"]
     content {
-      url                     = lookup(victorops.value, "url", null)
-      message_type            = lookup(victorops.value, "message_type", null)
-      description             = lookup(victorops.value, "description", null)
-      title                   = lookup(victorops.value, "title", null)
-      disable_resolve_message = lookup(victorops.value, "disable_resolve_message", false)
+      uid                     = try(victorops.value.uid, null)
+      url                     = try(victorops.value.settings.url, null)
+      message_type            = try(victorops.value.settings.message_type, null)
+      description             = try(victorops.value.settings.description, null)
+      title                   = try(victorops.value.settings.title, null)
+      disable_resolve_message = try(victorops.value.disableResolveMessage, false)
     }
   }
 
   # ==========================================================================
-  # PUSHOVER
+  # PUSHOVER RECEIVERS
   # ==========================================================================
   dynamic "pushover" {
-    for_each = each.value.type == "pushover" ? [each.value.settings] : []
+    for_each = [for r in each.value.receivers : r if r.type == "pushover"]
     content {
-      user_key                = lookup(pushover.value, "user_key", null)
-      api_token               = lookup(pushover.value, "api_token", null)
-      priority                = lookup(pushover.value, "priority", null)
-      ok_priority             = lookup(pushover.value, "ok_priority", null)
-      retry                   = lookup(pushover.value, "retry", null)
-      expire                  = lookup(pushover.value, "expire", null)
-      device                  = lookup(pushover.value, "device", null)
-      sound                   = lookup(pushover.value, "sound", null)
-      ok_sound                = lookup(pushover.value, "ok_sound", null)
-      title                   = lookup(pushover.value, "title", null)
-      message                 = lookup(pushover.value, "message", null)
-      upload_image            = lookup(pushover.value, "upload_image", null)
-      disable_resolve_message = lookup(pushover.value, "disable_resolve_message", false)
+      uid                     = try(pushover.value.uid, null)
+      user_key                = try(pushover.value.settings.userKey, pushover.value.settings.user_key, null)
+      api_token               = try(pushover.value.settings.apiToken, pushover.value.settings.api_token, null)
+      priority                = try(pushover.value.settings.priority, null)
+      ok_priority             = try(pushover.value.settings.okPriority, pushover.value.settings.ok_priority, null)
+      retry                   = try(pushover.value.settings.retry, null)
+      expire                  = try(pushover.value.settings.expire, null)
+      device                  = try(pushover.value.settings.device, null)
+      sound                   = try(pushover.value.settings.sound, null)
+      ok_sound                = try(pushover.value.settings.okSound, pushover.value.settings.ok_sound, null)
+      title                   = try(pushover.value.settings.title, null)
+      message                 = try(pushover.value.settings.message, null)
+      upload_image            = try(pushover.value.settings.upload_image, null)
+      disable_resolve_message = try(pushover.value.disableResolveMessage, false)
     }
   }
 
   # ==========================================================================
-  # AWS SNS
+  # AWS SNS RECEIVERS
   # ==========================================================================
   dynamic "sns" {
-    for_each = each.value.type == "sns" ? [each.value.settings] : []
+    for_each = [for r in each.value.receivers : r if r.type == "sns"]
     content {
-      topic                   = lookup(sns.value, "topic", null)
-      assume_role_arn         = lookup(sns.value, "assume_role_arn", null)
-      auth_provider           = lookup(sns.value, "auth_provider", null)
-      external_id             = lookup(sns.value, "external_id", null)
-      message_format          = lookup(sns.value, "message_format", null)
-      subject                 = lookup(sns.value, "subject", null)
-      body                    = lookup(sns.value, "body", null)
-      disable_resolve_message = lookup(sns.value, "disable_resolve_message", false)
+      uid                     = try(sns.value.uid, null)
+      topic                   = try(sns.value.settings.topic, null)
+      assume_role_arn         = try(sns.value.settings.assumeRoleArn, sns.value.settings.assume_role_arn, null)
+      auth_provider           = try(sns.value.settings.authProvider, sns.value.settings.auth_provider, null)
+      external_id             = try(sns.value.settings.externalId, sns.value.settings.external_id, null)
+      message_format          = try(sns.value.settings.messageFormat, sns.value.settings.message_format, null)
+      subject                 = try(sns.value.settings.subject, null)
+      body                    = try(sns.value.settings.body, null)
+      disable_resolve_message = try(sns.value.disableResolveMessage, false)
     }
   }
 
   # ==========================================================================
-  # SENSU GO
+  # SENSU GO RECEIVERS
   # ==========================================================================
   dynamic "sensugo" {
-    for_each = each.value.type == "sensugo" ? [each.value.settings] : []
+    for_each = [for r in each.value.receivers : r if r.type == "sensugo"]
     content {
-      url                     = lookup(sensugo.value, "url", null)
-      api_key                 = lookup(sensugo.value, "api_key", null)
-      entity                  = lookup(sensugo.value, "entity", null)
-      check                   = lookup(sensugo.value, "check", null)
-      handler                 = lookup(sensugo.value, "handler", null)
-      namespace               = lookup(sensugo.value, "namespace", null)
-      message                 = lookup(sensugo.value, "message", null)
-      disable_resolve_message = lookup(sensugo.value, "disable_resolve_message", false)
+      uid                     = try(sensugo.value.uid, null)
+      url                     = try(sensugo.value.settings.url, null)
+      api_key                 = try(sensugo.value.settings.apiKey, sensugo.value.settings.api_key, null)
+      entity                  = try(sensugo.value.settings.entity, null)
+      check                   = try(sensugo.value.settings.check, null)
+      handler                 = try(sensugo.value.settings.handler, null)
+      namespace               = try(sensugo.value.settings.namespace, null)
+      message                 = try(sensugo.value.settings.message, null)
+      disable_resolve_message = try(sensugo.value.disableResolveMessage, false)
     }
   }
 
   # ==========================================================================
-  # THREEMA
+  # THREEMA RECEIVERS
   # ==========================================================================
   dynamic "threema" {
-    for_each = each.value.type == "threema" ? [each.value.settings] : []
+    for_each = [for r in each.value.receivers : r if r.type == "threema"]
     content {
-      gateway_id              = lookup(threema.value, "gateway_id", null)
-      recipient_id            = lookup(threema.value, "recipient_id", null)
-      api_secret              = lookup(threema.value, "api_secret", null)
-      title                   = lookup(threema.value, "title", null)
-      description             = lookup(threema.value, "description", null)
-      disable_resolve_message = lookup(threema.value, "disable_resolve_message", false)
+      uid                     = try(threema.value.uid, null)
+      gateway_id              = try(threema.value.settings.gatewayId, threema.value.settings.gateway_id, null)
+      recipient_id            = try(threema.value.settings.recipientId, threema.value.settings.recipient_id, null)
+      api_secret              = try(threema.value.settings.apiSecret, threema.value.settings.api_secret, null)
+      title                   = try(threema.value.settings.title, null)
+      description             = try(threema.value.settings.description, null)
+      disable_resolve_message = try(threema.value.disableResolveMessage, false)
     }
   }
 
   # ==========================================================================
-  # WEBEX (Cisco Webex)
+  # WEBEX (Cisco Webex) RECEIVERS
   # ==========================================================================
   dynamic "webex" {
-    for_each = each.value.type == "webex" ? [each.value.settings] : []
+    for_each = [for r in each.value.receivers : r if r.type == "webex"]
     content {
-      token                   = lookup(webex.value, "token", null)
-      room_id                 = lookup(webex.value, "room_id", null)
-      api_url                 = lookup(webex.value, "api_url", null)
-      message                 = lookup(webex.value, "message", null)
-      disable_resolve_message = lookup(webex.value, "disable_resolve_message", false)
+      uid                     = try(webex.value.uid, null)
+      token                   = try(webex.value.settings.token, null)
+      room_id                 = try(webex.value.settings.roomId, webex.value.settings.room_id, null)
+      api_url                 = try(webex.value.settings.apiUrl, webex.value.settings.api_url, null)
+      message                 = try(webex.value.settings.message, null)
+      disable_resolve_message = try(webex.value.disableResolveMessage, false)
     }
   }
 
   # ==========================================================================
-  # LINE
+  # LINE RECEIVERS
   # ==========================================================================
   dynamic "line" {
-    for_each = each.value.type == "line" ? [each.value.settings] : []
+    for_each = [for r in each.value.receivers : r if r.type == "line"]
     content {
-      token                   = lookup(line.value, "token", null)
-      title                   = lookup(line.value, "title", null)
-      description             = lookup(line.value, "description", null)
-      disable_resolve_message = lookup(line.value, "disable_resolve_message", false)
+      uid                     = try(line.value.uid, null)
+      token                   = try(line.value.settings.token, null)
+      title                   = try(line.value.settings.title, null)
+      description             = try(line.value.settings.description, null)
+      disable_resolve_message = try(line.value.disableResolveMessage, false)
     }
   }
 
   # ==========================================================================
-  # KAFKA
+  # KAFKA RECEIVERS
   # ==========================================================================
   dynamic "kafka" {
-    for_each = each.value.type == "kafka" ? [each.value.settings] : []
+    for_each = [for r in each.value.receivers : r if r.type == "kafka"]
     content {
-      rest_proxy_url          = lookup(kafka.value, "rest_proxy_url", null)
-      topic                   = lookup(kafka.value, "topic", null)
-      description             = lookup(kafka.value, "description", null)
-      details                 = lookup(kafka.value, "details", null)
-      username                = lookup(kafka.value, "username", null)
-      password                = lookup(kafka.value, "password", null)
-      api_version             = lookup(kafka.value, "api_version", null)
-      cluster_id              = lookup(kafka.value, "cluster_id", null)
-      disable_resolve_message = lookup(kafka.value, "disable_resolve_message", false)
+      uid                     = try(kafka.value.uid, null)
+      rest_proxy_url          = try(kafka.value.settings.restProxyUrl, kafka.value.settings.rest_proxy_url, null)
+      topic                   = try(kafka.value.settings.topic, null)
+      description             = try(kafka.value.settings.description, null)
+      details                 = try(kafka.value.settings.details, null)
+      username                = try(kafka.value.settings.username, null)
+      password                = try(kafka.value.settings.password, null)
+      api_version             = try(kafka.value.settings.apiVersion, kafka.value.settings.api_version, null)
+      cluster_id              = try(kafka.value.settings.clusterId, kafka.value.settings.cluster_id, null)
+      disable_resolve_message = try(kafka.value.disableResolveMessage, false)
     }
   }
 
   # ==========================================================================
-  # GRAFANA ONCALL
+  # GRAFANA ONCALL RECEIVERS
   # ==========================================================================
   dynamic "oncall" {
-    for_each = each.value.type == "oncall" ? [each.value.settings] : []
+    for_each = [for r in each.value.receivers : r if r.type == "oncall"]
     content {
-      url                       = lookup(oncall.value, "url", null)
-      http_method               = lookup(oncall.value, "http_method", null)
-      basic_auth_user           = lookup(oncall.value, "basic_auth_user", null)
-      basic_auth_password       = lookup(oncall.value, "basic_auth_password", null)
-      authorization_scheme      = lookup(oncall.value, "authorization_scheme", null)
-      authorization_credentials = lookup(oncall.value, "authorization_credentials", null)
-      max_alerts                = lookup(oncall.value, "max_alerts", null)
-      message                   = lookup(oncall.value, "message", null)
-      title                     = lookup(oncall.value, "title", null)
-      disable_resolve_message   = lookup(oncall.value, "disable_resolve_message", false)
+      uid                       = try(oncall.value.uid, null)
+      url                       = try(oncall.value.settings.url, null)
+      http_method               = try(oncall.value.settings.httpMethod, oncall.value.settings.http_method, null)
+      basic_auth_user           = try(oncall.value.settings.basicAuthUser, oncall.value.settings.basic_auth_user, null)
+      basic_auth_password       = try(oncall.value.settings.basicAuthPassword, oncall.value.settings.basic_auth_password, null)
+      authorization_scheme      = try(oncall.value.settings.authorizationScheme, oncall.value.settings.authorization_scheme, null)
+      authorization_credentials = try(oncall.value.settings.authorizationCredentials, oncall.value.settings.authorization_credentials, null)
+      max_alerts                = try(oncall.value.settings.maxAlerts, oncall.value.settings.max_alerts, null)
+      message                   = try(oncall.value.settings.message, null)
+      title                     = try(oncall.value.settings.title, null)
+      disable_resolve_message   = try(oncall.value.disableResolveMessage, false)
     }
   }
 
   # ==========================================================================
-  # ALERTMANAGER
+  # ALERTMANAGER RECEIVERS
   # ==========================================================================
   dynamic "alertmanager" {
-    for_each = each.value.type == "alertmanager" ? [each.value.settings] : []
+    for_each = [for r in each.value.receivers : r if r.type == "alertmanager"]
     content {
-      url                     = lookup(alertmanager.value, "url", null)
-      basic_auth_user         = lookup(alertmanager.value, "basic_auth_user", null)
-      basic_auth_password     = lookup(alertmanager.value, "basic_auth_password", null)
-      disable_resolve_message = lookup(alertmanager.value, "disable_resolve_message", false)
+      uid                     = try(alertmanager.value.uid, null)
+      url                     = try(alertmanager.value.settings.url, null)
+      basic_auth_user         = try(alertmanager.value.settings.basicAuthUser, alertmanager.value.settings.basic_auth_user, null)
+      basic_auth_password     = try(alertmanager.value.settings.basicAuthPassword, alertmanager.value.settings.basic_auth_password, null)
+      disable_resolve_message = try(alertmanager.value.disableResolveMessage, false)
     }
   }
 
   # ==========================================================================
-  # DINGDING
+  # DINGDING RECEIVERS
   # ==========================================================================
   dynamic "dingding" {
-    for_each = each.value.type == "dingding" ? [each.value.settings] : []
+    for_each = [for r in each.value.receivers : r if r.type == "dingding"]
     content {
-      url                     = lookup(dingding.value, "url", null)
-      message_type            = lookup(dingding.value, "message_type", null)
-      message                 = lookup(dingding.value, "message", null)
-      title                   = lookup(dingding.value, "title", null)
-      disable_resolve_message = lookup(dingding.value, "disable_resolve_message", false)
+      uid                     = try(dingding.value.uid, null)
+      url                     = try(dingding.value.settings.url, null)
+      message_type            = try(dingding.value.settings.messageType, dingding.value.settings.message_type, null)
+      message                 = try(dingding.value.settings.message, null)
+      title                   = try(dingding.value.settings.title, null)
+      disable_resolve_message = try(dingding.value.disableResolveMessage, false)
     }
   }
 
   # ==========================================================================
-  # WECOM (WeChat Work)
+  # WECOM (WeChat Work) RECEIVERS
   # ==========================================================================
   dynamic "wecom" {
-    for_each = each.value.type == "wecom" ? [each.value.settings] : []
+    for_each = [for r in each.value.receivers : r if r.type == "wecom"]
     content {
-      url                     = lookup(wecom.value, "url", null)
-      secret                  = lookup(wecom.value, "secret", null)
-      agent_id                = lookup(wecom.value, "agent_id", null)
-      corp_id                 = lookup(wecom.value, "corp_id", null)
-      msg_type                = lookup(wecom.value, "msg_type", null)
-      message                 = lookup(wecom.value, "message", null)
-      title                   = lookup(wecom.value, "title", null)
-      to_user                 = lookup(wecom.value, "to_user", null)
-      disable_resolve_message = lookup(wecom.value, "disable_resolve_message", false)
+      uid                     = try(wecom.value.uid, null)
+      url                     = try(wecom.value.settings.url, null)
+      secret                  = try(wecom.value.settings.secret, null)
+      agent_id                = try(wecom.value.settings.agentId, wecom.value.settings.agent_id, null)
+      corp_id                 = try(wecom.value.settings.corpId, wecom.value.settings.corp_id, null)
+      msg_type                = try(wecom.value.settings.msgType, wecom.value.settings.msg_type, null)
+      message                 = try(wecom.value.settings.message, null)
+      title                   = try(wecom.value.settings.title, null)
+      to_user                 = try(wecom.value.settings.toUser, wecom.value.settings.to_user, null)
+      disable_resolve_message = try(wecom.value.disableResolveMessage, false)
     }
   }
 }
 
 # =============================================================================
 # ALERT RULE GROUPS
-# Supports Grafana's native export format with org name instead of orgId
+# Supports Grafana's native export format
+# Supports both 'org' (name) and 'orgId' (numeric) for organization reference
 # =============================================================================
 
 locals {
@@ -396,9 +414,16 @@ locals {
     for group in local.alert_groups :
     "${group.folder}-${group.name}" => {
       org              = try(group.org, null)
+      orgId            = try(group.orgId, null)
       folder           = group.folder
       name             = group.name
       interval_seconds = try(tonumber(trimsuffix(group.interval, "m")) * 60, try(tonumber(trimsuffix(group.interval, "s")), 60))
+      # Resolve org ID: priority is orgId (if numeric) > org (name lookup) > null
+      resolved_org_id = (
+        try(tonumber(group.orgId), null) != null ? tonumber(group.orgId) :
+        try(group.org, null) != null ? try(var.org_ids[group.org], null) :
+        null
+      )
       rules = [
         for rule in try(group.rules, []) : {
           name                  = try(rule.title, rule.name)
@@ -432,7 +457,7 @@ resource "grafana_rule_group" "rule_groups" {
   name               = each.value.name
   folder_uid         = each.value.folder
   interval_seconds   = each.value.interval_seconds
-  org_id             = try(var.org_ids[each.value.org], null)
+  org_id             = each.value.resolved_org_id
   disable_provenance = false
 
   dynamic "rule" {
@@ -484,21 +509,50 @@ resource "grafana_rule_group" "rule_groups" {
 
 # =============================================================================
 # NOTIFICATION POLICIES
-# Full support for all notification policy parameters
+# Uses Grafana's native export format with orgId and object_matchers
+# Supports both 'org' (name) and 'orgId' (numeric) for organization reference
 # =============================================================================
 
 locals {
+  # Helper function to resolve org name or ID to numeric ID for notification policies
+  resolve_np_org_id = {
+    for np in try(var.notification_policies.policies, []) : (
+      # Use orgId if provided, otherwise use org name, fallback to index
+      try(tostring(np.orgId), try(np.org, "unknown"))
+      ) => (
+      # If orgId is provided and is a number, use it directly
+      try(tonumber(np.orgId), null) != null ? tonumber(np.orgId) :
+      # If org name is provided, look it up in org_ids map
+      try(np.org, null) != null ? try(var.org_ids[np.org], 1) :
+      # Default to org 1 (Main Organization)
+      1
+    )
+  }
+
+  # Create map for notification policies with resolved org IDs
   notification_policies_map = {
-    for np in var.notification_policies.notification_policies :
-    np.org => np
+    for np in try(var.notification_policies.policies, []) : (
+      # If orgId is provided and is a number, use it as key
+      try(tonumber(np.orgId), null) != null ? tostring(tonumber(np.orgId)) :
+      # If org name is provided, resolve it to ID and use as key
+      try(np.org, null) != null ? tostring(try(var.org_ids[np.org], 1)) :
+      # Default to "1"
+      "1"
+      ) => merge(np, {
+        resolved_org_id = (
+          try(tonumber(np.orgId), null) != null ? tonumber(np.orgId) :
+          try(np.org, null) != null ? try(var.org_ids[np.org], 1) :
+          1
+        )
+    })
   }
 }
 
 resource "grafana_notification_policy" "policy" {
   for_each = local.notification_policies_map
 
-  org_id          = try(var.org_ids[each.key], null)
-  contact_point   = each.value.contact_point
+  org_id          = each.value.resolved_org_id
+  contact_point   = each.value.receiver
   group_by        = try(each.value.group_by, ["alertname"])
   group_wait      = try(each.value.group_wait, "30s")
   group_interval  = try(each.value.group_interval, "5m")
@@ -506,9 +560,9 @@ resource "grafana_notification_policy" "policy" {
 
   # Nested policies (routes)
   dynamic "policy" {
-    for_each = try(each.value.routes, each.value.policies, [])
+    for_each = try(each.value.routes, [])
     content {
-      contact_point   = try(policy.value.contact_point, null)
+      contact_point   = try(policy.value.receiver, null)
       group_by        = try(policy.value.group_by, [])
       group_wait      = try(policy.value.group_wait, null)
       group_interval  = try(policy.value.group_interval, null)
@@ -516,31 +570,21 @@ resource "grafana_notification_policy" "policy" {
       continue        = try(policy.value.continue, false)
       mute_timings    = try(policy.value.mute_timings, [])
 
-      # Matchers for the nested policy
+      # Grafana native object_matchers format: [[label, operator, value], ...]
       dynamic "matcher" {
-        for_each = try(policy.value.matchers, [])
+        for_each = try(policy.value.object_matchers, [])
         content {
-          label = matcher.value.label
-          match = try(matcher.value.match, "=")
-          value = matcher.value.value
-        }
-      }
-
-      # Legacy match support (key-value pairs)
-      dynamic "matcher" {
-        for_each = try(policy.value.match, {})
-        content {
-          label = matcher.key
-          match = "="
-          value = matcher.value
+          label = matcher.value[0]
+          match = matcher.value[1]
+          value = matcher.value[2]
         }
       }
 
       # Recursively nested policies (level 2)
       dynamic "policy" {
-        for_each = try(policy.value.policies, [])
+        for_each = try(policy.value.routes, [])
         content {
-          contact_point   = try(policy.value.contact_point, null)
+          contact_point   = try(policy.value.receiver, null)
           group_by        = try(policy.value.group_by, [])
           group_wait      = try(policy.value.group_wait, null)
           group_interval  = try(policy.value.group_interval, null)
@@ -548,12 +592,13 @@ resource "grafana_notification_policy" "policy" {
           continue        = try(policy.value.continue, false)
           mute_timings    = try(policy.value.mute_timings, [])
 
+          # Grafana native object_matchers format
           dynamic "matcher" {
-            for_each = try(policy.value.matchers, [])
+            for_each = try(policy.value.object_matchers, [])
             content {
-              label = matcher.value.label
-              match = try(matcher.value.match, "=")
-              value = matcher.value.value
+              label = matcher.value[0]
+              match = matcher.value[1]
+              value = matcher.value[2]
             }
           }
         }

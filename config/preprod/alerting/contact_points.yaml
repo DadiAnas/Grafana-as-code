@@ -1,65 +1,81 @@
 # Grafana Contact Points Configuration - PREPROD Environment
-# These override or extend shared contact points for PREPROD
-# Only webhook and email channels are supported
+# Uses Grafana's native export format for easy import/export
+# Supports both 'org' (name) and 'orgId' (numeric) for organization reference
 
-contact_points:
+apiVersion: 1
+
+contactPoints:
   # Main Organization Contact Points
-  - name: "email-preprod"
-    org: "Main Organization"
-    type: "email"
-    settings:
-      addresses: "oncall-preprod@example.com,platform-preprod@example.com"
-      singleEmail: true
-      subject: "[PREPROD] [{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}"
-      message: |
-        Environment: PREPROD
-        {{ range .Alerts }}
-        Alert: {{ .Labels.alertname }}
-        Status: {{ .Status }}
-        Severity: {{ .Labels.severity }}
-        Summary: {{ .Annotations.summary }}
-        Description: {{ .Annotations.description }}
-        {{ if .Annotations.runbook_url }}Runbook: {{ .Annotations.runbook_url }}{{ end }}
-        {{ end }}
+  - org: Main Organization
+    name: email-preprod
+    receivers:
+      - type: email
+        settings:
+          addresses: oncall-preprod@example.com;platform-preprod@example.com
+          singleEmail: true
+          subject: "[PREPROD] [{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}"
+          message: |
+            Environment: PREPROD
+            {{ range .Alerts }}
+            Alert: {{ .Labels.alertname }}
+            Status: {{ .Status }}
+            Severity: {{ .Labels.severity }}
+            Summary: {{ .Annotations.summary }}
+            Description: {{ .Annotations.description }}
+            {{ if .Annotations.runbook_url }}Runbook: {{ .Annotations.runbook_url }}{{ end }}
+            {{ end }}
+        disableResolveMessage: false
 
-  - name: "webhook-preprod"
-    org: "Main Organization"
-    type: "webhook"
-    use_vault: true
-    settings:
-      url: "https://api.preprod.example.com/alerts"
-      httpMethod: "POST"
-      authorization_scheme: "Bearer"
-      # authorization_credentials fetched from Vault
+  - org: Main Organization
+    name: webhook-preprod
+    receivers:
+      - type: webhook
+        settings:
+          url: https://api.preprod.example.com/alerts
+          httpMethod: POST
+          authorization_scheme: Bearer
+          authorization_credentials: "{{ vault:alerting/webhook-preprod:token }}"
+          headers:
+            Content-Type: application/json
+          maxAlerts: 0
+        disableResolveMessage: false
 
   # Platform Team Organization Contact Points
-  - name: "platform-email-preprod"
-    org: "Platform Team"
-    type: "email"
-    settings:
-      addresses: "platform-team-preprod@example.com"
-      singleEmail: true
-      subject: "[PREPROD-Platform] [{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}"
+  - org: Platform Team
+    name: platform-email-preprod
+    receivers:
+      - type: email
+        settings:
+          addresses: platform-team-preprod@example.com
+          singleEmail: true
+          subject: "[PREPROD-Platform] [{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}"
+        disableResolveMessage: false
 
-  - name: "platform-webhook-preprod"
-    org: "Platform Team"
-    type: "webhook"
-    settings:
-      url: "https://hooks.platform.example.com/preprod/alerts"
-      httpMethod: "POST"
+  - org: Platform Team
+    name: platform-webhook-preprod
+    receivers:
+      - type: webhook
+        settings:
+          url: https://hooks.platform.example.com/preprod/alerts
+          httpMethod: POST
+        disableResolveMessage: false
 
   # Application Team Organization Contact Points
-  - name: "app-email-preprod"
-    org: "Application Team"
-    type: "email"
-    settings:
-      addresses: "app-team-preprod@example.com"
-      singleEmail: true
-      subject: "[PREPROD-App] [{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}"
+  - org: Application Team
+    name: app-email-preprod
+    receivers:
+      - type: email
+        settings:
+          addresses: app-team-preprod@example.com
+          singleEmail: true
+          subject: "[PREPROD-App] [{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}"
+        disableResolveMessage: false
 
-  - name: "app-webhook-preprod"
-    org: "Application Team"
-    type: "webhook"
-    settings:
-      url: "https://hooks.app.example.com/preprod/alerts"
-      httpMethod: "POST"
+  - org: Application Team
+    name: app-webhook-preprod
+    receivers:
+      - type: webhook
+        settings:
+          url: https://hooks.app.example.com/preprod/alerts
+          httpMethod: POST
+        disableResolveMessage: false

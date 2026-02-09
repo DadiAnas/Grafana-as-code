@@ -1,68 +1,81 @@
 # Grafana Contact Points Configuration - NPR Environment
-# These override or extend shared contact points for NPR
-# Only webhook and email channels are supported
+# Uses Grafana's native export format for easy import/export
+# Supports both 'org' (name) and 'orgId' (numeric) for organization reference
 
-contact_points:
+apiVersion: 1
+
+contactPoints:
   # Main Organization Contact Points
-  - name: "email-npr"
-    org: "Main Organization"
-    type: "email"
-    settings:
-      addresses: "oncall-npr@example.com,platform-npr@example.com"
-      singleEmail: true
-      subject: "[NPR] [{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}"
-      message: |
-        Environment: NPR
-        {{ range .Alerts }}
-        Alert: {{ .Labels.alertname }}
-        Status: {{ .Status }}
-        Severity: {{ .Labels.severity }}
-        Summary: {{ .Annotations.summary }}
-        Description: {{ .Annotations.description }}
-        {{ if .Annotations.runbook_url }}Runbook: {{ .Annotations.runbook_url }}{{ end }}
-        {{ end }}
+  - org: Main Organization
+    name: email-npr
+    receivers:
+      - type: email
+        settings:
+          addresses: oncall-npr@example.com;platform-npr@example.com
+          singleEmail: true
+          subject: "[NPR] [{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}"
+          message: |
+            Environment: NPR
+            {{ range .Alerts }}
+            Alert: {{ .Labels.alertname }}
+            Status: {{ .Status }}
+            Severity: {{ .Labels.severity }}
+            Summary: {{ .Annotations.summary }}
+            Description: {{ .Annotations.description }}
+            {{ if .Annotations.runbook_url }}Runbook: {{ .Annotations.runbook_url }}{{ end }}
+            {{ end }}
+        disableResolveMessage: false
 
-  - name: "webhook-npr"
-    org: "Main Organization"
-    type: "webhook"
-    use_vault: true
-    headers:
-      - name: "Content-Type"
-        value: "application/json"
-    settings:
-      url: "https://api.npr.example.com/alerts"
-      httpMethod: "POST"
-      authorization_scheme: "Bearer"
-      # authorization_credentials fetched from Vault
+  - org: Main Organization
+    name: webhook-npr
+    receivers:
+      - type: webhook
+        settings:
+          url: https://api.npr.example.com/alerts
+          httpMethod: POST
+          authorization_scheme: Bearer
+          authorization_credentials: "{{ vault:alerting/webhook-npr:token }}"
+          headers:
+            Content-Type: application/json
+          maxAlerts: 0
+        disableResolveMessage: false
 
   # Platform Team Organization Contact Points
-  - name: "platform-email-npr"
-    org: "Platform Team"
-    type: "email"
-    settings:
-      addresses: "platform-team-npr@example.com"
-      singleEmail: true
-      subject: "[NPR-Platform] [{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}"
+  - org: Platform Team
+    name: platform-email-npr
+    receivers:
+      - type: email
+        settings:
+          addresses: platform-team-npr@example.com
+          singleEmail: true
+          subject: "[NPR-Platform] [{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}"
+        disableResolveMessage: false
 
-  - name: "platform-webhook-npr"
-    org: "Platform Team"
-    type: "webhook"
-    settings:
-      url: "https://hooks.platform.example.com/npr/alerts"
-      httpMethod: "POST"
+  - org: Platform Team
+    name: platform-webhook-npr
+    receivers:
+      - type: webhook
+        settings:
+          url: https://hooks.platform.example.com/npr/alerts
+          httpMethod: POST
+        disableResolveMessage: false
 
   # Application Team Organization Contact Points
-  - name: "app-email-npr"
-    org: "Application Team"
-    type: "email"
-    settings:
-      addresses: "app-team-npr@example.com"
-      singleEmail: true
-      subject: "[NPR-App] [{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}"
+  - org: Application Team
+    name: app-email-npr
+    receivers:
+      - type: email
+        settings:
+          addresses: app-team-npr@example.com
+          singleEmail: true
+          subject: "[NPR-App] [{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}"
+        disableResolveMessage: false
 
-  - name: "app-webhook-npr"
-    org: "Application Team"
-    type: "webhook"
-    settings:
-      url: "https://hooks.app.example.com/npr/alerts"
-      httpMethod: "POST"
+  - org: Application Team
+    name: app-webhook-npr
+    receivers:
+      - type: webhook
+        settings:
+          url: https://hooks.app.example.com/npr/alerts
+          httpMethod: POST
+        disableResolveMessage: false

@@ -105,34 +105,44 @@ locals {
 
   # =============================================================================
   # Contact Points (shared + environment-specific merged)
+  # Uses Grafana's native export format: contactPoints array
   # Environment-specific contact points override shared ones with same name
   # =============================================================================
-  shared_contact_points = try(yamldecode(file("${path.module}/config/shared/alerting/contact_points.yaml")), { contact_points = [] })
-  env_contact_points    = try(yamldecode(file("${path.module}/config/${local.env}/alerting/contact_points.yaml")), { contact_points = [] })
+  shared_contact_points = try(yamldecode(file("${path.module}/config/shared/alerting/contact_points.yaml")), { contactPoints = [] })
+  env_contact_points    = try(yamldecode(file("${path.module}/config/${local.env}/alerting/contact_points.yaml")), { contactPoints = [] })
 
   # Create maps by name for merging (env overrides shared)
-  shared_cp_map = { for cp in local.shared_contact_points.contact_points : cp.name => cp }
-  env_cp_map    = { for cp in local.env_contact_points.contact_points : cp.name => cp }
+  shared_cp_map = { for cp in try(local.shared_contact_points.contactPoints, []) : cp.name => cp }
+  env_cp_map    = { for cp in try(local.env_contact_points.contactPoints, []) : cp.name => cp }
   merged_cp_map = merge(local.shared_cp_map, local.env_cp_map)
 
   contact_points_config = {
-    contact_points = values(local.merged_cp_map)
+    contactPoints = values(local.merged_cp_map)
   }
 
   # =============================================================================
   # Notification Policies (shared + environment-specific merged)
-  # Environment-specific policies override shared ones with same org
+  # Uses Grafana's native export format: policies array
+  # Supports both 'org' (name) and 'orgId' (numeric) for organization reference
+  # Environment-specific policies override shared ones with same org/orgId
   # =============================================================================
-  shared_notification_policies = try(yamldecode(file("${path.module}/config/shared/alerting/notification_policies.yaml")), { notification_policies = [] })
-  env_notification_policies    = try(yamldecode(file("${path.module}/config/${local.env}/alerting/notification_policies.yaml")), { notification_policies = [] })
+  shared_notification_policies = try(yamldecode(file("${path.module}/config/shared/alerting/notification_policies.yaml")), { policies = [] })
+  env_notification_policies    = try(yamldecode(file("${path.module}/config/${local.env}/alerting/notification_policies.yaml")), { policies = [] })
 
-  # Create maps by org for merging (env overrides shared)
-  shared_np_map = { for np in local.shared_notification_policies.notification_policies : np.org => np }
-  env_np_map    = { for np in local.env_notification_policies.notification_policies : np.org => np }
+  # Create maps by org name or orgId for merging (env overrides shared)
+  # Use coalesce to prefer org name over orgId for the key
+  shared_np_map = {
+    for np in try(local.shared_notification_policies.policies, []) :
+    coalesce(try(np.org, null), try(tostring(np.orgId), "unknown")) => np
+  }
+  env_np_map = {
+    for np in try(local.env_notification_policies.policies, []) :
+    coalesce(try(np.org, null), try(tostring(np.orgId), "unknown")) => np
+  }
   merged_np_map = merge(local.shared_np_map, local.env_np_map)
 
   notification_policies_config = {
-    notification_policies = values(local.merged_np_map)
+    policies = values(local.merged_np_map)
   }
 
   # =============================================================================
@@ -165,8 +175,12 @@ locals {
   ])
 
   # Extract contact point names that need Vault credentials
-  contact_point_names = toset([
-    for cp in local.contact_points_config.contact_points : cp.name
-    if try(cp.use_vault, false)
-  ])
+  # Now using Grafana native format with contactPoints and receivers
+  contact_point_names = toset(flatten([
+    for cp in try(local.contact_points_config.contactPoints, []) : [
+      for receiver in try(cp.receivers, []) : cp.name
+      if try(receiver.settings.authorization_credentials, null) != null &&
+      can(regex("vault:", try(receiver.settings.authorization_credentials, "")))
+    ]
+  ]))
 }

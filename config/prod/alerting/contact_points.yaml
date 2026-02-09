@@ -1,65 +1,81 @@
 # Grafana Contact Points Configuration - PROD Environment
-# These override or extend shared contact points for PROD
-# Only webhook and email channels are supported
+# Uses Grafana's native export format for easy import/export
+# Supports both 'org' (name) and 'orgId' (numeric) for organization reference
 
-contact_points:
+apiVersion: 1
+
+contactPoints:
   # Main Organization Contact Points
-  - name: "email-prod"
-    org: "Main Organization"
-    type: "email"
-    settings:
-      addresses: "oncall-prod@example.com,platform-prod@example.com"
-      singleEmail: true
-      subject: "[PROD] [{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}"
-      message: |
-        Environment: PROD
-        {{ range .Alerts }}
-        Alert: {{ .Labels.alertname }}
-        Status: {{ .Status }}
-        Severity: {{ .Labels.severity }}
-        Summary: {{ .Annotations.summary }}
-        Description: {{ .Annotations.description }}
-        {{ if .Annotations.runbook_url }}Runbook: {{ .Annotations.runbook_url }}{{ end }}
-        {{ end }}
+  - org: Main Organization
+    name: email-prod
+    receivers:
+      - type: email
+        settings:
+          addresses: oncall-prod@example.com;platform-prod@example.com
+          singleEmail: true
+          subject: "[PROD] [{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}"
+          message: |
+            Environment: PROD
+            {{ range .Alerts }}
+            Alert: {{ .Labels.alertname }}
+            Status: {{ .Status }}
+            Severity: {{ .Labels.severity }}
+            Summary: {{ .Annotations.summary }}
+            Description: {{ .Annotations.description }}
+            {{ if .Annotations.runbook_url }}Runbook: {{ .Annotations.runbook_url }}{{ end }}
+            {{ end }}
+        disableResolveMessage: false
 
-  - name: "webhook-prod"
-    org: "Main Organization"
-    type: "webhook"
-    use_vault: true
-    settings:
-      url: "https://api.prod.example.com/alerts"
-      httpMethod: "POST"
-      authorization_scheme: "Bearer"
-      # authorization_credentials fetched from Vault
+  - org: Main Organization
+    name: webhook-prod
+    receivers:
+      - type: webhook
+        settings:
+          url: https://api.prod.example.com/alerts
+          httpMethod: POST
+          authorization_scheme: Bearer
+          authorization_credentials: "{{ vault:alerting/webhook-prod:token }}"
+          headers:
+            Content-Type: application/json
+          maxAlerts: 0
+        disableResolveMessage: false
 
   # Platform Team Organization Contact Points
-  - name: "platform-email-prod"
-    org: "Platform Team"
-    type: "email"
-    settings:
-      addresses: "platform-team-prod@example.com"
-      singleEmail: true
-      subject: "[PROD-Platform] [{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}"
+  - org: Platform Team
+    name: platform-email-prod
+    receivers:
+      - type: email
+        settings:
+          addresses: platform-team-prod@example.com
+          singleEmail: true
+          subject: "[PROD-Platform] [{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}"
+        disableResolveMessage: false
 
-  - name: "platform-webhook-prod"
-    org: "Platform Team"
-    type: "webhook"
-    settings:
-      url: "https://hooks.platform.example.com/prod/alerts"
-      httpMethod: "POST"
+  - org: Platform Team
+    name: platform-webhook-prod
+    receivers:
+      - type: webhook
+        settings:
+          url: https://hooks.platform.example.com/prod/alerts
+          httpMethod: POST
+        disableResolveMessage: false
 
   # Application Team Organization Contact Points
-  - name: "app-email-prod"
-    org: "Application Team"
-    type: "email"
-    settings:
-      addresses: "app-team-prod@example.com"
-      singleEmail: true
-      subject: "[PROD-App] [{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}"
+  - org: Application Team
+    name: app-email-prod
+    receivers:
+      - type: email
+        settings:
+          addresses: app-team-prod@example.com
+          singleEmail: true
+          subject: "[PROD-App] [{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}"
+        disableResolveMessage: false
 
-  - name: "app-webhook-prod"
-    org: "Application Team"
-    type: "webhook"
-    settings:
-      url: "https://hooks.app.example.com/prod/alerts"
-      httpMethod: "POST"
+  - org: Application Team
+    name: app-webhook-prod
+    receivers:
+      - type: webhook
+        settings:
+          url: https://hooks.app.example.com/prod/alerts
+          httpMethod: POST
+        disableResolveMessage: false

@@ -1,67 +1,80 @@
 # Grafana Notification Policies Configuration - PROD Environment
-# These override or extend shared notification policies for PROD
+# Uses Grafana's native export format for easy import/export
+# Supports both 'org' (name) and 'orgId' (numeric) for organization reference
 
-notification_policies:
+apiVersion: 1
+
+policies:
   # Main Organization Policy
-  - org: "Main Organization"
-    contact_point: "email-prod"
+  - org: Main Organization
+    receiver: email-prod
     group_by:
-      - "alertname"
-      - "team"
-    group_wait: "30s"
-    group_interval: "5m"
-    repeat_interval: "4h"
+      - alertname
+      - team
     routes:
       # Critical severity goes to webhook
-      - match:
-          severity: "critical"
-        contact_point: "webhook-prod"
-        group_wait: "10s"
-        group_interval: "1m"
-        repeat_interval: "1h"
+      - receiver: webhook-prod
+        object_matchers:
+          - - severity
+            - "="
+            - critical
         continue: true
+        group_wait: 10s
+        group_interval: 1m
+        repeat_interval: 1h
       # Platform team alerts
-      - match:
-          team: "platform"
-        contact_point: "email-prod"
-        group_wait: "30s"
-        group_interval: "5m"
-        repeat_interval: "2h"
+      - receiver: email-prod
+        object_matchers:
+          - - team
+            - "="
+            - platform
+        group_wait: 30s
+        group_interval: 5m
+        repeat_interval: 2h
       # Backend team alerts
-      - match:
-          team: "backend"
-        contact_point: "email-prod"
-        group_wait: "30s"
-        group_interval: "5m"
+      - receiver: email-prod
+        object_matchers:
+          - - team
+            - "="
+            - backend
+        group_wait: 30s
+        group_interval: 5m
+    group_wait: 30s
+    group_interval: 5m
+    repeat_interval: 4h
 
   # Platform Team Organization Policy
-  - org: "Platform Team"
-    contact_point: "platform-email-prod"
+  - org: Platform Team
+    receiver: platform-email-prod
     group_by:
-      - "alertname"
-      - "namespace"
-    group_wait: "30s"
-    group_interval: "5m"
-    repeat_interval: "4h"
+      - alertname
+      - namespace
     routes:
-      - match:
-          severity: "critical"
-        contact_point: "platform-webhook-prod"
-        group_wait: "10s"
+      - receiver: platform-webhook-prod
+        object_matchers:
+          - - severity
+            - "="
+            - critical
         continue: true
+        group_wait: 10s
+    group_wait: 30s
+    group_interval: 5m
+    repeat_interval: 4h
 
   # Application Team Organization Policy
-  - org: "Application Team"
-    contact_point: "app-email-prod"
+  - org: Application Team
+    receiver: app-email-prod
     group_by:
-      - "alertname"
-      - "service"
-    group_wait: "30s"
-    group_interval: "5m"
-    repeat_interval: "4h"
+      - alertname
+      - service
     routes:
-      - match:
-          severity: "critical"
-        contact_point: "app-webhook-prod"
-        group_wait: "10s"
+      - receiver: app-webhook-prod
+        object_matchers:
+          - - severity
+            - "="
+            - critical
         continue: true
+        group_wait: 10s
+    group_wait: 30s
+    group_interval: 5m
+    repeat_interval: 4h

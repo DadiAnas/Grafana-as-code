@@ -1,42 +1,77 @@
-# Shared Notification Policies Configuration
+# =============================================================================
+# SHARED NOTIFICATION POLICIES CONFIGURATION
+# =============================================================================
+# Uses Grafana's native export format for easy import/export
+# Supports both 'org' (name) and 'orgId' (numeric) for organization reference
 # These policies are deployed to ALL environments
 # Environment-specific policies in config/{env}/alerting/notification_policies.yaml will override these
+#
+# FORMAT: This follows Grafana's native YAML export format
+# To export from Grafana: Alerting > Notification policies > Export > YAML
+# =============================================================================
 
-notification_policies:
-  # Platform Team Organization Policy
-  - org: "Platform Team"
-    contact_point: "platform-email"
-    group_by: ["alertname", "severity"]
-    group_wait: "30s"
-    group_interval: "5m"
-    repeat_interval: "4h"
+apiVersion: 1
+
+policies:
+  # ===========================================================================
+  # PLATFORM TEAM ORGANIZATION POLICY
+  # ===========================================================================
+  - org: Platform Team
+    receiver: platform-email
+    group_by:
+      - alertname
+      - severity
     routes:
-      - match:
-          severity: "critical"
-        contact_point: "platform-webhook"
+      - receiver: platform-webhook
+        object_matchers:
+          - - severity
+            - "="
+            - critical
         continue: true
-      - match:
-          severity: "warning"
-        contact_point: "platform-email"
-        group_wait: "1m"
+        group_wait: 10s
+        group_interval: 1m
+        repeat_interval: 1h
+      - receiver: platform-email
+        object_matchers:
+          - - severity
+            - "="
+            - warning
+        group_wait: 1m
+        group_interval: 5m
+        repeat_interval: 4h
+    group_wait: 30s
+    group_interval: 5m
+    repeat_interval: 4h
 
-  # Application Team Organization Policy
-  - org: "Application Team"
-    contact_point: "app-email"
-    group_by: ["alertname", "service"]
-    group_wait: "30s"
-    group_interval: "5m"
-    repeat_interval: "4h"
+  # ===========================================================================
+  # APPLICATION TEAM ORGANIZATION POLICY
+  # ===========================================================================
+  - org: Application Team
+    receiver: app-email
+    group_by:
+      - alertname
+      - service
     routes:
-      - match:
-          severity: "critical"
-        contact_point: "app-webhook"
+      - receiver: app-webhook
+        object_matchers:
+          - - severity
+            - "="
+            - critical
         continue: true
+        group_wait: 10s
+        group_interval: 1m
+        repeat_interval: 1h
+    group_wait: 30s
+    group_interval: 5m
+    repeat_interval: 4h
 
-  # Business Intelligence Organization Policy
-  - org: "Business Intelligence"
-    contact_point: "bi-email"
-    group_by: ["alertname"]
-    group_wait: "1m"
-    group_interval: "10m"
-    repeat_interval: "12h"
+  # ===========================================================================
+  # BUSINESS INTELLIGENCE ORGANIZATION POLICY
+  # ===========================================================================
+  - org: Business Intelligence
+    receiver: bi-email
+    group_by:
+      - alertname
+    group_wait: 1m
+    group_interval: 10m
+    repeat_interval: 12h

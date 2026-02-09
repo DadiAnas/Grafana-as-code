@@ -1,91 +1,201 @@
-# Grafana Folders Configuration - Shared across environments
+# =============================================================================
+# GRAFANA FOLDERS CONFIGURATION - Shared across environments
+# =============================================================================
 # 
+# ORGANIZATION ASSIGNMENT:
 # Each folder can be assigned to a specific organization using the 'org' field.
 # If no org is specified, the folder is created in the default organization.
 #
+# PERMISSION INHERITANCE:
+# By default, teams inherit permissions from their org-level role.
+# Use 'permissions' to OVERRIDE the defaults for specific teams/users.
+#
+# IMPORTANT: Teams are organization-scoped in Grafana
+# A team can only be granted permissions on folders within the SAME organization.
+# For cross-org access, use org roles or consider creating teams in multiple orgs.
+#
+# PERMISSION LEVELS:
+#   - View: Can view dashboards in the folder
+#   - Edit: Can edit dashboards in the folder
+#   - Admin: Full control including managing permissions
+#
+# PERMISSION TYPES:
+#   - team: Grant permission to a team (by name) - MUST be in same org as folder
+#   - user: Grant permission to a user (by email)
+#   - role: Grant permission to an org role (Viewer, Editor, Admin)
+#
 # Organizations available:
-#   - Main Organization (default)
+#   - Main Organization (default) - Teams: Platform Team, Backend Team, Frontend Team, SRE Team, Data Team
 #   - Public (read-only for all users)
-#   - Platform Team
-#   - Application Team
-#   - Business Intelligence
+#   - Platform Team (org)
+#   - Application Team (org)
+#   - Business Intelligence (org)
+# =============================================================================
 
 folders:
   # =====================================================
   # MAIN ORGANIZATION - Default dashboards
+  # Teams available: Platform Team, Backend Team, Frontend Team, SRE Team, Data Team
   # =====================================================
   - name: "Infrastructure"
     uid: "infrastructure"
     org: "Main Organization"
+    permissions:
+      - team: "SRE Team"
+        permission: "Admin"
+      - team: "Platform Team"
+        permission: "Edit"
+      - role: "Viewer"
+        permission: "View"
     
   - name: "Applications"
     uid: "applications"
     org: "Main Organization"
+    permissions:
+      - team: "Backend Team"
+        permission: "Edit"
+      - team: "Frontend Team"
+        permission: "Edit"
+      - role: "Viewer"
+        permission: "View"
     
   - name: "Business"
     uid: "business"
     org: "Main Organization"
+    permissions:
+      - team: "Data Team"
+        permission: "Edit"
+      - role: "Viewer"
+        permission: "View"
     
   - name: "SLOs"
     uid: "slos"
     org: "Main Organization"
+    permissions:
+      - team: "SRE Team"
+        permission: "Admin"
+      - team: "Platform Team"
+        permission: "Edit"
+      - role: "Viewer"
+        permission: "View"
     
   - name: "Alerts"
     uid: "alerts"
     org: "Main Organization"
+    permissions:
+      - team: "SRE Team"
+        permission: "Admin"
+      - team: "Platform Team"
+        permission: "Edit"
+      - role: "Viewer"
+        permission: "View"
 
   # =====================================================
   # PUBLIC ORGANIZATION - Shared dashboards (read-only)
+  # No teams in this org - use role-based permissions
   # =====================================================
   - name: "Company Overview"
     uid: "public-overview"
     org: "Public"
+    # No explicit permissions = inherits org-level access
     
   - name: "System Status"
     uid: "public-status"
     org: "Public"
 
   # =====================================================
-  # PLATFORM TEAM - Infrastructure & platform dashboards
+  # PLATFORM TEAM ORG - Infrastructure & platform dashboards
+  # Note: To grant permissions here, teams must be created in this org
+  # Or use role-based permissions (Viewer, Editor, Admin)
   # =====================================================
   - name: "Kubernetes"
     uid: "platform-kubernetes"
     org: "Platform Team"
+    # Use role-based permissions for orgs without dedicated teams
+    permissions:
+      - role: "Editor"
+        permission: "Edit"
+      - role: "Viewer"
+        permission: "View"
     
   - name: "Infrastructure"
     uid: "platform-infrastructure"
     org: "Platform Team"
+    permissions:
+      - role: "Editor"
+        permission: "Edit"
+      - role: "Viewer"
+        permission: "View"
     
   - name: "CI/CD Pipelines"
     uid: "platform-cicd"
     org: "Platform Team"
+    permissions:
+      - role: "Editor"
+        permission: "Edit"
+      - role: "Viewer"
+        permission: "View"
 
   # =====================================================
-  # APPLICATION TEAM - Application-specific dashboards
+  # APPLICATION TEAM ORG - Application-specific dashboards
+  # Note: To grant permissions here, teams must be created in this org
+  # Or use role-based permissions (Viewer, Editor, Admin)
   # =====================================================
   - name: "API Services"
     uid: "app-api"
     org: "Application Team"
+    permissions:
+      - role: "Editor"
+        permission: "Edit"
+      - role: "Viewer"
+        permission: "View"
     
   - name: "Frontend"
     uid: "app-frontend"
     org: "Application Team"
+    permissions:
+      - role: "Editor"
+        permission: "Edit"
+      - role: "Viewer"
+        permission: "View"
     
   - name: "Backend Services"
     uid: "app-backend"
     org: "Application Team"
+    permissions:
+      - role: "Editor"
+        permission: "Edit"
+      - role: "Viewer"
+        permission: "View"
 
   # =====================================================
-  # BUSINESS INTELLIGENCE - Business metrics & KPIs
+  # BUSINESS INTELLIGENCE ORG - Business metrics & KPIs
+  # Note: To grant permissions here, teams must be created in this org
+  # Or use role-based permissions (Viewer, Editor, Admin)
   # =====================================================
   - name: "Revenue Metrics"
     uid: "bi-revenue"
     org: "Business Intelligence"
+    permissions:
+      - role: "Editor"
+        permission: "Edit"
+      - role: "Viewer"
+        permission: "View"
     
   - name: "Customer Analytics"
     uid: "bi-customers"
     org: "Business Intelligence"
+    permissions:
+      - role: "Editor"
+        permission: "Edit"
+      - role: "Viewer"
+        permission: "View"
     
   - name: "Operational KPIs"
     uid: "bi-kpis"
     org: "Business Intelligence"
+    permissions:
+      - role: "Editor"
+        permission: "Edit"
+      - role: "Viewer"
+        permission: "View"

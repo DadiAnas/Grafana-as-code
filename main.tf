@@ -91,21 +91,32 @@ module "vault_secrets" {
 }
 
 # Load all modules
+# Teams module - must be created early for folder permissions
+module "teams" {
+  source = "./modules/teams"
+
+  teams   = local.teams_config
+  org_ids = module.organizations.organization_ids
+
+  depends_on = [module.organizations]
+}
+
 module "folders" {
   source = "./modules/folders"
 
-  folders  = local.folders_config
-  org_ids  = module.organizations.organization_ids
+  folders      = local.folders_config
+  org_ids      = module.organizations.organization_ids
+  team_details = module.teams.team_details # For folder permissions (includes org_id for validation)
 
-  depends_on = [module.organizations]
+  depends_on = [module.organizations, module.teams]
 }
 
 module "datasources" {
   source = "./modules/datasources"
 
-  datasources         = local.datasources_config
-  org_ids             = module.organizations.organization_ids
-  vault_credentials   = module.vault_secrets.datasource_credentials
+  datasources       = local.datasources_config
+  org_ids           = module.organizations.organization_ids
+  vault_credentials = module.vault_secrets.datasource_credentials
 
   depends_on = [module.organizations, module.vault_secrets]
 }
@@ -134,15 +145,6 @@ module "alerting" {
   depends_on = [module.folders, module.datasources, module.vault_secrets, module.organizations]
 }
 
-module "teams" {
-  source = "./modules/teams"
-
-  teams   = local.teams_config
-  org_ids = module.organizations.organization_ids
-
-  depends_on = [module.organizations]
-}
-
 module "service_accounts" {
   source = "./modules/service_accounts"
 
@@ -159,9 +161,9 @@ module "sso" {
 
   sso_config        = local.sso_config
   vault_credentials = module.vault_secrets.sso_credentials
-  
+
   # Pass org IDs to use numeric IDs instead of names (avoids space issues)
-  org_ids           = module.organizations.organization_ids
+  org_ids = module.organizations.organization_ids
 
   depends_on = [module.vault_secrets, module.organizations]
 }

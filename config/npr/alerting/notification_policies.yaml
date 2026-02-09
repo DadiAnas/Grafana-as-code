@@ -1,67 +1,91 @@
 # Grafana Notification Policies Configuration - NPR Environment
-# These override or extend shared notification policies for NPR
+# Uses Grafana's native export format for easy import/export
+# Supports both 'org' (name) and 'orgId' (numeric) for organization reference
 
-notification_policies:
+apiVersion: 1
+
+policies:
   # Main Organization Policy
-  - org: "Main Organization"
-    contact_point: "email-npr"
+  - org: Main Organization
+    receiver: email-npr
     group_by:
-      - "alertname"
-      - "team"
-    group_wait: "30s"
-    group_interval: "5m"
-    repeat_interval: "4h"
+      - alertname
+      - team
     routes:
       # Critical severity goes to webhook
-      - match:
-          severity: "critical"
-        contact_point: "webhook-npr"
-        group_wait: "10s"
-        group_interval: "1m"
-        repeat_interval: "1h"
+      - receiver: webhook-npr
+        object_matchers:
+          - - severity
+            - "="
+            - critical
         continue: true
+        group_wait: 10s
+        group_interval: 1m
+        repeat_interval: 1h
       # Platform team alerts
-      - match:
-          team: "platform"
-        contact_point: "email-npr"
-        group_wait: "30s"
-        group_interval: "5m"
-        repeat_interval: "2h"
+      - receiver: email-npr
+        object_matchers:
+          - - team
+            - "="
+            - platform
+        group_wait: 30s
+        group_interval: 5m
+        repeat_interval: 2h
       # Backend team alerts
-      - match:
-          team: "backend"
-        contact_point: "email-npr"
-        group_wait: "30s"
-        group_interval: "5m"
+      - receiver: email-npr
+        object_matchers:
+          - - team
+            - "="
+            - backend
+        group_wait: 30s
+        group_interval: 5m
+    group_wait: 30s
+    group_interval: 5m
+    repeat_interval: 4h
+
+  # Business Intelligence Organization Policy
+  - org: Business Intelligence
+    receiver: bi-email
+    group_by:
+      - alertname
+      - dashboard
+    routes: []
+    group_wait: 30s
+    group_interval: 5m
+    repeat_interval: 4h
 
   # Platform Team Organization Policy
-  - org: "Platform Team"
-    contact_point: "platform-email-npr"
+  - org: Platform Team
+    receiver: platform-email-npr
     group_by:
-      - "alertname"
-      - "namespace"
-    group_wait: "30s"
-    group_interval: "5m"
-    repeat_interval: "4h"
+      - alertname
+      - namespace
     routes:
-      - match:
-          severity: "critical"
-        contact_point: "platform-webhook-npr"
-        group_wait: "10s"
+      - receiver: platform-webhook-npr
+        object_matchers:
+          - - severity
+            - "="
+            - critical
         continue: true
+        group_wait: 10s
+    group_wait: 30s
+    group_interval: 5m
+    repeat_interval: 4h
 
   # Application Team Organization Policy
-  - org: "Application Team"
-    contact_point: "app-email-npr"
+  - org: Application Team
+    receiver: app-email-npr
     group_by:
-      - "alertname"
-      - "service"
-    group_wait: "30s"
-    group_interval: "5m"
-    repeat_interval: "4h"
+      - alertname
+      - service
     routes:
-      - match:
-          severity: "critical"
-        contact_point: "app-webhook-npr"
-        group_wait: "10s"
+      - receiver: app-webhook-npr
+        object_matchers:
+          - - severity
+            - "="
+            - critical
         continue: true
+        group_wait: 10s
+    group_wait: 30s
+    group_interval: 5m
+    repeat_interval: 4h
