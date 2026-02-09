@@ -7,6 +7,8 @@
 
 Manage your **existing Grafana instance** entirely as code using Terraform. Define organizations, folders, dashboards, datasources, teams, alerting, and SSO in simple YAML files — version-controlled, reviewable, and repeatable.
 
+![Architecture Overview](docs/images/architecture.png)
+
 ## 🎯 Features
 
 - **Multi-Environment**: Separate configs per environment (dev, staging, production, etc.)
@@ -102,6 +104,8 @@ grafana-as-code/
 ## 🔄 Configuration Merge Behavior
 
 All resources follow a **shared + environment override** pattern:
+
+![Configuration Merge Pattern](docs/images/merge-workflow.png)
 
 | Resource | Shared Location | Env Override | Merge Key |
 |----------|----------------|--------------|-----------|
@@ -200,6 +204,8 @@ make apply ENV=staging
 ```
 
 ## 🛠️ Environment Management
+
+![Multi-Environment Deployment](docs/images/environments.png)
 
 Create, list, check, and delete environments with simple Make commands:
 
@@ -332,6 +338,28 @@ After applying, Terraform exposes:
 | Dashboard import fails | Validate JSON syntax before applying |
 | Folder cycle error | Split folders into top-level and subfolders (max 2 levels deep) |
 | Environment incomplete | `make check-env ENV=<name>` to see what's missing |
+
+## 🖼️ Visual Overview
+
+### Multi-Organization Support
+Manage multiple isolated organizations from a single Terraform configuration:
+
+![Organizations](docs/images/multi-org.png)
+
+### SSO Integration
+Single Sign-On login page with Keycloak/OIDC integration:
+
+![SSO Login](docs/images/sso.png)
+
+### Datasources Management
+Configured datasources deployed via Terraform:
+
+![Datasources](docs/images/grafana.png)
+
+### Keycloak Group Mapping
+Map IdP groups to Grafana organizations and roles:
+
+![Keycloak Mapping](docs/images/keycloak%20multi-team%20org%20mapping.png)
 
 ## 🤝 Contributing
 
