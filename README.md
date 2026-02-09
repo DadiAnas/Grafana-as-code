@@ -132,43 +132,47 @@ git clone <repository-url>
 cd grafana-as-code
 ```
 
-### 2. Configure your environment
+### 2. Create your environment
 
-Edit `environments/myenv.tfvars` with your Grafana URL:
-
-```hcl
-grafana_url = "https://grafana.example.com"
-environment = "myenv"
-vault_address = "http://localhost:8200"
-```
-
-### 3. Set up Vault secrets
+Use the built-in scaffolding to create all files in one command:
 
 ```bash
-# Start Vault (development mode for testing)
-vault server -dev
+# Create a new environment with your Grafana URL
+make new-env NAME=staging GRAFANA_URL=https://grafana.example.com
+```
 
-# In another terminal
+This creates everything you need:
+- `environments/staging.tfvars` — Terraform variables
+- `backends/staging.tfbackend` — Remote state config (optional)
+- `config/staging/` — 10 YAML config files
+- `dashboards/staging/` — Dashboard directories per organization
+
+### 3. Check your environment
+
+```bash
+# Validate that everything is in place
+make check-env ENV=staging
+```
+
+### 4. Set up Vault secrets
+
+```bash
+# Set Vault connection
 export VAULT_ADDR='http://127.0.0.1:8200'
 export VAULT_TOKEN='your-root-token'
 
-# Create the required secrets (edit the script first with real values)
-bash vault/scripts/setup-secrets.sh myenv
+# Create secrets (edit vault/scripts/setup-secrets.sh first with real values)
+make vault-setup ENV=staging
 
 # Verify
-bash vault/scripts/verify-secrets.sh myenv
+make vault-verify ENV=staging
 ```
 
-### 4. Add your configuration
+### 5. Add your configuration
 
 Edit the YAML files in `config/shared/` — each file has commented examples:
 
 ```yaml
-# config/shared/organizations.yaml
-organizations:
-  - name: "Main Organization"
-    id: 1
-
 # config/shared/datasources.yaml
 datasources:
   - name: "Prometheus"
@@ -179,7 +183,7 @@ datasources:
     is_default: true
 ```
 
-### 5. Add dashboards
+### 6. Add dashboards
 
 Drop Grafana dashboard JSON files into the folder structure:
 
@@ -187,49 +191,81 @@ Drop Grafana dashboard JSON files into the folder structure:
 dashboards/shared/Main Organization/infrastructure/my-dashboard.json
 ```
 
-### 6. Initialize and apply
+### 7. Initialize and deploy
 
 ```bash
-# Using Make
-make init ENV=myenv
-make plan ENV=myenv
-make apply ENV=myenv
-
-# Or directly with Terraform
-terraform init
-terraform plan  -var-file=environments/myenv.tfvars
-terraform apply -var-file=environments/myenv.tfvars
+make init  ENV=staging
+make plan  ENV=staging
+make apply ENV=staging
 ```
 
-## ➕ Adding a New Environment
+## 🛠️ Environment Management
 
-1. **Create tfvars**: Copy `environments/myenv.tfvars` → `environments/staging.tfvars`
-2. **Create backend** (optional): Copy `backends/myenv.tfbackend` → `backends/staging.tfbackend`
-3. **Create config**: Copy `config/myenv/` → `config/staging/`
-4. **Create dashboards**: `mkdir -p "dashboards/staging/Main Organization"`
-5. **Set up Vault**: `bash vault/scripts/setup-secrets.sh staging`
-6. **Apply**: `make init ENV=staging && make plan ENV=staging`
+Create, list, check, and delete environments with simple Make commands:
+
+```bash
+# Create a new environment (scaffolds all files)
+make new-env NAME=production GRAFANA_URL=https://grafana.example.com
+
+# List all environments with status
+make list-envs
+
+# Pre-deployment validation
+make check-env ENV=production
+
+# Delete an environment's scaffolding (NOT infrastructure — use destroy first)
+make delete-env NAME=production
+```
+
+### What `new-env` creates
+
+```
+environments/production.tfvars         ← Grafana URL, Vault config
+backends/production.tfbackend          ← S3/Azure/GCS backend (commented)
+config/production/                     ← 10 YAML override files
+  ├── organizations.yaml
+  ├── datasources.yaml
+  ├── folders.yaml
+  ├── teams.yaml
+  ├── service_accounts.yaml
+  ├── sso.yaml
+  ├── keycloak.yaml
+  └── alerting/
+      ├── alert_rules.yaml
+      ├── contact_points.yaml
+      └── notification_policies.yaml
+dashboards/production/                 ← Dashboard dirs per org
+  └── Main Organization/
+```
 
 ## 🔧 Common Operations
 
 ```bash
-# Format Terraform files
-make fmt
+# ─── Environment Management ───
+make new-env NAME=dev                          # Create environment
+make list-envs                                 # List all environments
+make check-env ENV=dev                         # Validate readiness
+make delete-env NAME=dev                       # Delete scaffolding
 
-# Validate configuration
-make validate
+# ─── Terraform Workflow ───
+make init  ENV=staging                         # Initialize
+make plan  ENV=staging                         # Preview changes
+make apply ENV=staging                         # Deploy
+make destroy ENV=staging                       # Tear down (with confirmation)
 
-# Show current state
-make state-list
+# ─── Vault ───
+make vault-setup  ENV=staging                  # Create Vault secrets
+make vault-verify ENV=staging                  # Check secrets exist
 
-# Show outputs
-make output ENV=myenv
+# ─── Utilities ───
+make fmt                                       # Format Terraform files
+make validate                                  # Validate configuration
+make output ENV=staging                        # Show outputs
+make state-list                                # List managed resources
+make clean                                     # Remove cache & plan files
 
-# Destroy everything (careful!)
-make destroy ENV=myenv
-
-# Debug mode
-TF_LOG=DEBUG terraform apply -var-file=environments/myenv.tfvars
+# ─── Debug ───
+TF_LOG=DEBUG terraform apply -var-file=environments/staging.tfvars
 ```
 
 ## 📤 Outputs
@@ -251,9 +287,10 @@ After applying, Terraform exposes:
 | Issue | Solution |
 |-------|----------|
 | Permission denied | Ensure Grafana credentials have `Admin` role |
-| Vault secret not found | Run `bash vault/scripts/verify-secrets.sh myenv` |
+| Vault secret not found | `make vault-verify ENV=<name>` then `make vault-setup ENV=<name>` |
 | Dashboard import fails | Validate JSON syntax before applying |
 | Folder cycle error | Split folders into top-level and subfolders (max 2 levels deep) |
+| Environment incomplete | `make check-env ENV=<name>` to see what's missing |
 
 ## 🤝 Contributing
 
