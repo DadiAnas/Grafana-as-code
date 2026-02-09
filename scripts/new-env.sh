@@ -676,6 +676,11 @@ generate_sso() {
 #
 # Supported providers: Keycloak, Okta, Azure AD, Google, GitHub
 # Client secrets are fetched from Vault at: ${VAULT_MOUNT}/${ENV_NAME}/sso/keycloak
+#
+# Key features:
+#   - allowed_groups: restrict login to specific IdP groups
+#   - groups[].org_mappings: map IdP groups to Grafana orgs + roles
+#   - team sync: sync IdP groups to Grafana teams
 # =============================================================================
 
 HEADER
@@ -684,17 +689,66 @@ HEADER
 sso:
   enabled: true
   name: "Keycloak"
+
+  # ─── OAuth2 Endpoints ───────────────────────────────────────────────
   auth_url: "${KEYCLOAK_URL}/realms/grafana/protocol/openid-connect/auth"
   token_url: "${KEYCLOAK_URL}/realms/grafana/protocol/openid-connect/token"
   api_url: "${KEYCLOAK_URL}/realms/grafana/protocol/openid-connect/userinfo"
+
+  # ─── Client Configuration ──────────────────────────────────────────
   # client_id: "grafana-${ENV_NAME}"
-  # use_vault: true                      # client_secret from Vault
+  # use_vault: true                        # client_secret from Vault
+
+  # ─── OAuth Settings ────────────────────────────────────────────────
+  allow_sign_up: true
+  auto_login: false
+  scopes: "openid profile email groups"
+  use_pkce: true
+  use_refresh_token: true
+
+  # ─── Access Control: Allowed Groups ────────────────────────────────
+  # Restrict login to ONLY users in these IdP groups (comma-separated).
+  # Users NOT in any of these groups will be denied access entirely.
+  # Leave empty or remove to allow all authenticated users.
+  # allowed_groups: "grafana-admins,grafana-editors,grafana-viewers"
+
+  # ─── Role Mapping ─────────────────────────────────────────────────
+  # skip_org_role_sync: false              # true = roles come ONLY from groups below
+  # allow_assign_grafana_admin: true       # Allow granting server-wide admin via groups
+
+  # ─── Sign Out ──────────────────────────────────────────────────────
+  # signout_redirect_url: "${KEYCLOAK_URL}/realms/grafana/protocol/openid-connect/logout"
+
+  # ─── Team Sync ─────────────────────────────────────────────────────
+  # Sync IdP groups to Grafana teams automatically
+  # teams_url: "${KEYCLOAK_URL}/realms/grafana/protocol/openid-connect/userinfo"
+  # team_ids_attribute_path: "groups[*]"
+
+  # ─── Group to Org Role Mappings ────────────────────────────────────
+  # Maps IdP groups to Grafana organizations with specific roles.
+  # Users ONLY get access to orgs explicitly listed in their group's org_mappings.
   #
-  # Optional settings:
-  # allow_sign_up: true
-  # auto_login: false
-  # scopes: "openid profile email groups"
-  # role_attribute_path: "contains(groups[*], 'grafana-admin') && 'Admin' || 'Viewer'"
+  # Roles: Admin, Editor, Viewer (for org access)
+  # Special: if a group has Admin on all orgs + allow_assign_grafana_admin: true,
+  #          members get server-wide super admin rights.
+  #
+  # groups:
+  #   - name: "grafana-admins"
+  #     org_mappings:
+  #       - org: "Main Organization"
+  #         role: "Admin"
+  #       - org: "Platform Team"
+  #         role: "Admin"
+  #
+  #   - name: "grafana-editors"
+  #     org_mappings:
+  #       - org: "Main Organization"
+  #         role: "Editor"
+  #
+  #   - name: "grafana-viewers"
+  #     org_mappings:
+  #       - org: "Main Organization"
+  #         role: "Viewer"
 SSOEOF
     else
         cat << SSOEOF
@@ -703,18 +757,55 @@ sso: {}
   # --- Example: Keycloak SSO for this environment ---
   # enabled: true
   # name: "Keycloak"
+  #
+  # # OAuth2 endpoints
   # auth_url: "https://keycloak-${ENV_NAME}.example.com/realms/grafana/protocol/openid-connect/auth"
   # token_url: "https://keycloak-${ENV_NAME}.example.com/realms/grafana/protocol/openid-connect/token"
   # api_url: "https://keycloak-${ENV_NAME}.example.com/realms/grafana/protocol/openid-connect/userinfo"
   # client_id: "grafana-${ENV_NAME}"
   # use_vault: true                        # Reads from: ${VAULT_MOUNT}/${ENV_NAME}/sso/keycloak
   #
+  # # OAuth settings
   # allow_sign_up: true
   # auto_login: false
   # scopes: "openid profile email groups"
+  # use_pkce: true
+  # use_refresh_token: true
   #
-  # # Map Keycloak groups to Grafana roles:
-  # role_attribute_path: "contains(groups[*], 'grafana-admin') && 'Admin' || 'Viewer'"
+  # # Restrict login to specific IdP groups (comma-separated)
+  # # Users NOT in any of these groups will be denied access entirely
+  # allowed_groups: "grafana-admins,grafana-editors,grafana-viewers"
+  #
+  # # Role mapping
+  # skip_org_role_sync: false              # true = roles come ONLY from groups below
+  # allow_assign_grafana_admin: true       # Allow granting server-wide admin
+  #
+  # # Sign out redirect (back to IdP logout)
+  # signout_redirect_url: "https://keycloak-${ENV_NAME}.example.com/realms/grafana/protocol/openid-connect/logout"
+  #
+  # # Team sync — sync IdP groups to Grafana teams
+  # teams_url: "https://keycloak-${ENV_NAME}.example.com/realms/grafana/protocol/openid-connect/userinfo"
+  # team_ids_attribute_path: "groups[*]"
+  #
+  # # Map IdP groups → Grafana orgs + roles
+  # # Users ONLY get access to orgs listed in their group's mappings
+  # groups:
+  #   - name: "grafana-admins"
+  #     org_mappings:
+  #       - org: "Main Organization"
+  #         role: "Admin"
+  #       - org: "Platform Team"
+  #         role: "Admin"
+  #
+  #   - name: "grafana-editors"
+  #     org_mappings:
+  #       - org: "Main Organization"
+  #         role: "Editor"
+  #
+  #   - name: "grafana-viewers"
+  #     org_mappings:
+  #       - org: "Main Organization"
+  #         role: "Viewer"
   #
   # --- Example: Azure AD SSO ---
   # enabled: true
