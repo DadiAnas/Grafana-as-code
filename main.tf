@@ -105,7 +105,7 @@ module "folders" {
   source = "./modules/folders"
 
   folder_permissions = local.folders_config
-  dashboards_path    = "${path.module}/dashboards"
+  dashboards_path    = "${abspath(path.module)}/dashboards"
   environment        = var.environment
   org_ids            = module.organizations.organization_ids
   team_details       = module.teams.team_details

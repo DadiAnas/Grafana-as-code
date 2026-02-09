@@ -9,11 +9,13 @@
 
 locals {
   # Find shared dashboard files (deployed to all environments)
-  shared_dashboard_files = fileset(var.dashboards_path, "shared/*/*.json")
-  
+  # Pattern: shared/<org>/<folder>/<file>.json
+  shared_dashboard_files = fileset(var.dashboards_path, "shared/*/*/*.json")
+
   # Find environment-specific dashboard files
-  env_dashboard_files = fileset(var.dashboards_path, "${var.environment}/*/*.json")
-  
+  # Pattern: <env>/<org>/<folder>/<file>.json
+  env_dashboard_files = fileset(var.dashboards_path, "${var.environment}/*/*/*.json")
+
   # Parse shared dashboards
   shared_dashboards = {
     for file in local.shared_dashboard_files :
@@ -24,7 +26,7 @@ locals {
       source        = "shared"
     }
   }
-  
+
   # Parse environment-specific dashboards
   env_dashboards = {
     for file in local.env_dashboard_files :
@@ -35,7 +37,7 @@ locals {
       source        = var.environment
     }
   }
-  
+
   # Merge: environment-specific dashboards override shared ones
   dashboards = merge(local.shared_dashboards, local.env_dashboards)
 }
