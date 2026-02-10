@@ -199,7 +199,7 @@ TOTAL_DS=0
 
         if [ "$DS_COUNT" -gt 0 ]; then
             echo "$DS_JSON" | python3 -c "
-import json, sys
+import json, sys, re
 org_name = '$ORG_NAME'
 datasources = json.load(sys.stdin)
 for ds in datasources:
@@ -211,12 +211,36 @@ for ds in datasources:
     print(f'    access: \"{ds.get(\"access\", \"proxy\")}\"')
     print(f'    is_default: {str(ds.get(\"isDefault\", False)).lower()}')
     json_data = ds.get('jsonData', {})
+    # Extract httpHeaderName*/httpHeaderValue* into http_headers
+    http_headers = {}
+    header_keys_to_remove = []
+    for k, v in json_data.items():
+        m = re.match(r'^httpHeaderName(\d+)$', k)
+        if m:
+            idx = m.group(1)
+            header_name = str(v)
+            header_keys_to_remove.append(k)
+            val_key = f'httpHeaderValue{idx}'
+            if val_key in json_data:
+                http_headers[header_name] = str(json_data[val_key])
+                header_keys_to_remove.append(val_key)
+            else:
+                http_headers[header_name] = ''
+        elif re.match(r'^httpHeaderValue\d+$', k):
+            header_keys_to_remove.append(k)
+    # Remove header keys from json_data
+    for hk in set(header_keys_to_remove):
+        json_data.pop(hk, None)
     if json_data:
         print(f'    json_data:')
         for k, v in json_data.items():
             if isinstance(v, bool): print(f'      {k}: {str(v).lower()}')
             elif isinstance(v, (int, float)): print(f'      {k}: {v}')
             else: print(f'      {k}: \"{v}\"')
+    if http_headers:
+        print(f'    http_headers:')
+        for hname, hval in http_headers.items():
+            print(f'      \"{hname}\": \"{hval}\"')
     print()
 " 2>/dev/null
             TOTAL_DS=$((TOTAL_DS + DS_COUNT))
@@ -495,29 +519,50 @@ TOTAL_AR=0
 
         if [ "$AR_COUNT" -gt 0 ]; then
             echo "$AR_JSON" | python3 -c "
-import json, sys
+import json, sys, yaml
+
+class NoAliasDumper(yaml.SafeDumper):
+    def ignore_aliases(self, data):
+        return True
+
 org_name = '$ORG_NAME'
-rules = json.load(sys.stdin)
+try:
+    rules = json.load(sys.stdin)
+except:
+    rules = []
+
 groups = {}
 for rule in rules:
     folder = rule.get('folderUID', 'general')
     group_name = rule.get('ruleGroup', 'default')
     key = f'{folder}/{group_name}'
+    
     if key not in groups:
-        groups[key] = {'name': group_name, 'folder': folder, 'rules': []}
-    groups[key]['rules'].append(rule)
-for key, g in groups.items():
-    print(f'  - name: \"{g[\"name\"]}\"')
-    print(f'    folder: \"{g[\"folder\"]}\"')
-    print(f'    org: \"{org_name}\"')
-    print(f'    interval: \"1m\"')
-    print(f'    rules:')
-    for r in g['rules']:
-        print(f'      - title: \"{r.get(\"title\", \"\")}\"')
-        print(f'        condition: \"{r.get(\"condition\", \"\")}\"')
-        print(f'        for: \"{r.get(\"for\", \"5m\")}\"')
-    print()
-" 2>/dev/null
+        groups[key] = {
+            'name': group_name,
+            'folder': folder,
+            'org': org_name,
+            'interval': '1m',
+            'rules': []
+        }
+    
+    # Construct rule object with all fields required by the module
+    r_data = {
+        'title': rule.get('title', rule.get('name', 'Alert')),
+        'condition': rule.get('condition', ''),
+        'for': rule.get('for', '5m'),
+        'annotations': rule.get('annotations', {}),
+        'labels': rule.get('labels', {}),
+        'noDataState': rule.get('noDataState', 'NoData'),
+        'execErrState': rule.get('execErrState', 'Error'),
+        'data': rule.get('data', [])
+    }
+    groups[key]['rules'].append(r_data)
+
+if groups:
+    # Dump as list of groups
+    print(yaml.dump(list(groups.values()), Dumper=NoAliasDumper, sort_keys=False))
+" 2>/dev/null | sed 's/^/  /'
             TOTAL_AR=$((TOTAL_AR + AR_COUNT))
         fi
     done
@@ -729,12 +774,15 @@ else
 fi
 IMPORTED_COUNT=$((IMPORTED_COUNT + 1))
 
-[ ! -f "${CONFIG_DIR}/keycloak.yaml" ] && cat > "${CONFIG_DIR}/keycloak.yaml" << 'EOF'
+[ ! -f "${CONFIG_DIR}/keycloak.yaml" ] && cat > "${CONFIG_DIR}/keycloak.yaml" << EOFKC
 # Keycloak configuration — must be configured manually
 
 keycloak:
   enabled: false
-EOF
+  realm_id: "master"
+  client_id: "grafana"
+  root_url: "${GRAFANA_URL}"
+EOFKC
 
 # =========================================================================
 # Generate tfvars file

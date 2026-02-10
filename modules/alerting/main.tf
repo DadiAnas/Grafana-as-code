@@ -9,7 +9,7 @@ locals {
   # Helper function to resolve org name or ID to numeric ID
   # Priority: orgId (if numeric) > org (name lookup) > default to 1
   resolve_org_id = {
-    for cp in try(var.contact_points.contactPoints, []) : cp.name => (
+    for cp in try(var.contact_points.contactPoints, []) : "${try(cp.org, "_")}:${cp.name}" => (
       # If orgId is provided and is a number, use it directly
       try(tonumber(cp.orgId), null) != null ? tonumber(cp.orgId) :
       # If org name is provided, look it up in org_ids map
@@ -19,11 +19,11 @@ locals {
     )
   }
 
-  # Create map for contact points - group by name to create single contact point with all receivers
+  # Create map for contact points - group by org:name to handle same name across orgs
   contact_points_by_name = {
-    for cp in try(var.contact_points.contactPoints, []) : cp.name => {
+    for cp in try(var.contact_points.contactPoints, []) : "${try(cp.org, "_")}:${cp.name}" => {
       name      = cp.name
-      org_id    = local.resolve_org_id[cp.name]
+      org_id    = local.resolve_org_id["${try(cp.org, "_")}:${cp.name}"]
       receivers = cp.receivers
     }
   }
@@ -409,10 +409,10 @@ locals {
   alert_groups = try(var.alert_rules.groups, [])
 
   # Convert groups to rule_groups map
-  # Key: "folder-groupname", Value: list of rules with org metadata
+  # Key: "org:folder-groupname", Value: list of rules with org metadata
   rule_groups = {
     for group in local.alert_groups :
-    "${group.folder}-${group.name}" => {
+    "${try(group.org, "_")}:${group.folder}-${group.name}" => {
       org              = try(group.org, null)
       orgId            = try(group.orgId, null)
       folder           = group.folder

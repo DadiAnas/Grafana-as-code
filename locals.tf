@@ -29,9 +29,10 @@ locals {
   shared_folders = try(yamldecode(file("${path.module}/config/shared/folders.yaml")), { folders = [] })
   env_folders    = try(yamldecode(file("${path.module}/config/${local.env}/folders.yaml")), { folders = [] })
 
-  # Create maps by uid for merging (env overrides shared)
-  shared_folder_map = { for f in try(local.shared_folders.folders, []) : f.uid => f }
-  env_folder_map    = { for f in try(local.env_folders.folders, []) : f.uid => f }
+  # Create maps by org:uid for merging (env overrides shared)
+  # Using composite key to handle same folder UID across different orgs
+  shared_folder_map = { for f in try(local.shared_folders.folders, []) : "${try(f.org, "_")}:${f.uid}" => f }
+  env_folder_map    = { for f in try(local.env_folders.folders, []) : "${try(f.org, "_")}:${f.uid}" => f }
   merged_folder_map = merge(local.shared_folder_map, local.env_folder_map)
 
   folders_config = {
@@ -94,9 +95,9 @@ locals {
   shared_alert_rules = try(yamldecode(file("${path.module}/config/shared/alerting/alert_rules.yaml")), { groups = [] })
   env_alert_rules    = try(yamldecode(file("${path.module}/config/${local.env}/alerting/alert_rules.yaml")), { groups = [] })
 
-  # Create maps by folder-name for merging (env overrides shared)
-  shared_ar_map = { for g in try(local.shared_alert_rules.groups, []) : "${g.folder}-${g.name}" => g }
-  env_ar_map    = { for g in try(local.env_alert_rules.groups, []) : "${g.folder}-${g.name}" => g }
+  # Create maps by org:folder-name for merging (env overrides shared)
+  shared_ar_map = { for g in try(local.shared_alert_rules.groups, []) : "${try(g.org, "_")}:${g.folder}-${g.name}" => g }
+  env_ar_map    = { for g in try(local.env_alert_rules.groups, []) : "${try(g.org, "_")}:${g.folder}-${g.name}" => g }
   merged_ar_map = merge(local.shared_ar_map, local.env_ar_map)
 
   alert_rules_config = {
@@ -111,9 +112,10 @@ locals {
   shared_contact_points = try(yamldecode(file("${path.module}/config/shared/alerting/contact_points.yaml")), { contactPoints = [] })
   env_contact_points    = try(yamldecode(file("${path.module}/config/${local.env}/alerting/contact_points.yaml")), { contactPoints = [] })
 
-  # Create maps by name for merging (env overrides shared)
-  shared_cp_map = { for cp in try(local.shared_contact_points.contactPoints, []) : cp.name => cp }
-  env_cp_map    = { for cp in try(local.env_contact_points.contactPoints, []) : cp.name => cp }
+  # Create maps by org:name for merging (env overrides shared)
+  # Using composite key to handle same contact point name across different orgs
+  shared_cp_map = { for cp in try(local.shared_contact_points.contactPoints, []) : "${try(cp.org, "_")}:${cp.name}" => cp }
+  env_cp_map    = { for cp in try(local.env_contact_points.contactPoints, []) : "${try(cp.org, "_")}:${cp.name}" => cp }
   merged_cp_map = merge(local.shared_cp_map, local.env_cp_map)
 
   contact_points_config = {
