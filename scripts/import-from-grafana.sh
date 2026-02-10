@@ -419,25 +419,54 @@ TOTAL_CP=0
         if [ "$CP_COUNT" -gt 0 ]; then
             echo "$CP_JSON" | python3 -c "
 import json, sys
+try:
+    import yaml
+    HAS_YAML = True
+except ImportError:
+    HAS_YAML = False
+
 org_name = '$ORG_NAME'
 cps = json.load(sys.stdin)
 grouped = {}
 for cp in cps:
     name = cp['name']
     if name not in grouped: grouped[name] = {'name': name, 'receivers': []}
-    grouped[name]['receivers'].append({'type': cp['type'], 'settings': cp.get('settings', {})})
+    recv = {'type': cp['type']}
+    settings = cp.get('settings', {})
+    if settings:
+        recv['settings'] = settings
+    dis_resolve = cp.get('disableResolveMessage')
+    if dis_resolve is not None:
+        recv['disableResolveMessage'] = dis_resolve
+    grouped[name]['receivers'].append(recv)
+
 for name, cp in grouped.items():
-    print(f'  - name: \"{name}\"')
-    print(f'    org: \"{org_name}\"')
-    print(f'    receivers:')
-    for r in cp['receivers']:
-        print(f'      - type: \"{r[\"type\"]}\"')
-        if r['settings']:
-            print(f'        settings:')
-            for k, v in r['settings'].items():
-                if isinstance(v, str): print(f'          {k}: \"{v}\"')
-                elif isinstance(v, bool): print(f'          {k}: {str(v).lower()}')
-                else: print(f'          {k}: {v}')
+    entry = {'name': name, 'org': org_name, 'receivers': cp['receivers']}
+    if HAS_YAML:
+        lines = yaml.dump([entry], default_flow_style=False, sort_keys=False).rstrip()
+        # indent to match contactPoints array
+        for line in lines.split('\n'):
+            print(f'  {line}')
+    else:
+        print(f'  - name: \"{name}\"')
+        print(f'    org: \"{org_name}\"')
+        print(f'    receivers:')
+        for r in cp['receivers']:
+            print(f'      - type: \"{r[\"type\"]}\"')
+            if r.get('settings'):
+                print(f'        settings:')
+                for k, v in r['settings'].items():
+                    if isinstance(v, str):
+                        if '\n' in v:
+                            print(f'          {k}: |')
+                            for sl in v.split('\n'): print(f'            {sl}')
+                        else:
+                            print(f'          {k}: \"{v}\"')
+                    elif isinstance(v, bool): print(f'          {k}: {str(v).lower()}')
+                    elif isinstance(v, dict):
+                        print(f'          {k}:')
+                        for dk, dv in v.items(): print(f'            {dk}: \"{dv}\"')
+                    else: print(f'          {k}: {v}')
     print()
 " 2>/dev/null
             TOTAL_CP=$((TOTAL_CP + CP_COUNT))
@@ -566,88 +595,137 @@ fi
 echo -e "${BLUE}[8/8]${NC} Importing SSO settings..."
 
 SSO_JSON=$(grafana_api "/api/v1/sso-settings" || echo "[]")
-SSO_COUNT=$(echo "$SSO_JSON" | python3 -c "
+
+# Build org_id->org_name JSON map for the python script
+ORG_MAP_JSON=$(echo "$ORGS_JSON" | python3 -c "
+import json, sys
+orgs = json.load(sys.stdin)
+print(json.dumps({str(o['id']): o['name'] for o in orgs}))
+" 2>/dev/null || echo "{}")
+
+{
+    echo "$SSO_JSON" | ORG_MAP="$ORG_MAP_JSON" python3 -c "
+import json, sys, os
+
+data = json.load(sys.stdin)
+org_map = json.loads(os.environ.get('ORG_MAP', '{}'))
+
+# Find the first enabled provider (generic_oauth preferred)
+enabled_provider = None
+for p in data:
+    if p.get('settings', {}).get('enabled', False):
+        if p.get('provider') == 'generic_oauth' or enabled_provider is None:
+            enabled_provider = p
+
+print('# Imported from Grafana SSO settings')
+print('#')
+print('# This file follows the project format expected by modules/sso.')
+print('# Client secret is stored in Vault — see vault-setup.')
+print()
+
+if enabled_provider is None:
+    print('sso:')
+    print('  enabled: false')
+else:
+    s = enabled_provider.get('settings', {})
+    provider_type = enabled_provider.get('provider', 'generic_oauth')
+
+    print('sso:')
+    print(f'  enabled: true')
+    print(f'  name: \"{s.get(\"name\", provider_type)}\"')
+    print()
+    print(f'  # OAuth2 endpoints')
+    print(f'  auth_url: \"{s.get(\"authUrl\", \"\")}\"')
+    print(f'  token_url: \"{s.get(\"tokenUrl\", \"\")}\"')
+    print(f'  api_url: \"{s.get(\"apiUrl\", \"\")}\"')
+    print()
+    print(f'  # Client configuration (client_secret stored in Vault)')
+    print(f'  client_id: \"{s.get(\"clientId\", \"\")}\"')
+    print()
+    print(f'  # OAuth settings')
+    print(f'  allow_sign_up: {str(s.get(\"allowSignUp\", True)).lower()}')
+    print(f'  auto_login: {str(s.get(\"autoLogin\", False)).lower()}')
+    print(f'  scopes: \"{s.get(\"scopes\", \"openid profile email groups\")}\"')
+    print(f'  use_pkce: {str(s.get(\"usePkce\", True)).lower()}')
+    print(f'  use_refresh_token: {str(s.get(\"useRefreshToken\", True)).lower()}')
+    print()
+
+    # Role mapping
+    rap = s.get('roleAttributePath', '')
+    if rap:
+        print(f'  role_attribute_path: \"{rap}\"')
+    print(f'  role_attribute_strict: {str(s.get(\"roleAttributeStrict\", False)).lower()}')
+    print(f'  skip_org_role_sync: {str(s.get(\"skipOrgRoleSync\", False)).lower()}')
+    print()
+
+    # Groups attribute
+    gap = s.get('groupsAttributePath', '')
+    if gap:
+        print(f'  groups_attribute_path: \"{gap}\"')
+    print()
+
+    # Allowed groups
+    ag = s.get('allowedGroups', '')
+    if ag:
+        print(f'  allowed_groups: \"{ag}\"')
+        print()
+
+    # Parse org_mapping into groups format
+    org_mapping_str = s.get('orgMapping', '')
+    if org_mapping_str:
+        print('  # Group-to-org role mappings')
+        print('  # Generated from Grafana org_mapping config')
+        print('  groups:')
+        # org_mapping format: group_name:org_id:role (newline separated)
+        mappings = [m.strip() for m in org_mapping_str.strip().replace('\\n', '\n').split('\n') if m.strip()]
+        groups = {}
+        for m in mappings:
+            parts = m.split(':')
+            if len(parts) >= 3:
+                group_name = parts[0]
+                org_id = parts[1]
+                role = parts[2]
+                if group_name not in groups:
+                    groups[group_name] = []
+                # Resolve org_id to org_name
+                org_name = org_map.get(org_id, org_id)
+                groups[group_name].append({'org': org_name, 'role': role})
+
+        for group_name, org_mappings in groups.items():
+            print(f'    - name: \"{group_name}\"')
+            print(f'      org_mappings:')
+            for om in org_mappings:
+                print(f'        - org: \"{om[\"org\"]}\"')
+                print(f'          role: \"{om[\"role\"]}\"')
+    print()
+
+    # Teams
+    tu = s.get('teamsUrl', '')
+    if tu:
+        print(f'  teams_url: \"{tu}\"')
+    tiap = s.get('teamIdsAttributePath', '')
+    if tiap:
+        print(f'  team_ids_attribute_path: \"{tiap}\"')
+
+    # Signout
+    sru = s.get('signoutRedirectUrl', '')
+    if sru:
+        print(f'  signout_redirect_url: \"{sru}\"')
+" 2>/dev/null
+} > "${CONFIG_DIR}/sso.yaml"
+
+# Check if SSO was enabled
+SSO_ENABLED=$(echo "$SSO_JSON" | python3 -c "
 import json, sys
 data = json.load(sys.stdin)
 enabled = [p for p in data if p.get('settings', {}).get('enabled', False)]
 print(len(enabled))
 " 2>/dev/null || echo 0)
 
-{
-    echo "# Imported from ${GRAFANA_URL} on $(date -Iseconds)"
-    echo "# SSO providers found: total=$(echo "$SSO_JSON" | python3 -c 'import json,sys; print(len(json.load(sys.stdin)))' 2>/dev/null || echo 0), enabled=${SSO_COUNT}"
-    echo ""
-    echo "$SSO_JSON" | python3 -c "
-import json, sys, yaml
-
-data = json.load(sys.stdin)
-result = {'sso': {'providers': []}}
-
-for provider in data:
-    name = provider.get('provider', '')
-    settings = provider.get('settings', {})
-    enabled = settings.get('enabled', False)
-    source = provider.get('source', 'system')
-
-    entry = {
-        'provider': name,
-        'enabled': enabled,
-        'source': source,
-    }
-
-    # Only include meaningful settings for enabled providers
-    if enabled:
-        important_keys = [
-            'name', 'clientId', 'authUrl', 'tokenUrl', 'apiUrl',
-            'scopes', 'allowSignUp', 'autoLogin', 'allowedDomains',
-            'allowedOrganizations', 'allowedGroups', 'roleAttributePath',
-            'orgMapping', 'skipOrgRoleSync', 'usePkce', 'icon',
-            'teamIds', 'hostedDomain'
-        ]
-        entry['settings'] = {}
-        for k in important_keys:
-            v = settings.get(k)
-            if v is not None and v != '' and v != False:
-                entry['settings'][k] = v
-        # Note: clientSecret is never returned by the API
-        entry['settings']['clientSecret'] = '** SET IN VAULT **'
-
-    result['sso']['providers'].append(entry)
-
-print(yaml.dump(result, default_flow_style=False, sort_keys=False))
-" 2>/dev/null || python3 -c "
-import json, sys
-
-# Fallback if PyYAML is not installed
-data = json.load(sys.stdin)
-print('sso:')
-print('  providers:')
-for provider in data:
-    name = provider.get('provider', '')
-    settings = provider.get('settings', {})
-    enabled = settings.get('enabled', False)
-    source = provider.get('source', 'system')
-    print(f'    - provider: \"{name}\"')
-    print(f'      enabled: {str(enabled).lower()}')
-    print(f'      source: \"{source}\"')
-    if enabled:
-        client_id = settings.get('clientId', '')
-        auth_url = settings.get('authUrl', '')
-        token_url = settings.get('tokenUrl', '')
-        scopes = settings.get('scopes', '')
-        if client_id: print(f'      client_id: \"{client_id}\"')
-        if auth_url: print(f'      auth_url: \"{auth_url}\"')
-        if token_url: print(f'      token_url: \"{token_url}\"')
-        if scopes: print(f'      scopes: \"{scopes}\"')
-        print(f'      client_secret: \"** SET IN VAULT **\"')
-    print()
-" <<< "$SSO_JSON" 2>/dev/null
-} > "${CONFIG_DIR}/sso.yaml"
-
-if [ "$SSO_COUNT" -gt 0 ]; then
-    echo -e "  ${GREEN}✓${NC} ${SSO_COUNT} enabled SSO provider(s) → config/${ENV_NAME}/sso.yaml"
+if [ "$SSO_ENABLED" -gt 0 ]; then
+    echo -e "  ${GREEN}✓${NC} SSO config (enabled) → config/${ENV_NAME}/sso.yaml"
 else
-    echo -e "  ${DIM}  No enabled SSO providers (all providers saved as reference)${NC}"
+    echo -e "  ${DIM}  SSO disabled → config/${ENV_NAME}/sso.yaml${NC}"
 fi
 IMPORTED_COUNT=$((IMPORTED_COUNT + 1))
 
@@ -657,6 +735,43 @@ IMPORTED_COUNT=$((IMPORTED_COUNT + 1))
 keycloak:
   enabled: false
 EOF
+
+# =========================================================================
+# Generate tfvars file
+# =========================================================================
+TFVARS_FILE="${OUTPUT}/environments/${ENV_NAME}.tfvars"
+if [ ! -f "$TFVARS_FILE" ]; then
+    mkdir -p "${OUTPUT}/environments"
+    cat > "$TFVARS_FILE" << EOFVARS
+# =============================================================================
+# ${ENV_NAME^^} ENVIRONMENT - Terraform Variables
+# =============================================================================
+# Auto-generated by import-from-grafana.sh on $(date -Iseconds)
+#
+# Usage:
+#   make plan  ENV=${ENV_NAME}
+#   make apply ENV=${ENV_NAME}
+# =============================================================================
+
+# The URL of your Grafana instance
+grafana_url = "${GRAFANA_URL}"
+
+# Environment name — must match a directory under config/ and dashboards/
+environment = "${ENV_NAME}"
+
+# Vault Configuration (HashiCorp Vault for secrets management)
+vault_address = "http://localhost:8200"
+vault_mount   = "grafana"
+# vault_token — set via VAULT_TOKEN env variable for security:
+#   export VAULT_TOKEN="your-vault-token"
+
+# Keycloak Configuration (optional — only if you enable SSO via Keycloak)
+# keycloak_url = "https://keycloak.example.com"
+EOFVARS
+    echo -e "  ${GREEN}✓${NC} Generated environments/${ENV_NAME}.tfvars"
+else
+    echo -e "  ${DIM}  environments/${ENV_NAME}.tfvars already exists (skipped)${NC}"
+fi
 
 # =========================================================================
 # Summary
@@ -697,7 +812,7 @@ echo "  Some values (SSO, secrets, Keycloak) need manual configuration."
 echo ""
 echo "  Next steps:"
 echo "    1. Review config/${ENV_NAME}/*.yaml"
-echo "    2. Create environments/${ENV_NAME}.tfvars (or run: make new-env NAME=${ENV_NAME})"
+echo "    2. Review environments/${ENV_NAME}.tfvars"
 echo "    3. Set up Vault secrets: make vault-setup ENV=${ENV_NAME}"
-echo "    4. Import existing state: terraform import ..."
+echo "    4. Run: make init ENV=${ENV_NAME} && make plan ENV=${ENV_NAME}"
 echo ""
