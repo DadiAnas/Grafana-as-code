@@ -120,7 +120,7 @@ echo -e "${NC}"
 
 HEALTH=$(grafana_api "/api/health" || echo "FAILED")
 if echo "$HEALTH" | grep -q "ok"; then
-    VERSION=$(echo "$HEALTH" | grep -o '"version":"[^"]*"' | cut -d'"' -f4)
+    VERSION=$(echo "$HEALTH" | grep -oP '"version"\s*:\s*"\K[^"]+' 2>/dev/null || echo "unknown")
     echo -e "  ${GREEN}✓${NC} Connected to Grafana ${VERSION} at ${GRAFANA_URL}"
 else
     echo -e "  ${RED}✗ Cannot connect to Grafana at ${GRAFANA_URL}${NC}"
@@ -137,7 +137,7 @@ IMPORTED_COUNT=0
 echo -e "${BLUE}[1/7]${NC} Importing organizations..."
 
 ORGS_JSON=$(grafana_api "/api/orgs" || echo "[]")
-ORG_COUNT=$(echo "$ORGS_JSON" | grep -o '"id"' | wc -l)
+ORG_COUNT=$(echo "$ORGS_JSON" | (grep -c '"id"' || true))
 
 CONFIG_DIR="${OUTPUT}/config/${ENV_NAME}"
 mkdir -p "${CONFIG_DIR}/alerting"
@@ -182,7 +182,7 @@ fi
 echo -e "${BLUE}[2/7]${NC} Importing datasources..."
 
 DS_JSON=$(grafana_api "/api/datasources" || echo "[]")
-DS_COUNT=$(echo "$DS_JSON" | grep -o '"id"' | wc -l)
+DS_COUNT=$(echo "$DS_JSON" | (grep -c '"id"' || true))
 
 if [ "$DS_COUNT" -gt 0 ]; then
     {
@@ -229,7 +229,7 @@ fi
 echo -e "${BLUE}[3/7]${NC} Importing folders..."
 
 FOLDERS_JSON=$(grafana_api "/api/folders?limit=1000" || echo "[]")
-FOLDER_COUNT=$(echo "$FOLDERS_JSON" | grep -o '"uid"' | wc -l)
+FOLDER_COUNT=$(echo "$FOLDERS_JSON" | (grep -c '"uid"' || true))
 
 if [ "$FOLDER_COUNT" -gt 0 ]; then
     {
@@ -261,7 +261,7 @@ fi
 echo -e "${BLUE}[4/7]${NC} Importing teams..."
 
 TEAMS_JSON=$(grafana_api "/api/teams/search?perpage=1000" || echo '{"teams":[]}')
-TEAM_COUNT=$(echo "$TEAMS_JSON" | grep -o '"id"' | wc -l)
+TEAM_COUNT=$(echo "$TEAMS_JSON" | (grep -c '"id"' || true))
 
 if [ "$TEAM_COUNT" -gt 0 ]; then
     {
@@ -294,7 +294,7 @@ fi
 echo -e "${BLUE}[5/7]${NC} Importing service accounts..."
 
 SA_JSON=$(grafana_api "/api/serviceaccounts/search?perpage=1000" || echo '{"serviceAccounts":[]}')
-SA_COUNT=$(echo "$SA_JSON" | grep -o '"id"' | wc -l)
+SA_COUNT=$(echo "$SA_JSON" | (grep -c '"id"' || true))
 
 if [ "$SA_COUNT" -gt 0 ]; then
     {
@@ -327,7 +327,7 @@ echo -e "${BLUE}[6/7]${NC} Importing alerting configuration..."
 
 # Contact points
 CP_JSON=$(grafana_api "/api/v1/provisioning/contact-points" || echo "[]")
-CP_COUNT=$(echo "$CP_JSON" | grep -o '"uid"' | wc -l)
+CP_COUNT=$(echo "$CP_JSON" | (grep -c '"uid"' || true))
 
 if [ "$CP_COUNT" -gt 0 ]; then
     {
@@ -375,7 +375,7 @@ fi
 
 # Alert rules
 AR_JSON=$(grafana_api "/api/v1/provisioning/alert-rules" || echo "[]")
-AR_COUNT=$(echo "$AR_JSON" | grep -o '"uid"' | wc -l)
+AR_COUNT=$(echo "$AR_JSON" | (grep -c '"uid"' || true))
 
 if [ "$AR_COUNT" -gt 0 ]; then
     {
@@ -437,7 +437,7 @@ if [ "$IMPORT_DASHBOARDS" = true ]; then
     echo -e "${BLUE}[7/7]${NC} Importing dashboards..."
 
     SEARCH_JSON=$(grafana_api "/api/search?type=dash-db&limit=5000" || echo "[]")
-    DASH_COUNT=$(echo "$SEARCH_JSON" | grep -o '"uid"' | wc -l)
+    DASH_COUNT=$(echo "$SEARCH_JSON" | (grep -c '"uid"' || true))
 
     if [ "$DASH_COUNT" -gt 0 ]; then
         # Get folder mapping
