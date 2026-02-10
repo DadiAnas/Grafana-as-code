@@ -436,29 +436,43 @@ EOF
 if [ "$IMPORT_DASHBOARDS" = true ]; then
     echo -e "${BLUE}[7/7]${NC} Importing dashboards..."
 
+    # Build org_id → org_name mapping
+    ORG_MAP=$(echo "$ORGS_JSON" | python3 -c "
+import json, sys
+orgs = json.load(sys.stdin)
+for org in orgs:
+    print(f'{org[\"id\"]}|{org[\"name\"]}')
+" 2>/dev/null || echo "1|Main Organization")
+
     SEARCH_JSON=$(grafana_api "/api/search?type=dash-db&limit=5000" || echo "[]")
     DASH_COUNT=$(echo "$SEARCH_JSON" | (grep -c '"uid"' || true))
 
     if [ "$DASH_COUNT" -gt 0 ]; then
-        # Get folder mapping
         DASH_DIR="${OUTPUT}/dashboards/${ENV_NAME}"
-        EXPORTED=0
 
+        # Parse dashboards: uid|folderUid|orgId|title
         echo "$SEARCH_JSON" | python3 -c "
 import json, sys
 dashboards = json.load(sys.stdin)
 for d in dashboards:
     uid = d.get('uid', '')
-    folder = d.get('folderTitle', 'General')
+    folder_uid = d.get('folderUid', 'general')
+    org_id = d.get('orgId', 1)
     title = d.get('title', 'unknown')
-    # Print: uid|folder|title
-    print(f'{uid}|{folder}|{title}')
-" 2>/dev/null | while IFS='|' read -r uid folder title; do
-            # Sanitize folder name
-            safe_folder=$(echo "$folder" | sed 's/[^a-zA-Z0-9 _-]//g')
-            [ -z "$safe_folder" ] && safe_folder="General"
+    # Print: uid|folderUid|orgId|title
+    print(f'{uid}|{folder_uid}|{org_id}|{title}')
+" 2>/dev/null | while IFS='|' read -r uid folder_uid org_id title; do
+            # Resolve org name from org_id
+            org_name=$(echo "$ORG_MAP" | grep "^${org_id}|" | cut -d'|' -f2)
+            [ -z "$org_name" ] && org_name="Main Organization"
 
-            mkdir -p "${DASH_DIR}/${safe_folder}"
+            # Use folder UID as directory name (matches Terraform convention)
+            [ -z "$folder_uid" ] && folder_uid="general"
+
+            # Sanitize title for filename
+            safe_title=$(echo "$title" | sed 's/[\/\\]/-/g')
+
+            mkdir -p "${DASH_DIR}/${org_name}/${folder_uid}"
 
             # Export dashboard JSON
             DASH_JSON=$(grafana_api "/api/dashboards/uid/${uid}" || echo "")
@@ -471,9 +485,8 @@ dash = data.get('dashboard', {})
 dash.pop('id', None)
 dash.pop('version', None)
 print(json.dumps(dash, indent=2))
-" 2>/dev/null > "${DASH_DIR}/${safe_folder}/${title}.json"
-                EXPORTED=$((EXPORTED + 1))
-                echo -e "  ${GREEN}✓${NC} ${folder}/${title}.json"
+" 2>/dev/null > "${DASH_DIR}/${org_name}/${folder_uid}/${safe_title}.json"
+                echo -e "  ${GREEN}✓${NC} ${org_name}/${folder_uid}/${safe_title}.json"
             fi
         done
 
