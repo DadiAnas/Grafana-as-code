@@ -231,6 +231,7 @@ make delete-env NAME=production
 | `GRAFANA_URL` | Grafana instance URL | `http://localhost:3000` |
 | `VAULT_ADDR` | Vault server address | `http://localhost:8200` |
 | `VAULT_MOUNT` | Vault KV mount path | `grafana` |
+| `VAULT_NAMESPACE` | Vault Enterprise namespace | *(root namespace)* |
 | `KEYCLOAK_URL` | Keycloak URL (enables SSO config) | *(disabled)* |
 | `BACKEND` | Backend type: `s3`, `azurerm`, `gcs` | *(all commented)* |
 | `ORGS` | Custom organizations (comma-separated) | *(from shared config)* |

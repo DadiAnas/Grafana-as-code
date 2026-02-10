@@ -14,6 +14,10 @@
 #   export VAULT_ADDR="http://localhost:8200"
 #   export VAULT_TOKEN="your-root-token"
 #   bash vault/scripts/setup-secrets.sh myenv
+#
+# For Vault Enterprise namespaces:
+#   export VAULT_NAMESPACE="admin/grafana"
+#   bash vault/scripts/setup-secrets.sh myenv
 # =============================================================================
 
 set -euo pipefail
@@ -21,6 +25,12 @@ set -euo pipefail
 # Environment name from argument or default
 ENV="${1:-myenv}"
 MOUNT="${2:-grafana}"
+
+# Vault Enterprise namespace support
+if [ -n "${VAULT_NAMESPACE:-}" ]; then
+    echo "Using Vault namespace: ${VAULT_NAMESPACE}"
+    export VAULT_NAMESPACE
+fi
 
 echo "=== Setting up Vault secrets for environment: ${ENV} ==="
 

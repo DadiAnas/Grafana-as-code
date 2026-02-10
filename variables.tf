@@ -46,6 +46,12 @@ variable "vault_mount" {
   default     = "grafana"
 }
 
+variable "vault_namespace" {
+  description = "Vault Enterprise namespace (e.g., 'admin/grafana'). Leave empty for OSS Vault or root namespace."
+  type        = string
+  default     = ""
+}
+
 # =============================================================================
 # KEYCLOAK CONFIGURATION (OPTIONAL)
 # =============================================================================

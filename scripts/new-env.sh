@@ -50,6 +50,7 @@ ENV_NAME=""
 GRAFANA_URL="http://localhost:3000"
 VAULT_ADDR="http://localhost:8200"
 VAULT_MOUNT="grafana"
+VAULT_NAMESPACE=""
 KEYCLOAK_URL=""
 BACKEND=""
 ORGS=""
@@ -69,6 +70,7 @@ show_help() {
     echo "    --grafana-url=<url>            Grafana URL               (default: http://localhost:3000)"
     echo "    --vault-addr=<url>             Vault address             (default: http://localhost:8200)"
     echo "    --vault-mount=<path>           Vault KV mount            (default: grafana)"
+    echo "    --vault-namespace=<ns>         Vault Enterprise namespace (e.g., admin/grafana)"
     echo "    --keycloak-url=<url>           Keycloak URL (enables SSO)"
     echo "    --backend=<type>               Backend: s3, azurerm, gcs (default: all commented)"
     echo "    --orgs=<org1,org2,...>          Custom organization names (comma-separated)"
@@ -97,6 +99,7 @@ while [[ $# -gt 0 ]]; do
         --grafana-url=*)   GRAFANA_URL="${1#*=}"; shift ;;
         --vault-addr=*)    VAULT_ADDR="${1#*=}"; shift ;;
         --vault-mount=*)   VAULT_MOUNT="${1#*=}"; shift ;;
+        --vault-namespace=*) VAULT_NAMESPACE="${1#*=}"; shift ;;
         --keycloak-url=*)  KEYCLOAK_URL="${1#*=}"; shift ;;
         --backend=*)       BACKEND="${1#*=}"; shift ;;
         --orgs=*)          ORGS="${1#*=}"; shift ;;
@@ -121,6 +124,7 @@ done
 [ "$GRAFANA_URL" = "http://localhost:3000" ] && [ -n "${GRAFANA_URL_ARG:-}" ] && GRAFANA_URL="$GRAFANA_URL_ARG"
 [ "$VAULT_ADDR" = "http://localhost:8200" ] && [ -n "${VAULT_ADDR_ARG:-}" ] && VAULT_ADDR="$VAULT_ADDR_ARG"
 [ "$VAULT_MOUNT" = "grafana" ] && [ -n "${VAULT_MOUNT_ARG:-}" ] && VAULT_MOUNT="$VAULT_MOUNT_ARG"
+[ -z "$VAULT_NAMESPACE" ] && [ -n "${VAULT_NAMESPACE_ARG:-}" ] && VAULT_NAMESPACE="$VAULT_NAMESPACE_ARG"
 [ -z "$KEYCLOAK_URL" ] && [ -n "${KEYCLOAK_URL_ARG:-}" ] && KEYCLOAK_URL="$KEYCLOAK_URL_ARG"
 [ -z "$BACKEND" ] && [ -n "${BACKEND_ARG:-}" ] && BACKEND="$BACKEND_ARG"
 [ -z "$ORGS" ] && [ -n "${ORGS_ARG:-}" ] && ORGS="$ORGS_ARG"
@@ -172,7 +176,9 @@ echo "╚═══════════════════════�
 echo -e "${NC}"
 
 echo -e "  ${DIM}Grafana URL:   ${GRAFANA_URL}${NC}"
-echo -e "  ${DIM}Vault:         ${VAULT_ADDR} (mount: ${VAULT_MOUNT})${NC}"
+VAULT_DISPLAY="${VAULT_ADDR} (mount: ${VAULT_MOUNT})"
+[ -n "$VAULT_NAMESPACE" ] && VAULT_DISPLAY="${VAULT_DISPLAY} [ns: ${VAULT_NAMESPACE}]"
+echo -e "  ${DIM}Vault:         ${VAULT_DISPLAY}${NC}"
 [ -n "$KEYCLOAK_URL" ] && echo -e "  ${DIM}Keycloak:      ${KEYCLOAK_URL}${NC}"
 [ -n "$BACKEND" ] && echo -e "  ${DIM}Backend:       ${BACKEND}${NC}"
 [ -n "$ORGS" ] && echo -e "  ${DIM}Organizations: ${ORGS}${NC}"
@@ -189,6 +195,11 @@ echo -e "${BLUE}[1/4]${NC} Creating ${YELLOW}environments/${ENV_NAME}.tfvars${NC
 KEYCLOAK_LINE="# keycloak_url = \"https://keycloak.example.com\""
 if [ -n "$KEYCLOAK_URL" ]; then
     KEYCLOAK_LINE="keycloak_url = \"${KEYCLOAK_URL}\""
+fi
+
+VAULT_NS_LINE="# vault_namespace = \"admin/grafana\"   # e.g., admin/team-x"
+if [ -n "$VAULT_NAMESPACE" ]; then
+    VAULT_NS_LINE="vault_namespace = \"${VAULT_NAMESPACE}\""
 fi
 
 cat > "$PROJECT_ROOT/environments/${ENV_NAME}.tfvars" << EOF
@@ -218,6 +229,10 @@ environment = "${ENV_NAME}"
 # HashiCorp Vault for secrets management (datasource passwords, SSO secrets)
 vault_address = "${VAULT_ADDR}"
 vault_mount   = "${VAULT_MOUNT}"
+
+# Vault Enterprise namespace (leave commented for OSS Vault or root namespace)
+# See: https://developer.hashicorp.com/vault/docs/enterprise/namespaces
+${VAULT_NS_LINE}
 
 # The vault token should be set via environment variable for security:
 #   export VAULT_TOKEN="your-vault-token"

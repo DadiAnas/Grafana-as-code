@@ -106,7 +106,7 @@ new-env:
 		echo "    make new-env NAME=prod GRAFANA_URL=https://grafana.example.com BACKEND=s3"; \
 		echo "    make new-env NAME=dev DATASOURCES=prometheus,loki KEYCLOAK_URL=https://sso.example.com"; \
 		echo ""; \
-		echo "  Optional params: GRAFANA_URL, VAULT_ADDR, VAULT_MOUNT, KEYCLOAK_URL, BACKEND, ORGS, DATASOURCES"; \
+		echo "  Optional params: GRAFANA_URL, VAULT_ADDR, VAULT_MOUNT, VAULT_NAMESPACE, KEYCLOAK_URL, BACKEND, ORGS, DATASOURCES"; \
 		echo ""; \
 		exit 1; \
 	fi
@@ -114,6 +114,7 @@ new-env:
 	 GRAFANA_URL_ARG="$(GRAFANA_URL)" \
 	 VAULT_ADDR_ARG="$(VAULT_ADDR)" \
 	 VAULT_MOUNT_ARG="$(VAULT_MOUNT)" \
+	 VAULT_NAMESPACE_ARG="$(VAULT_NAMESPACE)" \
 	 KEYCLOAK_URL_ARG="$(KEYCLOAK_URL)" \
 	 BACKEND_ARG="$(BACKEND)" \
 	 ORGS_ARG="$(ORGS)" \
