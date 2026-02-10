@@ -12,7 +12,9 @@
 
 .PHONY: help init plan apply destroy fmt validate clean output state-list \
         vault-setup vault-verify new-env delete-env list-envs check-env \
-        ci-init ci-plan ci-apply ci-destroy apply-auto
+        ci-init ci-plan ci-apply ci-destroy apply-auto \
+        dev-up dev-down dev-bootstrap lint import drift backup promote \
+        dashboard-diff test dry-run
 
 # Default environment — override with: make plan ENV=staging
 ENV ?= myenv
@@ -57,9 +59,23 @@ help:
 	@echo "  ─── Utilities ─────────────────────────────────────────────"
 	@echo "  fmt           Format all Terraform files"
 	@echo "  validate      Validate Terraform configuration"
+	@echo "  lint          Run TFLint + YAML lint"
 	@echo "  clean         Remove Terraform cache and plans"
 	@echo "  output        Show Terraform outputs             ENV=staging"
 	@echo "  state-list    List all resources in state"
+	@echo ""
+	@echo "  ─── Operations ───────────────────────────────────────────"
+	@echo "  drift          Detect out-of-band changes        ENV=staging"
+	@echo "  backup         Backup Grafana state via API      ENV=staging"
+	@echo "  import         Import from existing Grafana      ENV=staging AUTH=admin:admin"
+	@echo "  promote        Promote configs between envs      FROM=staging TO=prod"
+	@echo "  dashboard-diff Human-readable dashboard diff     ENV=staging"
+	@echo ""
+	@echo "  ─── Local Development ────────────────────────────────────"
+	@echo "  dev-up         Start Grafana+Vault+Keycloak      (docker compose)"
+	@echo "  dev-down       Stop local dev services"
+	@echo "  dev-bootstrap  Bootstrap dev env (seed Vault)    "
+	@echo "  test           Full local test cycle"
 	@echo ""
 	@echo "  ─── Vault ────────────────────────────────────────────────"
 	@echo "  vault-setup   Create Vault secrets               ENV=staging"
@@ -187,9 +203,16 @@ validate:
 clean:
 	@echo "Cleaning Terraform cache..."
 	rm -rf .terraform
-	rm -f .terraform.lock.hcl
 	rm -f tfplan-*
 	rm -f *.tfplan
+
+lint:
+	@echo "Running TFLint..."
+	@tflint --init 2>/dev/null || true
+	tflint --recursive
+	@echo ""
+	@echo "Running YAML lint..."
+	@yamllint -d '{extends: default, rules: {line-length: {max: 200}, truthy: disable, document-start: disable}}' config/ 2>/dev/null || echo "(install yamllint: pip install yamllint)"
 
 output:
 	@echo "Terraform outputs for $(ENV):"
@@ -197,6 +220,87 @@ output:
 
 state-list:
 	terraform state list
+
+# =============================================================================
+# OPERATIONS
+# =============================================================================
+
+drift:
+	@bash scripts/drift-detect.sh "$(ENV)"
+
+backup:
+	@bash scripts/backup.sh "$(ENV)"
+
+# Import from existing Grafana instance
+# Usage: make import ENV=prod GRAFANA_URL=https://grafana.example.com AUTH=admin:admin
+AUTH ?=
+import:
+	@if [ -z "$(GRAFANA_URL)" ] || [ -z "$(AUTH)" ]; then \
+		echo ""; \
+		echo "  Usage: make import ENV=prod GRAFANA_URL=https://grafana.example.com AUTH=admin:admin"; \
+		echo ""; \
+		echo "  AUTH can be:"; \
+		echo "    - Basic auth:  admin:password"; \
+		echo "    - API token:   glsa_xxxxxxxxxx"; \
+		echo ""; \
+		exit 1; \
+	fi
+	@bash scripts/import-from-grafana.sh "$(ENV)" --grafana-url="$(GRAFANA_URL)" --auth="$(AUTH)"
+
+# Promote configuration from one environment to another
+# Usage: make promote FROM=staging TO=prod
+FROM ?=
+TO   ?=
+promote:
+	@if [ -z "$(FROM)" ] || [ -z "$(TO)" ]; then \
+		echo ""; \
+		echo "  Usage: make promote FROM=staging TO=prod"; \
+		echo "         make promote FROM=staging TO=prod --diff-only"; \
+		echo ""; \
+		exit 1; \
+	fi
+	@bash scripts/promote.sh "$(FROM)" "$(TO)"
+
+dashboard-diff:
+	@bash scripts/dashboard-diff.sh "$(ENV)"
+
+# Dry-run for new-env
+dry-run:
+	@if [ -z "$(NAME)" ]; then \
+		echo "Usage: make dry-run NAME=staging"; \
+		exit 1; \
+	fi
+	@bash scripts/new-env.sh "$(NAME)" --dry-run
+
+# =============================================================================
+# LOCAL DEVELOPMENT
+# =============================================================================
+
+dev-up:
+	@echo "Starting Grafana + Vault + Keycloak..."
+	docker compose up -d
+	@echo ""
+	@echo "  Grafana:   http://localhost:3000  (admin/admin)"
+	@echo "  Vault:     http://localhost:8200  (token: root)"
+	@echo "  Keycloak:  http://localhost:8080  (admin/admin)"
+	@echo ""
+	@echo "  Run 'make dev-bootstrap' to seed Vault and create a dev environment"
+
+dev-down:
+	@echo "Stopping local dev services..."
+	docker compose down
+
+dev-bootstrap:
+	@bash scripts/dev-bootstrap.sh dev
+
+test: dev-up dev-bootstrap
+	@echo ""
+	@echo "Running test cycle..."
+	@export VAULT_TOKEN=root && \
+		make init ENV=dev && \
+		make plan ENV=dev && \
+		echo "" && \
+		echo "✅ Test plan succeeded! Run 'make apply ENV=dev' to apply."
 
 # =============================================================================
 # VAULT OPERATIONS

@@ -1,0 +1,334 @@
+# =============================================================================
+# GITHUB ACTIONS — Terraform Plan/Apply for Grafana-as-Code
+# =============================================================================
+# Triggers:
+#   - On PR:    terraform fmt, validate, lint, plan (comment on PR)
+#   - On push:  terraform apply (after merge to main)
+#
+# Requirements:
+#   - GitHub Secrets: VAULT_ADDR, VAULT_TOKEN, GRAFANA_URL (per environment)
+#   - Terraform state backend configured in backends/<env>.tfbackend
+# =============================================================================
+
+name: Terraform
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '**.tf'
+      - '**.tfvars'
+      - '**.tfbackend'
+      - 'config/**'
+      - 'dashboards/**'
+  push:
+    branches: [main]
+    paths:
+      - '**.tf'
+      - '**.tfvars'
+      - '**.tfbackend'
+      - 'config/**'
+      - 'dashboards/**'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+env:
+  TF_VERSION: "1.9.0"
+  TF_IN_AUTOMATION: true
+
+jobs:
+  # ─── Detect Changed Environments ──────────────────────────────────────
+  detect-envs:
+    name: Detect changed environments
+    runs-on: ubuntu-latest
+    outputs:
+      environments: ${{ steps.detect.outputs.environments }}
+      has_changes: ${{ steps.detect.outputs.has_changes }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changed environments
+        id: detect
+        run: |
+          # Find which environments have changed files
+          ENVS=()
+          
+          # Check config/ and dashboards/ directories
+          CHANGED_FILES=$(git diff --name-only ${{ github.event.before || 'HEAD~1' }} HEAD 2>/dev/null || git diff --name-only HEAD~1 HEAD)
+          
+          for file in $CHANGED_FILES; do
+            if [[ "$file" =~ ^config/([^/]+)/ ]]; then
+              ENV="${BASH_REMATCH[1]}"
+              [[ "$ENV" != "shared" ]] && ENVS+=("$ENV")
+            elif [[ "$file" =~ ^dashboards/([^/]+)/ ]]; then
+              ENV="${BASH_REMATCH[1]}"
+              [[ "$ENV" != "shared" ]] && ENVS+=("$ENV")
+            elif [[ "$file" =~ ^environments/([^.]+)\.tfvars$ ]]; then
+              ENVS+=("${BASH_REMATCH[1]}")
+            fi
+          done
+          
+          # Also detect if shared configs changed (affects all envs)
+          SHARED_CHANGED=false
+          if echo "$CHANGED_FILES" | grep -qE '^(config/shared/|dashboards/shared/|.*\.tf$)'; then
+            SHARED_CHANGED=true
+            # Add all existing environments
+            for f in environments/*.tfvars; do
+              [ -f "$f" ] && ENVS+=("$(basename "$f" .tfvars)")
+            done
+          fi
+          
+          # Deduplicate
+          UNIQUE_ENVS=($(printf '%s\n' "${ENVS[@]}" | sort -u))
+          
+          if [ ${#UNIQUE_ENVS[@]} -eq 0 ]; then
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+            echo "environments=[]" >> "$GITHUB_OUTPUT"
+          else
+            JSON=$(printf '%s\n' "${UNIQUE_ENVS[@]}" | jq -R . | jq -sc .)
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+            echo "environments=$JSON" >> "$GITHUB_OUTPUT"
+            echo "Detected environments: ${UNIQUE_ENVS[*]}"
+          fi
+
+  # ─── Lint & Validate ──────────────────────────────────────────────────
+  lint:
+    name: Lint & Validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Format Check
+        id: fmt
+        run: terraform fmt -check -recursive -diff
+        continue-on-error: true
+
+      - name: Terraform Init (validation only)
+        run: terraform init -backend=false
+
+      - name: Terraform Validate
+        id: validate
+        run: terraform validate -no-color
+
+      - name: YAML Lint
+        uses: ibiqlik/action-yamllint@v3
+        with:
+          file_or_dir: config/
+          config_data: |
+            extends: default
+            rules:
+              line-length:
+                max: 200
+              truthy: disable
+              document-start: disable
+
+      - name: Setup TFLint
+        uses: terraform-linters/setup-tflint@v4
+
+      - name: TFLint Init
+        run: tflint --init
+
+      - name: TFLint
+        id: tflint
+        run: tflint --no-color --recursive
+        continue-on-error: true
+
+      - name: Comment PR with lint results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fmt = '${{ steps.fmt.outcome }}';
+            const validate = '${{ steps.validate.outcome }}';
+            const tflint = '${{ steps.tflint.outcome }}';
+            
+            const statusIcon = (s) => s === 'success' ? '✅' : '❌';
+            
+            const body = `### Terraform Lint Results
+            
+            | Check | Status |
+            |-------|--------|
+            | 🖌 Format | ${statusIcon(fmt)} |
+            | ✅ Validate | ${statusIcon(validate)} |
+            | 🔍 TFLint | ${statusIcon(tflint)} |
+            
+            *Pushed by @${{ github.actor }}*`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
+
+      - name: Fail on lint errors
+        if: steps.fmt.outcome == 'failure' || steps.validate.outcome == 'failure'
+        run: exit 1
+
+  # ─── Plan ──────────────────────────────────────────────────────────────
+  plan:
+    name: Plan (${{ matrix.environment }})
+    needs: [detect-envs, lint]
+    if: needs.detect-envs.outputs.has_changes == 'true' && github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        environment: ${{ fromJson(needs.detect-envs.outputs.environments) }}
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init
+        run: |
+          terraform init \
+            -backend-config="backends/${{ matrix.environment }}.tfbackend"
+        env:
+          VAULT_ADDR: ${{ secrets.VAULT_ADDR }}
+          VAULT_TOKEN: ${{ secrets.VAULT_TOKEN }}
+
+      - name: Terraform Plan
+        id: plan
+        run: |
+          terraform plan \
+            -var-file="environments/${{ matrix.environment }}.tfvars" \
+            -var="environment=${{ matrix.environment }}" \
+            -no-color \
+            -out=tfplan 2>&1 | tee plan_output.txt
+        env:
+          VAULT_ADDR: ${{ secrets.VAULT_ADDR }}
+          VAULT_TOKEN: ${{ secrets.VAULT_TOKEN }}
+        continue-on-error: true
+
+      - name: Comment PR with plan
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const plan = fs.readFileSync('plan_output.txt', 'utf8');
+            const outcome = '${{ steps.plan.outcome }}';
+            const icon = outcome === 'success' ? '✅' : '❌';
+            
+            // Truncate if too long
+            const maxLen = 60000;
+            const truncated = plan.length > maxLen 
+              ? plan.substring(0, maxLen) + '\n\n... (truncated)' 
+              : plan;
+            
+            const body = `### ${icon} Terraform Plan: \`${{ matrix.environment }}\`
+            
+            <details>
+            <summary>Show Plan Output</summary>
+            
+            \`\`\`hcl
+            ${truncated}
+            \`\`\`
+            
+            </details>
+            
+            *Environment: \`${{ matrix.environment }}\` | Pushed by @${{ github.actor }}*`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
+
+      - name: Fail on plan error
+        if: steps.plan.outcome == 'failure'
+        run: exit 1
+
+  # ─── Apply (on merge to main) ─────────────────────────────────────────
+  apply:
+    name: Apply (${{ matrix.environment }})
+    needs: [detect-envs]
+    if: needs.detect-envs.outputs.has_changes == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: ${{ matrix.environment }}  # Uses GitHub Environment protection rules
+    strategy:
+      matrix:
+        environment: ${{ fromJson(needs.detect-envs.outputs.environments) }}
+      max-parallel: 1  # Apply one environment at a time
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init
+        run: |
+          terraform init \
+            -backend-config="backends/${{ matrix.environment }}.tfbackend"
+        env:
+          VAULT_ADDR: ${{ secrets.VAULT_ADDR }}
+          VAULT_TOKEN: ${{ secrets.VAULT_TOKEN }}
+
+      - name: Terraform Apply
+        run: |
+          terraform apply \
+            -var-file="environments/${{ matrix.environment }}.tfvars" \
+            -var="environment=${{ matrix.environment }}" \
+            -auto-approve \
+            -no-color
+        env:
+          VAULT_ADDR: ${{ secrets.VAULT_ADDR }}
+          VAULT_TOKEN: ${{ secrets.VAULT_TOKEN }}
+
+  # ─── Drift Detection (scheduled) ──────────────────────────────────────
+  drift:
+    name: Drift Detection (${{ matrix.environment }})
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        environment: [] # Populate with your environments
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Check for drift
+        id: drift
+        run: |
+          terraform init -backend-config="backends/${{ matrix.environment }}.tfbackend"
+          terraform plan \
+            -var-file="environments/${{ matrix.environment }}.tfvars" \
+            -var="environment=${{ matrix.environment }}" \
+            -detailed-exitcode -no-color 2>&1 | tee drift.txt || true
+        env:
+          VAULT_ADDR: ${{ secrets.VAULT_ADDR }}
+          VAULT_TOKEN: ${{ secrets.VAULT_TOKEN }}
+
+      - name: Alert on drift
+        if: steps.drift.outcome == 'failure'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `⚠️ Drift detected in ${{ matrix.environment }}`,
+              body: 'Terraform plan detected differences. Run `make drift ENV=${{ matrix.environment }}` for details.',
+              labels: ['drift', 'environment:${{ matrix.environment }}']
+            });

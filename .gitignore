@@ -3,7 +3,7 @@
 *.tfstate.*
 *.tfstate.backup
 .terraform/
-.terraform.lock.hcl
+# NOTE: .terraform.lock.hcl is intentionally NOT ignored — commit it for reproducible builds
 crash.log
 crash.*.log
 
@@ -71,3 +71,6 @@ plan.out
 
 # Dashboard exports (if auto-generated)
 dashboards/*.json.bak
+
+# Backups (from make backup)
+backups/

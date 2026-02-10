@@ -1,29 +1,38 @@
 # =============================================================================
 # GITLAB CI/CD — Grafana as Code
 # =============================================================================
-# This pipeline validates and deploys Grafana configuration via Terraform.
-# Adapt the ENVIRONMENTS list and job definitions for your setup.
+# Multi-environment Terraform pipeline with GitLab HTTP backend support.
 #
-# Required CI/CD Variables (set in GitLab Settings > CI/CD > Variables):
+# Pipeline stages:
+#   1. validate  — fmt, validate, lint, security scan
+#   2. plan      — terraform plan (per environment, on MR + main)
+#   3. apply     — terraform apply (auto on main, manual gate optional)
+#   4. drift     — scheduled drift detection
+#   5. cleanup   — manual destroy
+#
+# Required CI/CD Variables (Settings > CI/CD > Variables):
 #   VAULT_ADDR    — Vault server address
 #   VAULT_TOKEN   — Vault authentication token (masked)
+#
+# GitLab HTTP backend auth uses CI_JOB_TOKEN automatically.
 # =============================================================================
 
 stages:
   - validate
-  - security
   - plan
   - apply
+  - drift
   - cleanup
 
 variables:
-  TF_VERSION: "1.6.0"
+  TF_VERSION: "1.9.0"
   TF_ROOT: ${CI_PROJECT_DIR}
-  # Vault configuration (set in GitLab CI/CD variables)
-  # VAULT_ADDR: "https://vault.example.com"
-  # VAULT_TOKEN: (masked variable)
+  TF_IN_AUTOMATION: "true"
+  # GitLab HTTP backend auth (automatic in CI)
+  TF_HTTP_USERNAME: "gitlab-ci-token"
+  TF_HTTP_PASSWORD: "${CI_JOB_TOKEN}"
 
-# Default settings for all jobs
+# ─── Default job settings ──────────────────────────────────────────────
 default:
   image:
     name: hashicorp/terraform:${TF_VERSION}
@@ -32,21 +41,150 @@ default:
     - cd ${TF_ROOT}
     - terraform --version
   cache:
-    key: ${CI_COMMIT_REF_SLUG}
+    key: terraform-${CI_COMMIT_REF_SLUG}
     paths:
       - ${TF_ROOT}/.terraform/
+      - ${TF_ROOT}/.terraform.lock.hcl
 
 # =============================================================================
-# VALIDATE STAGE — Run on all branches and merge requests
+# REUSABLE TEMPLATES
 # =============================================================================
 
-fmt:check:
+# Plan template — extend for each environment
+.plan-template:
+  stage: plan
+  script:
+    - |
+      echo "═══════════════════════════════════════════════"
+      echo "  Planning: ${ENV_NAME}"
+      echo "═══════════════════════════════════════════════"
+    - terraform init -backend-config="backends/${ENV_NAME}.tfbackend" -reconfigure
+    - |
+      terraform plan \
+        -var-file="environments/${ENV_NAME}.tfvars" \
+        -var="environment=${ENV_NAME}" \
+        -no-color \
+        -out="${ENV_NAME}.tfplan" | tee "${ENV_NAME}-plan.txt"
+    - |
+      # Summarize changes
+      ADDS=$(grep -c '# .* will be created' "${ENV_NAME}-plan.txt" 2>/dev/null || echo 0)
+      CHANGES=$(grep -c '# .* will be updated' "${ENV_NAME}-plan.txt" 2>/dev/null || echo 0)
+      DESTROYS=$(grep -c '# .* will be destroyed' "${ENV_NAME}-plan.txt" 2>/dev/null || echo 0)
+      echo ""
+      echo "Plan Summary: +${ADDS} ~${CHANGES} -${DESTROYS}"
+  artifacts:
+    paths:
+      - "${ENV_NAME}.tfplan"
+      - "${ENV_NAME}-plan.txt"
+    expire_in: 1 day
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - "config/${ENV_NAME}/**"
+        - "config/shared/**"
+        - "dashboards/${ENV_NAME}/**"
+        - "dashboards/shared/**"
+        - "environments/${ENV_NAME}.tfvars"
+        - "backends/${ENV_NAME}.tfbackend"
+        - "**/*.tf"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes:
+        - "config/${ENV_NAME}/**"
+        - "config/shared/**"
+        - "dashboards/${ENV_NAME}/**"
+        - "dashboards/shared/**"
+        - "environments/${ENV_NAME}.tfvars"
+        - "**/*.tf"
+
+# Apply template — extend for each environment
+.apply-template:
+  stage: apply
+  script:
+    - |
+      echo "═══════════════════════════════════════════════"
+      echo "  Applying: ${ENV_NAME}"
+      echo "═══════════════════════════════════════════════"
+    - terraform init -backend-config="backends/${ENV_NAME}.tfbackend" -reconfigure
+    - |
+      terraform apply \
+        -var-file="environments/${ENV_NAME}.tfvars" \
+        -var="environment=${ENV_NAME}" \
+        -auto-approve \
+        -no-color
+    - terraform output -json > "${ENV_NAME}-outputs.json" || true
+  artifacts:
+    paths:
+      - "${ENV_NAME}-outputs.json"
+    expire_in: 1 week
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: on_success
+
+# Destroy template — manual trigger only
+.destroy-template:
+  stage: cleanup
+  script:
+    - terraform init -backend-config="backends/${ENV_NAME}.tfbackend" -reconfigure
+    - |
+      echo "⚠️  DESTROYING environment: ${ENV_NAME}"
+      terraform destroy \
+        -var-file="environments/${ENV_NAME}.tfvars" \
+        -var="environment=${ENV_NAME}" \
+        -auto-approve
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: manual
+  allow_failure: true
+
+# Drift template — scheduled runs
+.drift-template:
+  stage: drift
+  script:
+    - terraform init -backend-config="backends/${ENV_NAME}.tfbackend" -reconfigure
+    - |
+      set +e
+      terraform plan \
+        -var-file="environments/${ENV_NAME}.tfvars" \
+        -var="environment=${ENV_NAME}" \
+        -detailed-exitcode \
+        -no-color 2>&1 | tee drift_${ENV_NAME}.txt
+      EXIT_CODE=$?
+      set -e
+
+      case $EXIT_CODE in
+        0)
+          echo "✅ No drift detected for ${ENV_NAME}"
+          ;;
+        2)
+          echo "⚠️  DRIFT DETECTED in ${ENV_NAME}!"
+          echo "Review the plan output above."
+          exit 1
+          ;;
+        *)
+          echo "❌ Error running drift check"
+          exit 1
+          ;;
+      esac
+  artifacts:
+    paths:
+      - "drift_${ENV_NAME}.txt"
+    expire_in: 1 week
+    when: always
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+  allow_failure: true
+
+# =============================================================================
+# STAGE 1: VALIDATE
+# =============================================================================
+
+format-check:
   stage: validate
   script:
     - terraform fmt -check -recursive -diff
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
 validate:
   stage: validate
@@ -55,26 +193,30 @@ validate:
     - terraform validate
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
-lint:yaml:
+yaml-lint:
   stage: validate
-  image: python:3.11-slim
+  image: python:3.12-slim
   before_script:
-    - pip install yamllint
+    - pip install yamllint --quiet
   script:
-    - yamllint -d relaxed config/
+    - |
+      yamllint -d '{
+        extends: default,
+        rules: {
+          line-length: {max: 200},
+          truthy: disable,
+          document-start: disable
+        }
+      }' config/
   allow_failure: true
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH
-
-# =============================================================================
-# SECURITY STAGE — Static analysis
-# =============================================================================
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
 tfsec:
-  stage: security
+  stage: validate
   image:
     name: aquasec/tfsec:latest
     entrypoint: [""]
@@ -94,123 +236,77 @@ tfsec:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
 # =============================================================================
-# PLAN STAGE — Generate Terraform plan
+# ENVIRONMENT JOBS — Duplicate these blocks for each environment
 # =============================================================================
-# Duplicate or modify this job for each environment you add.
+# To add a new environment (e.g., staging), copy the blocks below and
+# replace "myenv" with your environment name.
 # =============================================================================
 
+# ─── Example: myenv ──────────────────────────────────────────────────────
+
 plan:myenv:
-  stage: plan
+  extends: .plan-template
   variables:
-    ENVIRONMENT: myenv
-  script:
-    - |
-      echo "Initializing Terraform for ${ENVIRONMENT}..."
-      terraform init \
-        -backend-config="backends/${ENVIRONMENT}.tfbackend"
-    - |
-      echo "Generating plan for ${ENVIRONMENT}..."
-      terraform plan \
-        -var-file="environments/${ENVIRONMENT}.tfvars" \
-        -out="${ENVIRONMENT}.tfplan" \
-        -input=false
-    - |
-      echo "Saving plan summary..."
-      terraform show -no-color "${ENVIRONMENT}.tfplan" > "${ENVIRONMENT}-plan.txt"
-  artifacts:
-    paths:
-      - "${ENVIRONMENT}.tfplan"
-      - "${ENVIRONMENT}-plan.txt"
-    expire_in: 1 day
+    ENV_NAME: myenv
   environment:
     name: myenv
     action: prepare
-  rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-
-# =============================================================================
-# APPLY STAGE — Deploy Terraform changes
-# =============================================================================
 
 apply:myenv:
-  stage: apply
+  extends: .apply-template
   variables:
-    ENVIRONMENT: myenv
-  script:
-    - |
-      echo "Initializing Terraform for ${ENVIRONMENT}..."
-      terraform init \
-        -backend-config="backends/${ENVIRONMENT}.tfbackend"
-    - |
-      echo "Applying changes to ${ENVIRONMENT}..."
-      terraform apply \
-        -input=false \
-        -auto-approve \
-        "${ENVIRONMENT}.tfplan"
-    - |
-      echo "Deployment Summary:"
-      terraform output -json > "${ENVIRONMENT}-outputs.json"
-  artifacts:
-    paths:
-      - "${ENVIRONMENT}-outputs.json"
-    expire_in: 1 week
-  environment:
-    name: myenv
-    # url: https://grafana.example.com
-    on_stop: destroy:myenv
+    ENV_NAME: myenv
   needs:
     - job: plan:myenv
       artifacts: true
-  rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      when: on_success
-
-# =============================================================================
-# CLEANUP STAGE — Destroy environments (manual trigger only)
-# =============================================================================
+  environment:
+    name: myenv
+    on_stop: destroy:myenv
 
 destroy:myenv:
-  stage: cleanup
+  extends: .destroy-template
   variables:
-    ENVIRONMENT: myenv
-  script:
-    - |
-      echo "Initializing Terraform for ${ENVIRONMENT}..."
-      terraform init \
-        -backend-config="backends/${ENVIRONMENT}.tfbackend"
-    - |
-      echo "Destroying ${ENVIRONMENT} environment..."
-      terraform destroy \
-        -var-file="environments/${ENVIRONMENT}.tfvars" \
-        -auto-approve
+    ENV_NAME: myenv
   environment:
     name: myenv
     action: stop
-  rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      when: manual
-  allow_failure: true
 
-# =============================================================================
-# SCHEDULED JOBS — Drift detection (optional)
-# =============================================================================
-# Enable this by creating a scheduled pipeline in GitLab.
+drift:myenv:
+  extends: .drift-template
+  variables:
+    ENV_NAME: myenv
 
-drift:detection:
-  stage: validate
-  script:
-    - |
-      echo "Checking drift for myenv..."
-      terraform init -backend-config="backends/myenv.tfbackend" -reconfigure
-      terraform plan \
-        -var-file="environments/myenv.tfvars" \
-        -detailed-exitcode \
-        -input=false \
-        || if [ $? -eq 2 ]; then
-          echo "WARNING: DRIFT DETECTED in myenv!"
-          exit 1
-        fi
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "schedule"
-  allow_failure: true
+# ─── Add more environments below ─────────────────────────────────────────
+# Copy and adapt the blocks above. Example for "staging":
+#
+# plan:staging:
+#   extends: .plan-template
+#   variables:
+#     ENV_NAME: staging
+#   environment:
+#     name: staging
+#     action: prepare
+#
+# apply:staging:
+#   extends: .apply-template
+#   variables:
+#     ENV_NAME: staging
+#   needs:
+#     - job: plan:staging
+#       artifacts: true
+#   environment:
+#     name: staging
+#     on_stop: destroy:staging
+#
+# destroy:staging:
+#   extends: .destroy-template
+#   variables:
+#     ENV_NAME: staging
+#   environment:
+#     name: staging
+#     action: stop
+#
+# drift:staging:
+#   extends: .drift-template
+#   variables:
+#     ENV_NAME: staging

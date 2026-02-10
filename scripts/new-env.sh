@@ -55,6 +55,7 @@ KEYCLOAK_URL=""
 BACKEND=""
 ORGS=""
 DATASOURCES=""
+DRY_RUN=false
 
 # =========================================================================
 # Parse arguments — supports both positional and --flag=value styles
@@ -77,6 +78,7 @@ show_help() {
     echo "    --datasources=<ds1,ds2,...>     Datasource presets (comma-separated)"
     echo "                                   Options: prometheus, loki, postgres, mysql,"
     echo "                                   elasticsearch, influxdb, tempo, mimir, cloudwatch, graphite"
+    echo "    --dry-run                      Show what would be created without writing files"
     echo ""
     echo "  Examples:"
     echo "    $0 staging"
@@ -104,6 +106,7 @@ while [[ $# -gt 0 ]]; do
         --backend=*)       BACKEND="${1#*=}"; shift ;;
         --orgs=*)          ORGS="${1#*=}"; shift ;;
         --datasources=*)   DATASOURCES="${1#*=}"; shift ;;
+        --dry-run)         DRY_RUN=true; shift ;;
         --help|-h)         show_help ;;
         -*)                echo -e "${RED}Unknown option: $1${NC}"; echo "Use --help for usage."; exit 1 ;;
         *)
@@ -183,7 +186,48 @@ echo -e "  ${DIM}Vault:         ${VAULT_DISPLAY}${NC}"
 [ -n "$BACKEND" ] && echo -e "  ${DIM}Backend:       ${BACKEND}${NC}"
 [ -n "$ORGS" ] && echo -e "  ${DIM}Organizations: ${ORGS}${NC}"
 [ -n "$DATASOURCES" ] && echo -e "  ${DIM}Datasources:   ${DATASOURCES}${NC}"
+[ "$DRY_RUN" = true ] && echo -e "  ${DIM}Mode:          ${YELLOW}DRY RUN${NC}"
 echo ""
+
+# =========================================================================
+# Dry-run mode — show what would be created and exit
+# =========================================================================
+if [ "$DRY_RUN" = true ]; then
+    echo -e "${YELLOW}=== DRY RUN — No files will be created ===${NC}"
+    echo ""
+    echo "  Would create:"
+    echo "    ✓ environments/${ENV_NAME}.tfvars"
+    echo "    ✓ backends/${ENV_NAME}.tfbackend"
+    echo "    ✓ config/${ENV_NAME}/"
+    echo "        ├── organizations.yaml"
+    echo "        ├── folders.yaml"
+    echo "        ├── teams.yaml"
+    echo "        ├── datasources.yaml"
+    echo "        ├── service_accounts.yaml"
+    echo "        ├── sso.yaml"
+    echo "        ├── keycloak.yaml"
+    echo "        └── alerting/"
+    echo "            ├── alert_rules.yaml"
+    echo "            ├── contact_points.yaml"
+    echo "            └── notification_policies.yaml"
+    echo "    ✓ dashboards/${ENV_NAME}/"
+
+    # Show orgs for dashboard subdirs
+    if [ -n "$ORGS" ]; then
+        IFS=',' read -ra ORG_ARRAY <<< "$ORGS"
+        for org in "${ORG_ARRAY[@]}"; do
+            org=$(echo "$org" | xargs)
+            echo "        └── ${org}/"
+        done
+    else
+        echo "        └── Main Organization/"
+    fi
+    echo ""
+    echo -e "  Total: ${BOLD}13+ files${NC}"
+    echo ""
+    echo "  To create for real, run without --dry-run"
+    exit 0
+fi
 
 CREATED_FILES=()
 

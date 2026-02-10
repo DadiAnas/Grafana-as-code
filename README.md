@@ -19,7 +19,14 @@ Manage your **existing Grafana instance** entirely as code using Terraform. Defi
 - **Dynamic Datasources**: All datasource types with Vault-managed credentials
 - **SSO Integration**: OAuth2/OIDC (Keycloak, Okta, Azure AD, etc.)
 - **Secrets Management**: HashiCorp Vault for all sensitive credentials
-- **CI/CD Ready**: GitLab CI pipeline included (adapt for GitHub Actions, etc.)
+- **CI/CD Ready**: GitHub Actions + GitLab CI pipelines included
+- **Local Dev Environment**: Docker Compose with Grafana + Vault + Keycloak
+- **Import from Grafana**: Auto-generate YAML configs from an existing instance
+- **Drift Detection**: Detect manual changes made outside Terraform
+- **Backup/Restore**: Snapshot Grafana state via API before destructive operations
+- **Environment Promotion**: Diff and copy configs between environments
+- **Dashboard Diff**: Human-readable panel/query change summaries
+- **Linting**: TFLint + YAML lint for code quality
 
 ## 📁 Project Structure
 
@@ -87,6 +94,19 @@ grafana-as-code/
 │   ├── keycloak/                   # Keycloak client (optional)
 │   └── vault/                      # Vault secrets integration
 │
+├── scripts/                         # Automation scripts
+│   ├── new-env.sh                  # Create new environment
+│   ├── delete-env.sh               # Delete environment files
+│   ├── check-env.sh                # Validate environment readiness
+│   ├── list-envs.sh                # List all environments
+│   ├── import-from-grafana.sh      # Import from existing Grafana instance
+│   ├── drift-detect.sh             # Detect out-of-band changes
+│   ├── backup.sh                   # Backup Grafana state via API
+│   ├── promote.sh                  # Promote configs between environments
+│   ├── dashboard-diff.sh           # Human-readable dashboard diff
+│   ├── dev-bootstrap.sh            # Bootstrap local dev environment
+│   └── generate-sso-env.sh         # Generate SSO env vars
+│
 ├── vault/                           # Vault setup scripts
 │   ├── policies/
 │   │   └── grafana-terraform.hcl
@@ -97,6 +117,9 @@ grafana-as-code/
 │       ├── rotate-secret.sh        # Rotate a secret
 │       └── bootstrap-secrets.sh    # One-time Vault init
 │
+├── docker-compose.yml               # Local dev: Grafana + Vault + Keycloak
+├── .tflint.hcl                      # TFLint configuration
+├── .github/workflows/terraform.yml  # GitHub Actions CI/CD
 ├── .gitlab-ci.yml                   # GitLab CI/CD pipeline
 └── Makefile                         # Automation shortcuts
 ```
@@ -122,21 +145,33 @@ All resources follow a **shared + environment override** pattern:
 
 ## 📋 Prerequisites
 
-- **Terraform** >= 1.0.0
+- **Terraform** >= 1.6.0
 - **Grafana** instance with admin access (API key or service account token)
 - **HashiCorp Vault** for secrets management
+- **Docker** (optional) for local development
 - **Keycloak** (optional) for SSO
 
 ## 🚀 Quick Start
 
-### 1. Clone the repository
+### Option A: Local Development (recommended for first-time setup)
 
 ```bash
-git clone <repository-url>
-cd grafana-as-code
+# 1. Start Grafana + Vault + Keycloak locally
+make dev-up
+
+# 2. Bootstrap dev environment (seeds Vault, creates service account)
+make dev-bootstrap
+
+# 3. Initialize and plan
+export VAULT_TOKEN=root
+make init ENV=dev
+make plan ENV=dev
+make apply ENV=dev
 ```
 
-### 2. Create your environment
+### Option B: Existing Grafana Instance
+
+#### 1. Create your environment
 
 Use the built-in scaffolding to create all files in one command:
 
@@ -308,13 +343,98 @@ make vault-verify ENV=staging                  # Check secrets exist
 # ─── Utilities ───
 make fmt                                       # Format Terraform files
 make validate                                  # Validate configuration
+make lint                                      # Run TFLint + YAML lint
 make output ENV=staging                        # Show outputs
 make state-list                                # List managed resources
 make clean                                     # Remove cache & plan files
 
+# ─── Operations ───
+make drift ENV=staging                         # Detect out-of-band changes
+make backup ENV=staging                        # Snapshot Grafana via API
+make import ENV=prod GRAFANA_URL=https://grafana.example.com AUTH=admin:pass
+make promote FROM=staging TO=prod              # Copy configs between envs
+make dashboard-diff ENV=staging                # Human-readable dashboard changes
+make dry-run NAME=staging                      # Preview what new-env would create
+
+# ─── Local Development ───
+make dev-up                                    # Start Grafana+Vault+Keycloak
+make dev-down                                  # Stop local services
+make dev-bootstrap                             # Seed Vault, create dev env
+make test                                      # Full local test cycle
+
 # ─── Debug ───
 TF_LOG=DEBUG terraform apply -var-file=environments/staging.tfvars
 ```
+
+## 🔄 CI/CD
+
+### GitHub Actions
+
+The `.github/workflows/terraform.yml` pipeline automatically:
+
+1. **On PR**: Runs `fmt`, `validate`, `tflint`, YAML lint, then `terraform plan` per changed environment and posts the plan as a PR comment
+2. **On merge to main**: Runs `terraform apply` with GitHub Environment protection rules
+3. **On schedule**: Drift detection — creates a GitHub Issue if changes are detected
+
+### GitLab CI
+
+The `.gitlab-ci.yml` pipeline uses reusable templates:
+
+1. **validate**: `fmt`, `validate`, YAML lint, `tfsec` security scan
+2. **plan**: Per-environment plans with artifacts
+3. **apply**: Manual gate or auto-apply per environment
+4. **drift**: Scheduled pipeline for drift detection
+
+GitLab HTTP backend authentication uses `CI_JOB_TOKEN` automatically.
+
+## 🔍 Operations
+
+### Import from Existing Grafana
+
+Migrate an existing Grafana setup to code:
+
+```bash
+make import ENV=prod \ 
+  GRAFANA_URL=https://grafana.example.com \
+  AUTH=admin:password
+```
+
+This imports organizations, datasources, folders, teams, service accounts, alert rules, contact points, and dashboards as YAML/JSON config files.
+
+### Drift Detection
+
+```bash
+make drift ENV=staging
+```
+
+Runs `terraform plan -detailed-exitcode` and reports a clean summary of resources that were changed outside of Terraform.
+
+### Backup
+
+```bash
+make backup ENV=prod
+```
+
+Exports Grafana's live state (dashboards, datasources, alerting, etc.) to `backups/<env>/<timestamp>/` via the API.
+
+### Environment Promotion
+
+```bash
+# Preview differences
+make promote FROM=staging TO=prod  # includes diff
+
+# Or diff-only mode
+bash scripts/promote.sh staging prod --diff-only
+```
+
+### Dashboard Diff
+
+```bash
+make dashboard-diff ENV=staging              # vs git HEAD
+bash scripts/dashboard-diff.sh staging --against=prod  # vs another env
+```
+
+Shows human-readable changes: panels added/removed, queries modified, variables changed, etc.
 
 ## 📤 Outputs
 
