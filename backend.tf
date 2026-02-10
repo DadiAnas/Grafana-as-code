@@ -21,3 +21,11 @@
 #     # Configuration provided via -backend-config flag
 #   }
 # }
+
+# Alternative: GitLab HTTP Backend (managed Terraform state)
+# terraform {
+#   backend "http" {
+#     # Configuration provided via -backend-config flag
+#     # Auth via TF_HTTP_USERNAME / TF_HTTP_PASSWORD env vars
+#   }
+# }

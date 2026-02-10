@@ -23,3 +23,11 @@
 # --- Google Cloud Storage ---
 # bucket = "my-terraform-state"
 # prefix = "myenv/grafana"
+
+# --- GitLab HTTP Backend ---
+# address        = "https://gitlab.example.com/api/v4/projects/<PROJECT_ID>/terraform/state/myenv"
+# lock_address   = "https://gitlab.example.com/api/v4/projects/<PROJECT_ID>/terraform/state/myenv/lock"
+# unlock_address = "https://gitlab.example.com/api/v4/projects/<PROJECT_ID>/terraform/state/myenv/lock"
+# lock_method    = "POST"
+# unlock_method  = "DELETE"
+# retry_wait_min = 5

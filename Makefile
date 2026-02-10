@@ -44,7 +44,7 @@ help:
 	@echo "    VAULT_ADDR     Vault address          (default: http://localhost:8200)"
 	@echo "    VAULT_MOUNT    Vault mount path       (default: grafana)"
 	@echo "    KEYCLOAK_URL   Keycloak URL           (enables SSO config)"
-	@echo "    BACKEND        Backend type           (s3 | azurerm | gcs)"
+	@echo "    BACKEND        Backend type           (s3 | azurerm | gcs | gitlab)"
 	@echo "    ORGS           Organizations          (comma-separated)"
 	@echo "    DATASOURCES    Datasource presets     (prometheus,loki,postgres,...)"
 	@echo ""
@@ -86,7 +86,7 @@ help:
 # Create a new environment (scaffolds all files)
 #   Required:  NAME
 #   Optional:  GRAFANA_URL, VAULT_ADDR, VAULT_MOUNT, KEYCLOAK_URL,
-#              BACKEND (s3|azurerm|gcs), ORGS, DATASOURCES
+#              BACKEND (s3|azurerm|gcs|gitlab), ORGS, DATASOURCES
 NAME         ?=
 GRAFANA_URL  ?=
 VAULT_ADDR   ?=

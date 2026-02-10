@@ -72,7 +72,7 @@ show_help() {
     echo "    --vault-mount=<path>           Vault KV mount            (default: grafana)"
     echo "    --vault-namespace=<ns>         Vault Enterprise namespace (e.g., admin/grafana)"
     echo "    --keycloak-url=<url>           Keycloak URL (enables SSO)"
-    echo "    --backend=<type>               Backend: s3, azurerm, gcs (default: all commented)"
+    echo "    --backend=<type>               Backend: s3, azurerm, gcs, gitlab (default: all commented)"
     echo "    --orgs=<org1,org2,...>          Custom organization names (comma-separated)"
     echo "    --datasources=<ds1,ds2,...>     Datasource presets (comma-separated)"
     echo "                                   Options: prometheus, loki, postgres, mysql,"
@@ -147,9 +147,9 @@ if ! echo "$ENV_NAME" | grep -qE '^[a-zA-Z][a-zA-Z0-9_-]*$'; then
     exit 1
 fi
 
-if [ -n "$BACKEND" ] && ! echo "$BACKEND" | grep -qE '^(s3|azurerm|gcs)$'; then
+if [ -n "$BACKEND" ] && ! echo "$BACKEND" | grep -qE '^(s3|azurerm|gcs|gitlab)$'; then
     echo -e "${RED}Error: Invalid backend type '${BACKEND}'${NC}"
-    echo "Supported: s3, azurerm, gcs"
+    echo "Supported: s3, azurerm, gcs, gitlab"
     exit 1
 fi
 
@@ -284,11 +284,12 @@ generate_backend() {
     echo "# ============================================================================="
     echo ""
 
-    local s3_comment="#" azure_comment="#" gcs_comment="#"
+    local s3_comment="#" azure_comment="#" gcs_comment="#" gitlab_comment="#"
     case "${BACKEND}" in
         s3)      s3_comment="" ;;
         azurerm) azure_comment="" ;;
         gcs)     gcs_comment="" ;;
+        gitlab)  gitlab_comment="" ;;
     esac
 
     echo "# --- AWS S3 Backend ---"
@@ -313,6 +314,19 @@ generate_backend() {
     echo "# See: https://developer.hashicorp.com/terraform/language/backend/gcs"
     echo "${gcs_comment} bucket = \"my-terraform-state\""
     echo "${gcs_comment} prefix = \"${ENV_NAME}/grafana\""
+    echo ""
+    echo "# --- GitLab HTTP Backend ---"
+    echo "# Prerequisites: GitLab project with Terraform state enabled"
+    echo "# Auth: set TF_HTTP_USERNAME and TF_HTTP_PASSWORD env vars"
+    echo "#   export TF_HTTP_USERNAME=\"gitlab-ci-token\"  # or your username"
+    echo "#   export TF_HTTP_PASSWORD=\"\${CI_JOB_TOKEN}\"   # or a personal access token"
+    echo "# See: https://docs.gitlab.com/ee/user/infrastructure/iac/terraform_state.html"
+    echo "${gitlab_comment} address        = \"https://gitlab.example.com/api/v4/projects/<PROJECT_ID>/terraform/state/${ENV_NAME}\""
+    echo "${gitlab_comment} lock_address   = \"https://gitlab.example.com/api/v4/projects/<PROJECT_ID>/terraform/state/${ENV_NAME}/lock\""
+    echo "${gitlab_comment} unlock_address = \"https://gitlab.example.com/api/v4/projects/<PROJECT_ID>/terraform/state/${ENV_NAME}/lock\""
+    echo "${gitlab_comment} lock_method    = \"POST\""
+    echo "${gitlab_comment} unlock_method  = \"DELETE\""
+    echo "${gitlab_comment} retry_wait_min = 5"
 }
 
 generate_backend > "$PROJECT_ROOT/backends/${ENV_NAME}.tfbackend"

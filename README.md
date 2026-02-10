@@ -233,7 +233,7 @@ make delete-env NAME=production
 | `VAULT_MOUNT` | Vault KV mount path | `grafana` |
 | `VAULT_NAMESPACE` | Vault Enterprise namespace | *(root namespace)* |
 | `KEYCLOAK_URL` | Keycloak URL (enables SSO config) | *(disabled)* |
-| `BACKEND` | Backend type: `s3`, `azurerm`, `gcs` | *(all commented)* |
+| `BACKEND` | Backend type: `s3`, `azurerm`, `gcs`, `gitlab` | *(all commented)* |
 | `ORGS` | Custom organizations (comma-separated) | *(from shared config)* |
 | `DATASOURCES` | Datasource presets (comma-separated) | *(empty)* |
 
