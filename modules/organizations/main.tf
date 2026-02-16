@@ -20,7 +20,7 @@ resource "grafana_organization" "orgs" {
 # Output for the default org
 locals {
   default_org = [for org in var.organizations.organizations : org if try(org.id, null) == 1][0]
-  
+
   # Combine created orgs with default org
   all_org_ids = merge(
     { for k, v in grafana_organization.orgs : k => v.org_id },

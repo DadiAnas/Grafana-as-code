@@ -169,7 +169,7 @@ resource "keycloak_openid_group_membership_protocol_mapper" "groups" {
   name      = "groups"
 
   claim_name = "groups"
-  full_path  = false  # Use simple group names like "grafana-admins", not "/grafana-admins"
+  full_path  = false # Use simple group names like "grafana-admins", not "/grafana-admins"
 
   add_to_id_token     = true
   add_to_access_token = true
@@ -184,9 +184,9 @@ resource "keycloak_openid_user_client_role_protocol_mapper" "roles" {
   client_id = keycloak_openid_client.grafana[0].id
   name      = "client-roles"
 
-  claim_name                 = "roles"
+  claim_name                  = "roles"
   client_id_for_role_mappings = keycloak_openid_client.grafana[0].client_id
-  multivalued                = true
+  multivalued                 = true
 
   add_to_id_token     = true
   add_to_access_token = true

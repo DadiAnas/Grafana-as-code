@@ -128,11 +128,11 @@ module "datasources" {
 module "dashboards" {
   source = "./modules/dashboards"
 
-  dashboards_path    = "${path.module}/dashboards"
-  environment        = var.environment
-  folder_ids         = module.folders.folder_ids
-  folder_org_ids     = module.folders.folder_org_ids
-  exclude_folders    = var.exclude_dashboard_folders
+  dashboards_path = "${path.module}/dashboards"
+  environment     = var.environment
+  folder_ids      = module.folders.folder_ids
+  folder_org_ids  = module.folders.folder_org_ids
+  exclude_folders = var.exclude_dashboard_folders
 
   depends_on = [module.folders, module.datasources]
 }
