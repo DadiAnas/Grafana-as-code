@@ -34,6 +34,7 @@ env:
   TF_IN_AUTOMATION: true
   VAULT_ADDR: http://localhost:8200
   VAULT_TOKEN: root
+  TF_VAR_vault_token: root
   GRAFANA_URL: http://localhost:3000
   GRAFANA_AUTH: admin:admin
   ENV_NAME: ci-test
@@ -148,6 +149,13 @@ jobs:
             client_secret="ci-test-client-secret"
 
           echo "✅ Vault secrets created"
+
+          # Verify secrets are readable
+          echo ""
+          echo "Verifying Vault connectivity..."
+          vault kv get grafana/${ENV_NAME}/grafana/auth
+          vault kv get grafana/${ENV_NAME}/sso/keycloak
+          echo "✅ Vault secrets verified"
 
       - name: "Step 2: Create test environment"
         run: |
