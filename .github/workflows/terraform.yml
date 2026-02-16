@@ -298,7 +298,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        environment: [] # Populate with your environments
+        environment: [myenv] # Add your environments here, e.g. [myenv, staging, prod]
       fail-fast: false
     steps:
       - uses: actions/checkout@v4
