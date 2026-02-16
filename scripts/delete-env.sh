@@ -139,5 +139,5 @@ echo ""
 [ -f "$PROJECT_ROOT/tfplan-${ENV_NAME}" ] && rm -f "$PROJECT_ROOT/tfplan-${ENV_NAME}" && echo -e "  ${GREEN}✓${NC} Removed tfplan-${ENV_NAME}"
 
 echo ""
-echo -e "${GREEN}${BOLD}✅ Environment '${ENV_NAME}' has been deleted.${NC}"
+echo -e "${GREEN}${BOLD}Environment '${ENV_NAME}' has been deleted.${NC}"
 echo ""

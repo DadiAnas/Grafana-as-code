@@ -56,7 +56,7 @@ PLAN_EXIT=${PLAN_EXIT:-0}
 case $PLAN_EXIT in
     0)
         echo -e "${GREEN}╔═══════════════════════════════════════════════════════════════╗${NC}"
-        echo -e "${GREEN}║  ✅ No drift detected — Grafana matches Terraform state${NC}"
+        echo -e "${GREEN}║  No drift detected — Grafana matches Terraform state${NC}"
         echo -e "${GREEN}╚═══════════════════════════════════════════════════════════════╝${NC}"
         exit 0
         ;;
@@ -92,7 +92,7 @@ case $PLAN_EXIT in
         ;;
     *)
         echo -e "${RED}╔═══════════════════════════════════════════════════════════════╗${NC}"
-        echo -e "${RED}║  ❌ Error running drift detection${NC}"
+        echo -e "${RED}║  Error running drift detection${NC}"
         echo -e "${RED}╚═══════════════════════════════════════════════════════════════╝${NC}"
         echo ""
         echo "$PLAN_OUTPUT" | tail -20

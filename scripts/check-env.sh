@@ -35,8 +35,8 @@ echo "║          Environment Check: ${ENV_NAME}"
 echo "╚═══════════════════════════════════════════════════════════════╝"
 echo -e "${NC}"
 
-pass() { echo -e "  ${GREEN}✅ PASS${NC}  $1"; }
-fail() { echo -e "  ${RED}❌ FAIL${NC}  $1"; ERRORS=$((ERRORS + 1)); }
+pass() { echo -e "  ${GREEN}PASS${NC}  $1"; }
+fail() { echo -e "  ${RED}FAIL${NC}  $1"; ERRORS=$((ERRORS + 1)); }
 warn() { echo -e "  ${YELLOW}⚠️  WARN${NC}  $1"; WARNINGS=$((WARNINGS + 1)); }
 info() { echo -e "  ${BLUE}ℹ️  INFO${NC}  $1"; }
 
@@ -214,11 +214,11 @@ echo ""
 # -------------------------------------------------------------------------
 echo -e "${BOLD}── Summary ──${NC}"
 if [ $ERRORS -eq 0 ] && [ $WARNINGS -eq 0 ]; then
-    echo -e "  ${GREEN}${BOLD}✅ Environment '${ENV_NAME}' is ready for deployment!${NC}"
+    echo -e "  ${GREEN}${BOLD}Environment '${ENV_NAME}' is ready for deployment!${NC}"
 elif [ $ERRORS -eq 0 ]; then
     echo -e "  ${YELLOW}${BOLD}⚠️  ${WARNINGS} warning(s), but environment is deployable.${NC}"
 else
-    echo -e "  ${RED}${BOLD}❌ ${ERRORS} error(s), ${WARNINGS} warning(s) — fix before deploying.${NC}"
+    echo -e "  ${RED}${BOLD}${ERRORS} error(s), ${WARNINGS} warning(s) — fix before deploying.${NC}"
 fi
 echo ""
 

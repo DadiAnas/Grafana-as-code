@@ -1143,7 +1143,7 @@ CREATED_FILES+=("dashboards/${ENV_NAME}/")
 # Summary
 # =========================================================================
 echo ""
-echo -e "${BOLD}${GREEN}✅ Environment '${ENV_NAME}' created successfully!${NC}"
+echo -e "${BOLD}${GREEN}Environment '${ENV_NAME}' created successfully!${NC}"
 echo ""
 echo -e "${BOLD}Created files:${NC}"
 for f in "${CREATED_FILES[@]}"; do

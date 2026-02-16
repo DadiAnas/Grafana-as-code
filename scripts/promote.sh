@@ -177,7 +177,7 @@ fi
 
 echo ""
 echo -e "${GREEN}╔═══════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${GREEN}║  ✅ Promotion complete: ${FROM} → ${TO}${NC}"
+echo -e "${GREEN}║  Promotion complete: ${FROM} → ${TO}${NC}"
 echo -e "${GREEN}╚═══════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 echo "  Config files: ${COPIED}"

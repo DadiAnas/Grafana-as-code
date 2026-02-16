@@ -118,7 +118,7 @@ jobs:
           curl -sf http://localhost:8200/v1/sys/health
           echo ""
 
-          echo "✅ All services are healthy"
+          echo "All services are healthy"
 
       # ─────────────────────────────────────────────────────────────────
       # Step 1: Lint & Validate
@@ -148,14 +148,14 @@ jobs:
           vault kv put grafana/${ENV_NAME}/sso/keycloak \
             client_secret="ci-test-client-secret"
 
-          echo "✅ Vault secrets created"
+          echo "Vault secrets created"
 
           # Verify secrets are readable
           echo ""
           echo "Verifying Vault connectivity..."
           vault kv get grafana/${ENV_NAME}/grafana/auth
           vault kv get grafana/${ENV_NAME}/sso/keycloak
-          echo "✅ Vault secrets verified"
+          echo "Vault secrets verified"
 
       - name: "Step 2: Create test environment"
         run: |
@@ -164,7 +164,7 @@ jobs:
             VAULT_ADDR=${VAULT_ADDR} \
             VAULT_MOUNT=grafana
 
-          echo "✅ Environment scaffolded"
+          echo "Environment scaffolded"
           echo ""
           echo "Config files:"
           ls -la config/${ENV_NAME}/
@@ -204,7 +204,7 @@ jobs:
           terraform output -json organization_ids | jq .
           ORG_COUNT=$(terraform output -json organization_ids | jq 'length')
           echo "Organizations created: ${ORG_COUNT}"
-          [ "$ORG_COUNT" -ge 1 ] || { echo "❌ No organizations found"; exit 1; }
+          [ "$ORG_COUNT" -ge 1 ] || { echo "No organizations found"; exit 1; }
 
           echo ""
           echo "=== Folder IDs ==="
@@ -219,7 +219,7 @@ jobs:
           terraform output sso_enabled
 
           echo ""
-          echo "✅ All outputs verified"
+          echo "All outputs verified"
 
       - name: "Step 4: Verify Grafana API"
         run: |
@@ -243,20 +243,20 @@ jobs:
           curl -sf -u ${GRAFANA_AUTH} ${GRAFANA_URL}/api/teams/search | jq '.teams[].name'
 
           echo ""
-          echo "✅ Grafana API resources verified"
+          echo "Grafana API resources verified"
 
       - name: "Step 4: Verify state count"
         run: |
           RESOURCE_COUNT=$(terraform state list | wc -l)
           echo "Total managed resources: ${RESOURCE_COUNT}"
-          [ "$RESOURCE_COUNT" -ge 1 ] || { echo "❌ No resources in state"; exit 1; }
+          [ "$RESOURCE_COUNT" -ge 1 ] || { echo "No resources in state"; exit 1; }
 
           echo ""
           echo "Resources by module:"
           terraform state list | sed 's/\[.*//' | sort | uniq -c | sort -rn
 
           echo ""
-          echo "✅ State verified"
+          echo "State verified"
 
       # ─────────────────────────────────────────────────────────────────
       # Step 5: Idempotency Check (re-plan should show no changes)
@@ -275,10 +275,10 @@ jobs:
             echo "This may be expected for some resources (e.g., dashboard config_json normalization)"
             cat replan.txt
           elif [ "${EXITCODE:-0}" -eq 1 ]; then
-            echo "❌ Plan failed"
+            echo "Plan failed"
             exit 1
           else
-            echo "✅ Fully idempotent — no changes on re-plan"
+            echo "Fully idempotent — no changes on re-plan"
           fi
 
       # ─────────────────────────────────────────────────────────────────
@@ -313,19 +313,19 @@ jobs:
           find dashboards/ci-import -name '*.json' 2>/dev/null | head -20 || echo "(none)"
 
           echo ""
-          echo "✅ Import completed"
+          echo "Import completed"
 
       - name: "Step 6: Validate imported config"
         run: |
           # Ensure required YAML files were created
           for file in organizations folders teams datasources sso keycloak service_accounts; do
-            [ -f "config/ci-import/${file}.yaml" ] || { echo "❌ Missing config/ci-import/${file}.yaml"; exit 1; }
+            [ -f "config/ci-import/${file}.yaml" ] || { echo "Missing config/ci-import/${file}.yaml"; exit 1; }
           done
 
           # Ensure tfvars was created
-          [ -f "environments/ci-import.tfvars" ] || { echo "❌ Missing environments/ci-import.tfvars"; exit 1; }
+          [ -f "environments/ci-import.tfvars" ] || { echo "Missing environments/ci-import.tfvars"; exit 1; }
 
-          echo "✅ All imported config files present"
+          echo "All imported config files present"
 
       # ─────────────────────────────────────────────────────────────────
       # Step 7: Apply imported config (import round-trip)
@@ -347,7 +347,7 @@ jobs:
           tail -5 import-plan.txt
 
           echo ""
-          echo "✅ Imported config plan succeeded"
+          echo "Imported config plan succeeded"
 
       # ─────────────────────────────────────────────────────────────────
       # Step 8: Drift Detection
@@ -360,7 +360,7 @@ jobs:
             -u ${GRAFANA_AUTH} \
             -d '{"uid": "drift-test-folder", "title": "Drift Test Folder"}' || true
 
-          echo "✅ Manual change created (drift-test-folder)"
+          echo "Manual change created (drift-test-folder)"
 
       - name: "Step 8: Detect drift"
         run: |
@@ -371,11 +371,11 @@ jobs:
 
           if [ "${DRIFT_CODE:-0}" -eq 2 ]; then
             echo ""
-            echo "✅ Drift detected (exit code 2) — this is expected"
+            echo "Drift detected (exit code 2) — this is expected"
           elif [ "${DRIFT_CODE:-0}" -eq 0 ]; then
             echo "ℹ️  No drift detected (manual folder is outside Terraform scope)"
           else
-            echo "❌ Plan error during drift detection"
+            echo "Plan error during drift detection"
             exit 1
           fi
 
@@ -393,7 +393,7 @@ jobs:
             curl -sf -u ${GRAFANA_AUTH} ${GRAFANA_URL}/api/folders > backups/${ENV_NAME}/folders.json
             curl -sf -u ${GRAFANA_AUTH} ${GRAFANA_URL}/api/orgs > backups/${ENV_NAME}/orgs.json
 
-            echo "✅ Manual backup completed"
+            echo "Manual backup completed"
           }
 
           echo ""
@@ -423,7 +423,7 @@ jobs:
             -no-color 2>&1 | tee plan-no-exclude.txt
 
           if grep -q "test-exclude" plan-no-exclude.txt; then
-            echo "✅ Dashboard appears in plan without exclusion"
+            echo "Dashboard appears in plan without exclusion"
           else
             echo "ℹ️  Dashboard not detected (may need folder in Grafana first)"
           fi
@@ -436,10 +436,10 @@ jobs:
 
           # Check the excluded dashboard is not in the plan as a creation
           if grep -q 'grafana_dashboard.dashboards\["Main Organization-test-exclude' plan-with-exclude.txt; then
-            echo "❌ Dashboard still appears with exclusion — filter not working"
+            echo "Dashboard still appears with exclusion — filter not working"
             exit 1
           else
-            echo "✅ Dashboard correctly excluded from plan"
+            echo "Dashboard correctly excluded from plan"
           fi
 
       # ─────────────────────────────────────────────────────────────────
@@ -452,9 +452,9 @@ jobs:
             DATASOURCES=prometheus,loki,postgres
 
           # Verify files
-          [ -f "environments/scaffold-test.tfvars" ] || { echo "❌ Missing tfvars"; exit 1; }
-          [ -d "config/scaffold-test" ] || { echo "❌ Missing config dir"; exit 1; }
-          [ -d "dashboards/scaffold-test" ] || { echo "❌ Missing dashboards dir"; exit 1; }
+          [ -f "environments/scaffold-test.tfvars" ] || { echo "Missing tfvars"; exit 1; }
+          [ -d "config/scaffold-test" ] || { echo "Missing config dir"; exit 1; }
+          [ -d "dashboards/scaffold-test" ] || { echo "Missing dashboards dir"; exit 1; }
 
           echo ""
           echo "=== Scaffold tfvars ==="
@@ -465,17 +465,17 @@ jobs:
           cat config/scaffold-test/datasources.yaml | head -30
 
           echo ""
-          echo "✅ Scaffolding verified"
+          echo "Scaffolding verified"
 
       - name: "Step 11: Test delete-env"
         run: |
           bash scripts/delete-env.sh scaffold-test --force
 
-          [ ! -f "environments/scaffold-test.tfvars" ] || { echo "❌ tfvars not deleted"; exit 1; }
-          [ ! -d "config/scaffold-test" ] || { echo "❌ config dir not deleted"; exit 1; }
-          [ ! -d "dashboards/scaffold-test" ] || { echo "❌ dashboards dir not deleted"; exit 1; }
+          [ ! -f "environments/scaffold-test.tfvars" ] || { echo "tfvars not deleted"; exit 1; }
+          [ ! -d "config/scaffold-test" ] || { echo "config dir not deleted"; exit 1; }
+          [ ! -d "dashboards/scaffold-test" ] || { echo "dashboards dir not deleted"; exit 1; }
 
-          echo "✅ Environment deletion verified"
+          echo "Environment deletion verified"
 
       # ─────────────────────────────────────────────────────────────────
       # Step 12: Promote (config copy between envs)
@@ -492,8 +492,8 @@ jobs:
             echo "Verifying promote-target exists..."
           }
 
-          [ -d "config/promote-target" ] || { echo "❌ promote-target config missing"; exit 1; }
-          echo "✅ Promote test completed"
+          [ -d "config/promote-target" ] || { echo "promote-target config missing"; exit 1; }
+          echo "Promote test completed"
 
       # ─────────────────────────────────────────────────────────────────
       # Step 13: Destroy
@@ -509,7 +509,7 @@ jobs:
           REMAINING=$(terraform state list 2>/dev/null | wc -l)
           echo "Resources remaining after destroy: ${REMAINING}"
 
-          echo "✅ Destroy completed"
+          echo "Destroy completed"
 
       # ─────────────────────────────────────────────────────────────────
       # Summary

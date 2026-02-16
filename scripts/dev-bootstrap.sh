@@ -127,7 +127,7 @@ fi
 # ─── Summary ─────────────────────────────────────────────────────────────
 echo ""
 echo -e "${GREEN}╔═══════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${GREEN}║  ✅ Dev environment bootstrapped successfully!${NC}"
+echo -e "${GREEN}║  Dev environment bootstrapped successfully!${NC}"
 echo -e "${GREEN}╚═══════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 echo "  Services:"

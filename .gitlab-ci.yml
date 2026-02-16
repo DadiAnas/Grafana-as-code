@@ -153,7 +153,7 @@ default:
 
       case $EXIT_CODE in
         0)
-          echo "✅ No drift detected for ${ENV_NAME}"
+          echo "No drift detected for ${ENV_NAME}"
           ;;
         2)
           echo "⚠️  DRIFT DETECTED in ${ENV_NAME}!"
@@ -161,7 +161,7 @@ default:
           exit 1
           ;;
         *)
-          echo "❌ Error running drift check"
+          echo "Error running drift check"
           exit 1
           ;;
       esac

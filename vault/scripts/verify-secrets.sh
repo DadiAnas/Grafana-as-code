@@ -28,10 +28,10 @@ check_secret() {
     local description=$2
 
     if vault kv get -format=json "${MOUNT}/${path}" > /dev/null 2>&1; then
-        echo "  ✅ ${description}"
+        echo "  ${description}"
         echo "     Path: ${MOUNT}/${path}"
     else
-        echo "  ❌ ${description} — MISSING"
+        echo "  ${description} — MISSING"
         echo "     Expected: ${MOUNT}/${path}"
         ERRORS=$((ERRORS + 1))
     fi
@@ -46,10 +46,10 @@ check_secret_key() {
     value=$(vault kv get -format=json "${MOUNT}/${path}" 2>/dev/null | jq -r ".data.data.${key} // empty")
 
     if [ -n "$value" ]; then
-        echo "  ✅ ${description}"
+        echo "  ${description}"
         echo "     Path: ${MOUNT}/${path} (key: ${key})"
     else
-        echo "  ❌ ${description} — MISSING or EMPTY"
+        echo "  ${description} — MISSING or EMPTY"
         echo "     Expected: ${MOUNT}/${path} with key '${key}'"
         ERRORS=$((ERRORS + 1))
     fi
@@ -82,9 +82,9 @@ echo "  ℹ️  Uncomment SSO check if you use SSO"
 echo ""
 echo "=============================================="
 if [ $ERRORS -eq 0 ]; then
-    echo "  ✅ All required secrets verified!"
+    echo "  All required secrets verified!"
 else
-    echo "  ❌ ${ERRORS} secret(s) missing"
+    echo "  ${ERRORS} secret(s) missing"
     echo ""
     echo "  Run: bash vault/scripts/setup-secrets.sh ${ENV}"
 fi

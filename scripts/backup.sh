@@ -126,7 +126,7 @@ TOTAL=$((TOTAL + 2))
 BACKUP_SIZE=$(du -sh "$BACKUP_DIR" 2>/dev/null | cut -f1)
 echo ""
 echo -e "${GREEN}╔═══════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${GREEN}║  ✅ Backup complete!${NC}"
+echo -e "${GREEN}║  Backup complete!${NC}"
 echo -e "${GREEN}╚═══════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 echo "  Location:  backups/${ENV}/${TIMESTAMP}/"

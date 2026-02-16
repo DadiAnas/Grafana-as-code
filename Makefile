@@ -325,7 +325,7 @@ test: dev-up dev-bootstrap
 		make init ENV=dev && \
 		make plan ENV=dev && \
 		echo "" && \
-		echo "✅ Test plan succeeded! Run 'make apply ENV=dev' to apply."
+		echo "Test plan succeeded! Run 'make apply ENV=dev' to apply."
 
 # =============================================================================
 # VAULT OPERATIONS

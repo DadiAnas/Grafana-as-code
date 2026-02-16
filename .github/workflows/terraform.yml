@@ -8,27 +8,31 @@
 # Requirements:
 #   - GitHub Secrets: VAULT_ADDR, VAULT_TOKEN, GRAFANA_URL (per environment)
 #   - Terraform state backend configured in backends/<env>.tfbackend
+#
+# STATUS: Disabled until real infrastructure secrets are configured.
+#         Re-enable by uncommenting the on: triggers below.
 # =============================================================================
 
 name: Terraform
 
 on:
-  pull_request:
-    branches: [main]
-    paths:
-      - '**.tf'
-      - '**.tfvars'
-      - '**.tfbackend'
-      - 'config/**'
-      - 'dashboards/**'
-  push:
-    branches: [main]
-    paths:
-      - '**.tf'
-      - '**.tfvars'
-      - '**.tfbackend'
-      - 'config/**'
-      - 'dashboards/**'
+  workflow_dispatch:  # Manual-only for now
+  # pull_request:
+  #   branches: [main]
+  #   paths:
+  #     - '**.tf'
+  #     - '**.tfvars'
+  #     - '**.tfbackend'
+  #     - 'config/**'
+  #     - 'dashboards/**'
+  # push:
+  #   branches: [main]
+  #   paths:
+  #     - '**.tf'
+  #     - '**.tfvars'
+  #     - '**.tfbackend'
+  #     - 'config/**'
+  #     - 'dashboards/**'
 
 permissions:
   contents: read
@@ -158,7 +162,7 @@ jobs:
             | Check | Status |
             |-------|--------|
             | 🖌 Format | ${statusIcon(fmt)} |
-            | ✅ Validate | ${statusIcon(validate)} |
+            | Validate | ${statusIcon(validate)} |
             | 🔍 TFLint | ${statusIcon(tflint)} |
             
             *Pushed by @${{ github.actor }}*`;
