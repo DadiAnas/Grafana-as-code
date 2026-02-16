@@ -11,8 +11,8 @@ variable "enabled" {
 variable "keycloak_config" {
   description = "Keycloak client configuration"
   type = object({
-    realm_id    = string
-    client_id   = string
+    realm_id    = optional(string, "master")
+    client_id   = optional(string, "grafana")
     client_name = optional(string, "Grafana")
     description = optional(string, "Grafana OAuth Client")
     enabled     = optional(bool, true)
@@ -25,7 +25,7 @@ variable "keycloak_config" {
     service_accounts_enabled     = optional(bool, false)
 
     # URLs
-    root_url            = string
+    root_url            = optional(string, "http://localhost:3000")
     base_url            = optional(string, "/")
     valid_redirect_uris = optional(list(string), [])
     web_origins         = optional(list(string), ["+"])

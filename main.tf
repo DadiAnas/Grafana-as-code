@@ -179,7 +179,7 @@ module "sso" {
 module "keycloak" {
   source = "./modules/keycloak"
 
-  enabled           = local.keycloak_config.enabled
+  enabled           = try(local.keycloak_config.enabled, false)
   keycloak_config   = local.keycloak_config
   vault_credentials = module.vault_secrets.keycloak_credentials
 
