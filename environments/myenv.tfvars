@@ -23,7 +23,7 @@ vault_mount   = "grafana"
 # OSS Team Sync — sync Keycloak group members → Grafana teams via local-exec
 # Keycloak is the source of truth: adds/removes Grafana team members to match
 # Requires external_groups in teams.yaml + Keycloak credentials in Vault
-enable_team_sync_oss = true
+enable_team_sync_oss = false
 
 # Keycloak Configuration (optional — only if you enable SSO via Keycloak)
 # keycloak_url = "https://keycloak.example.com"
