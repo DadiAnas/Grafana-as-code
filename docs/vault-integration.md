@@ -69,8 +69,8 @@ vault status
 ### 3. Run Setup Script
 
 ```bash
-# Setup secrets for NPR environment
-./vault/scripts/setup-npr-secrets.sh
+# Bootstrap Vault with defaults for an environment
+./vault/scripts/bootstrap-secrets.sh myenv
 
 # Or setup all environments
 ./vault/scripts/setup-all-secrets.sh --all
@@ -80,15 +80,15 @@ vault status
 
 ```bash
 # Verify all required secrets exist
-./vault/scripts/verify-secrets.sh npr
+./vault/scripts/verify-secrets.sh myenv
 ```
 
 ### 5. Run Terraform
 
 ```bash
 terraform init
-terraform plan -var-file=environments/npr.tfvars
-terraform apply -var-file=environments/npr.tfvars
+terraform plan -var-file=environments/myenv.tfvars
+terraform apply -var-file=environments/myenv.tfvars
 ```
 
 ## Vault Secret Structure
@@ -156,33 +156,30 @@ grafana/                                    # KV v2 Secrets Engine
 
 | Script | Description |
 |--------|-------------|
-| `setup-npr-secrets.sh` | Create NPR environment secrets |
-| `setup-preprod-secrets.sh` | Create PreProd environment secrets |
-| `setup-prod-secrets.sh` | Create Production secrets (with confirmation) |
+| `bootstrap-secrets.sh` | Quick bootstrap with defaults for an environment |
 | `setup-all-secrets.sh` | Interactive multi-environment setup |
 | `verify-secrets.sh` | Verify all required secrets exist |
 | `rotate-secret.sh` | Rotate individual secrets |
-| `bootstrap-secrets.sh` | Quick bootstrap with defaults |
 
 ### Usage Examples
 
 ```bash
-# Setup single environment
-./vault/scripts/setup-npr-secrets.sh
+# Bootstrap secrets for an environment
+./vault/scripts/bootstrap-secrets.sh myenv
 
 # Setup all environments interactively
 ./vault/scripts/setup-all-secrets.sh
 
 # Setup specific environments via flags
-./vault/scripts/setup-all-secrets.sh --npr --preprod
+./vault/scripts/setup-all-secrets.sh --myenv --staging
 
 # Verify secrets exist
-./vault/scripts/verify-secrets.sh npr
+./vault/scripts/verify-secrets.sh myenv
 ./vault/scripts/verify-secrets.sh prod
 
 # Rotate a specific secret
 ./vault/scripts/rotate-secret.sh prod datasource PostgreSQL
-./vault/scripts/rotate-secret.sh npr contact-point webhook-npr
+./vault/scripts/rotate-secret.sh myenv contact-point webhook-alerts
 ./vault/scripts/rotate-secret.sh prod grafana auth
 ```
 
@@ -239,15 +236,16 @@ datasources:
     # secure_json_data populated from Vault
 
 # Contact point with Vault credentials
-contact_points:
+contactPoints:
   - name: webhook-critical
-    type: webhook
-    use_vault: true  # ← Enable Vault integration
-    settings:
-      url: https://alerts.example.com/webhook
-      httpMethod: POST
-      authorization_scheme: Bearer
-      # authorization_credentials from Vault
+    org: "Main Organization"
+    receivers:
+      - type: webhook
+        settings:
+          url: https://alerts.example.com/webhook
+          httpMethod: POST
+          authorization_scheme: Bearer
+          authorization_credentials: "vault:webhook-critical"  # Fetched from Vault
 ```
 
 ## Authentication Methods
@@ -329,7 +327,7 @@ on:
   pull_request:
 
 env:
-  TF_VERSION: '1.6.0'
+  TF_VERSION: '1.9.0'
 
 jobs:
   terraform:
@@ -372,7 +370,7 @@ stages:
   - apply
 
 variables:
-  TF_VERSION: "1.6.0"
+  TF_VERSION: "1.9.0"
 
 .terraform_base:
   image: hashicorp/terraform:$TF_VERSION

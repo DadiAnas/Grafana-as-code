@@ -24,22 +24,23 @@ All resources follow a **shared + environment-specific** pattern where environme
 | Resource | Shared Location | Env Location | Merge Key |
 |----------|----------------|--------------|-----------|
 | Datasources | `config/shared/datasources.yaml` | `config/{env}/datasources.yaml` | `uid` |
-| Alert Rules | `config/shared/alerting/alert_rules.yaml` | `config/{env}/alerting/alert_rules.yaml` | `name` |
-| Contact Points | `config/shared/alerting/contact_points.yaml` | `config/{env}/alerting/contact_points.yaml` | `name` |
+| Organizations | `config/shared/organizations.yaml` | `config/{env}/organizations.yaml` | `name` |
+| Folders | `config/shared/folders.yaml` | `config/{env}/folders.yaml` | `uid` |
+| Teams | `config/shared/teams.yaml` | `config/{env}/teams.yaml` | `name/org` |
+| Service Accounts | `config/shared/service_accounts.yaml` | `config/{env}/service_accounts.yaml` | `name` |
+| Alert Rules | `config/shared/alerting/alert_rules.yaml` | `config/{env}/alerting/alert_rules.yaml` | `org:folder-name` |
+| Contact Points | `config/shared/alerting/contact_points.yaml` | `config/{env}/alerting/contact_points.yaml` | `org:name` |
 | Notification Policies | `config/shared/alerting/notification_policies.yaml` | `config/{env}/alerting/notification_policies.yaml` | `org` |
 | Dashboards | `dashboards/shared/{folder}/` | `dashboards/{env}/{folder}/` | filename |
 
-**Shared-only resources** (no environment override):
-- Organizations: `config/shared/organizations.yaml`
-- Folders: `config/shared/folders.yaml`
-- Teams: `config/shared/teams.yaml`
-- Service Accounts: `config/shared/service_accounts.yaml`
+**Environment-specific configs override shared configs** with the same merge key.
 
 ---
 
 ## Organizations
 
 **File**: `config/shared/organizations.yaml`
+**Env Override**: `config/{env}/organizations.yaml`
 
 Defines Grafana organizations for multi-tenancy.
 
@@ -81,12 +82,13 @@ organizations:
 ## Folders
 
 **File**: `config/shared/folders.yaml`
+**Env Override**: `config/{env}/folders.yaml`
 
 Defines the folder structure for organizing dashboards. Folders can be assigned to specific organizations.
 
 ```yaml
 folders:
-  - title: "Folder Name"          # Required: Display name
+  - name: "Folder Name"            # Required: Display name
     uid: "folder-uid"             # Required: Unique identifier
     org: "Organization Name"      # Optional: Parent organization (defaults to Main)
     permissions:                   # Optional: Access control (see below)
@@ -112,7 +114,7 @@ By default, **all folders** are managed with zero-default permissions — Grafan
 ```yaml
 folders:
   # Main Organization folders
-  - title: "Infrastructure"
+  - name: "Infrastructure"
     uid: "infrastructure"
     org: "Main Organization"
     permissions:
@@ -121,13 +123,13 @@ folders:
       - team: "grafana-viewers"
         permission: "View"
 
-  - title: "Applications"
+  - name: "Applications"
     uid: "applications"
     org: "Main Organization"
     permissions: []               # No access except Org Admins
     
   # Platform Team folders
-  - title: "Kubernetes"
+  - name: "Kubernetes"
     uid: "platform-kubernetes"
     org: "Platform Team"
     permissions:
@@ -135,7 +137,7 @@ folders:
         permission: "View"
     
   # Application Team folders
-  - title: "API Services"
+  - name: "API Services"
     uid: "app-api"
     org: "Application Team"
 ```
@@ -245,6 +247,7 @@ datasources:
 ## Teams
 
 **File**: `config/shared/teams.yaml`
+**Env Override**: `config/{env}/teams.yaml`
 
 Defines teams for access control. Teams use a **composite key** (`name/org`) internally, so the same team name can exist in different organizations.
 
@@ -317,6 +320,7 @@ teams:
 ## Service Accounts
 
 **File**: `config/shared/service_accounts.yaml`
+**Env Override**: `config/{env}/service_accounts.yaml`
 
 Defines service accounts for API access.
 
@@ -328,7 +332,7 @@ service_accounts:
     is_disabled: false            # Optional: Disable account
     tokens:                       # Optional: API tokens
       - name: "token-name"
-        expires_at: "2025-12-31"  # Optional: Expiration date
+        seconds_to_live: 31536000 # Optional: TTL in seconds (0 = no expiry)
 ```
 
 ### Example
@@ -340,12 +344,13 @@ service_accounts:
     role: "Editor"
     tokens:
       - name: "github-actions"
-        expires_at: "2026-12-31"
+        seconds_to_live: 31536000  # 1 year
 
   - name: "monitoring-readonly"
     role: "Viewer"
     tokens:
       - name: "prometheus-scraper"
+        seconds_to_live: 0         # No expiry
 ```
 
 ---
@@ -473,7 +478,9 @@ groups:
 | `no_data_state` | `NoData`, `OK`, `Alerting`, `KeepLast` | State when query returns no data |
 | `exec_err_state` | `Error`, `OK`, `Alerting`, `KeepLast` | State when query execution fails |
 
-### Example with All Parameters
+### Example with All Parameters (Legacy Flat Format)
+
+> **Note:** The above Grafana native format (with `groups:` and `rules:`) is the recommended format. The flat format below is an alternative supported by the module's auto-conversion logic, but using the native format is preferred.
 
 ```yaml
 alert_rules:
@@ -558,210 +565,198 @@ Defines notification channels with support for 20+ contact point types.
 ### Base Template
 
 ```yaml
-contact_points:
+contactPoints:
   - name: "Contact Name"          # Required: Display name
     org: "Organization Name"      # Required: Parent organization
-    type: "contact-type"          # Required: Contact type from list above
-    disable_provenance: false     # Optional: Allow UI modification
-    use_vault: true/false         # Optional: Fetch secrets from Vault
-    settings:                     # Required: Type-specific settings
-      # See type-specific settings below
+    receivers:                     # Required: Array of receivers
+      - type: "contact-type"      # Required: Contact type from list above
+        settings:                  # Required: Type-specific settings
+          # See type-specific settings below
+        disableResolveMessage: false  # Optional: Suppress resolve notifications
 ```
 
 ### Email Settings
 
 ```yaml
-- name: "email-alerts"
-  org: "Main Organization"
-  type: "email"
-  settings:
-    addresses: "team@example.com,oncall@example.com"
-    single_email: true
-    subject: "[{{ .Status }}] {{ .CommonLabels.alertname }}"
-    message: |
-      {{ range .Alerts }}
-      Alert: {{ .Labels.alertname }}
-      Status: {{ .Status }}
-      {{ end }}
-    disable_resolve_message: false
+contactPoints:
+  - name: "email-alerts"
+    org: "Main Organization"
+    receivers:
+      - type: "email"
+        settings:
+          addresses: "team@example.com;oncall@example.com"
+          singleEmail: true
+          subject: "[{{ .Status }}] {{ .CommonLabels.alertname }}"
+          message: |
+            {{ range .Alerts }}
+            Alert: {{ .Labels.alertname }}
+            Status: {{ .Status }}
+            {{ end }}
+        disableResolveMessage: false
 ```
 
 ### Webhook Settings
 
 ```yaml
-- name: "webhook-critical"
-  org: "Main Organization"
-  type: "webhook"
-  use_vault: true
-  settings:
-    url: "https://alerts.example.com/webhook"
-    http_method: "POST"
-    basic_auth_user: "user"           # Optional
-    basic_auth_password: "pass"       # Optional (use Vault)
-    authorization_scheme: "Bearer"    # Optional
-    authorization_credentials: "..."  # Optional (use Vault)
-    max_alerts: 10                    # Optional
-    message: "{{ .CommonAnnotations.summary }}"
-    title: "{{ .CommonLabels.alertname }}"
-    disable_resolve_message: false
+contactPoints:
+  - name: "webhook-critical"
+    org: "Main Organization"
+    receivers:
+      - type: "webhook"
+        settings:
+          url: "https://alerts.example.com/webhook"
+          httpMethod: "POST"
+          # authorization_credentials: "vault:webhook-myenv"  # Fetch from Vault
+        disableResolveMessage: false
 ```
 
 ### Slack Settings
 
 ```yaml
-- name: "slack-alerts"
-  org: "Main Organization"
-  type: "slack"
-  use_vault: true  # token stored in Vault
-  settings:
-    recipient: "#alerts"
-    token: "xoxb-..."               # Use Vault
-    text: "{{ .CommonAnnotations.summary }}"
-    title: "{{ .CommonLabels.alertname }}"
-    username: "Grafana Alerts"
-    icon_emoji: ":warning:"
-    mention_channel: "here"         # or "channel"
-    mention_users: "U12345,U67890"
-    mention_groups: "G12345"
-    disable_resolve_message: false
+contactPoints:
+  - name: "slack-alerts"
+    org: "Main Organization"
+    receivers:
+      - type: "slack"
+        settings:
+          url: "https://hooks.slack.com/services/XXXX/YYYY/ZZZZ"
+          recipient: "#alerts"
+          title: "{{ .CommonLabels.alertname }}"
+          text: "{{ .CommonAnnotations.summary }}"
+          username: "Grafana Alerts"
+          icon_emoji: ":warning:"
+          mention_channel: "here"
+        disableResolveMessage: false
 ```
 
 ### PagerDuty Settings
 
 ```yaml
-- name: "pagerduty-critical"
-  org: "Main Organization"
-  type: "pagerduty"
-  use_vault: true  # integration_key stored in Vault
-  settings:
-    integration_key: "..."          # Use Vault
-    severity: "critical"            # critical, error, warning, info
-    class: "infrastructure"
-    component: "kubernetes"
-    group: "platform"
-    summary: "{{ .CommonAnnotations.summary }}"
-    source: "grafana"
-    client: "Grafana"
-    client_url: "https://grafana.example.com"
-    disable_resolve_message: false
+contactPoints:
+  - name: "pagerduty-critical"
+    org: "Main Organization"
+    receivers:
+      - type: "pagerduty"
+        settings:
+          integrationKey: "..."       # Use Vault
+          severity: "critical"          # critical, error, warning, info
+          class: "infrastructure"
+          component: "kubernetes"
+          group: "platform"
+          summary: "{{ .CommonAnnotations.summary }}"
+        disableResolveMessage: false
 ```
 
 ### Opsgenie Settings
 
 ```yaml
-- name: "opsgenie-alerts"
-  org: "Main Organization"
-  type: "opsgenie"
-  use_vault: true  # api_key stored in Vault
-  settings:
-    api_key: "..."                  # Use Vault
-    url: "https://api.opsgenie.com" # or api.eu.opsgenie.com
-    message: "{{ .CommonLabels.alertname }}"
-    description: "{{ .CommonAnnotations.description }}"
-    auto_close: true
-    override_priority: true
-    send_tags_as: "both"            # both, teams, tags
-    responders:
-      - type: "team"
-        name: "Platform Team"
-    disable_resolve_message: false
+contactPoints:
+  - name: "opsgenie-alerts"
+    org: "Main Organization"
+    receivers:
+      - type: "opsgenie"
+        settings:
+          apiKey: "..."                # Use Vault
+          apiUrl: "https://api.opsgenie.com"
+          message: "{{ .CommonLabels.alertname }}"
+          description: "{{ .CommonAnnotations.description }}"
+          autoClose: true
+          overridePriority: true
+          sendTagsAs: "both"
+        disableResolveMessage: false
 ```
 
 ### Telegram Settings
 
 ```yaml
-- name: "telegram-alerts"
-  org: "Main Organization"
-  type: "telegram"
-  use_vault: true  # token stored in Vault
-  settings:
-    token: "..."                    # Use Vault
-    chat_id: "-1001234567890"
-    message: "<b>{{ .CommonLabels.alertname }}</b>"
-    parse_mode: "HTML"              # HTML or MarkdownV2
-    disable_web_page_preview: true
-    disable_notifications: false
-    disable_resolve_message: false
+contactPoints:
+  - name: "telegram-alerts"
+    org: "Main Organization"
+    receivers:
+      - type: "telegram"
+        settings:
+          bottoken: "..."              # Use Vault
+          chatid: "-1001234567890"
+          message: "<b>{{ .CommonLabels.alertname }}</b>"
+          parse_mode: "HTML"
+          disable_web_page_preview: true
+        disableResolveMessage: false
 ```
 
 ### Microsoft Teams Settings
 
 ```yaml
-- name: "teams-alerts"
-  org: "Main Organization"
-  type: "teams"
-  use_vault: true  # url stored in Vault
-  settings:
-    url: "https://..."              # Teams webhook URL (use Vault)
-    title: "{{ .CommonLabels.alertname }}"
-    message: "{{ .CommonAnnotations.summary }}"
-    section_title: "Alert Details"
-    disable_resolve_message: false
+contactPoints:
+  - name: "teams-alerts"
+    org: "Main Organization"
+    receivers:
+      - type: "teams"
+        settings:
+          url: "https://..."           # Teams webhook URL (use Vault)
+          title: "{{ .CommonLabels.alertname }}"
+          message: "{{ .CommonAnnotations.summary }}"
+          sectiontitle: "Alert Details"
+        disableResolveMessage: false
 ```
 
 ---
 
 ## Notification Policies
 
-**File**: `config/{env}/alerting/notification_policies.yaml`
+**Files**:
+- Shared: `config/shared/alerting/notification_policies.yaml`
+- Environment: `config/{env}/alerting/notification_policies.yaml`
 
-Defines routing for alerts to contact points.
+Defines routing for alerts to contact points. Uses Grafana's native format — one policy per organization.
 
 ```yaml
-notification_policies:
-  default_contact_point: "email-default"    # Required: Default receiver
-  group_by:                                  # Optional: Grouping labels
-    - "alertname"
-    - "severity"
-  group_wait: "30s"                         # Optional: Initial wait
-  group_interval: "5m"                      # Optional: Interval between groups
-  repeat_interval: "4h"                     # Optional: Repeat interval
-  policies:                                  # Optional: Child policies
-    - matchers:
-        - label: "severity"
-          match: "="
-          value: "critical"
-      contact_point: "webhook-critical"
-      continue: false
+policies:
+  - org: "Organization Name"         # Required: Organization name
+    receiver: "default-contact"      # Required: Default contact point
+    group_by:                         # Optional: Grouping labels
+      - "alertname"
+      - "severity"
+    group_wait: "30s"                # Optional: Initial wait
+    group_interval: "5m"             # Optional: Interval between groups
+    repeat_interval: "4h"            # Optional: Repeat interval
+    routes:                           # Optional: Child route policies
+      - receiver: "webhook-critical"
+        object_matchers:
+          - ["severity", "=", "critical"]
+        continue: false
 ```
 
 ### Example
 
 ```yaml
-notification_policies:
-  default_contact_point: "email-prod"
-  group_by:
-    - "alertname"
-    - "severity"
-  group_wait: "30s"
-  group_interval: "5m"
-  repeat_interval: "4h"
-  
-  policies:
-    # Critical alerts → webhook
-    - matchers:
-        - label: "severity"
-          match: "="
-          value: "critical"
-      contact_point: "webhook-critical"
-      group_wait: "10s"
-      repeat_interval: "15m"
-      continue: false
-    
-    # Warning alerts → email
-    - matchers:
-        - label: "severity"
-          match: "="
-          value: "warning"
-      contact_point: "email-warnings"
-      continue: true
-    
-    # Team-specific routing
-    - matchers:
-        - label: "team"
-          match: "="
-          value: "platform"
-      contact_point: "email-platform"
+policies:
+  - org: "Main Organization"
+    receiver: "email-prod"
+    group_by:
+      - "alertname"
+      - "severity"
+    group_wait: "30s"
+    group_interval: "5m"
+    repeat_interval: "4h"
+    routes:
+      # Critical alerts → webhook
+      - receiver: "webhook-critical"
+        object_matchers:
+          - ["severity", "=", "critical"]
+        group_wait: "10s"
+        repeat_interval: "15m"
+        continue: false
+
+      # Warning alerts → email
+      - receiver: "email-warnings"
+        object_matchers:
+          - ["severity", "=", "warning"]
+        continue: true
+
+      # Team-specific routing
+      - receiver: "email-platform"
+        object_matchers:
+          - ["team", "=", "platform"]
 ```
 
 ---
@@ -813,8 +808,8 @@ mute_timings:
     org: "Main Organization"
     intervals:
       - times:
-          - start_time: "02:00"
-            end_time: "04:00"
+          - start: "02:00"
+            end: "04:00"
         weekdays: ["sunday"]
         location: "UTC"
 ```
@@ -849,15 +844,13 @@ mute_timings:
 Reference mute timings in notification policies:
 
 ```yaml
-notification_policies:
+policies:
   - org: "Main Organization"
-    contact_point: "email"
+    receiver: "email-alerts"
     routes:
-      - matchers:
-          - label: "severity"
-            match: "="
-            value: "warning"
-        contact_point: "email-warnings"
+      - receiver: "email-warnings"
+        object_matchers:
+          - ["severity", "=", "warning"]
         mute_timings:
           - "maintenance-window"
           - "weekends"
@@ -867,7 +860,7 @@ notification_policies:
 
 ## Dashboard JSON
 
-**Location**: `dashboards/shared/{folder}/*.json` and `dashboards/{env}/{folder}/*.json`
+**Location**: `dashboards/shared/<Org Name>/<folder-uid>/*.json` and `dashboards/{env}/<Org Name>/<folder-uid>/*.json`
 
 Dashboards are standard Grafana JSON exports. The system supports:
 
@@ -878,28 +871,24 @@ Dashboards are standard Grafana JSON exports. The system supports:
 
 ```
 dashboards/
-├── shared/                    # Deployed to ALL environments
-│   ├── infrastructure/
-│   │   ├── node-exporter.json
-│   │   ├── kubernetes-cluster.json
-│   │   └── network-overview.json
-│   ├── applications/
-│   │   ├── api-gateway.json
-│   │   └── backend-services.json
-│   ├── business/
-│   │   └── revenue-metrics.json
-│   ├── slos/
-│   │   └── slo-overview.json
-│   └── alerts/
-│       └── alert-overview.json
-├── npr/                       # NPR-only dashboards
-│   └── infrastructure/
-│       └── debug-dashboard.json
-├── preprod/                   # PreProd-only dashboards
-│   └── (empty or custom dashboards)
-└── prod/                      # Prod-only dashboards
-    └── business/
-        └── executive-summary.json
+├── shared/                              # Deployed to ALL environments
+│   └── Main Organization/
+│       ├── infrastructure/
+│       │   ├── node-exporter.json
+│       │   └── kubernetes-cluster.json
+│       └── applications/
+│           └── api-gateway.json
+├── myenv/                               # Environment-specific dashboards
+│   └── Main Organization/
+│       └── infrastructure/
+│           └── debug-dashboard.json
+└── prod/                                # Prod-only dashboards
+    ├── Main Organization/
+    │   └── business/
+    │       └── executive-summary.json
+    └── Platform Team/
+        └── sre/
+            └── sre-overview.json
 ```
 
 ### Override Behavior

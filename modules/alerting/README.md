@@ -29,12 +29,15 @@ No modules.
 | <a name="input_alert_rules"></a> [alert\_rules](#input\_alert\_rules) | Alert rules configuration from YAML | `any` | n/a | yes |
 | <a name="input_contact_points"></a> [contact\_points](#input\_contact\_points) | Contact points configuration from YAML | `any` | n/a | yes |
 | <a name="input_folder_ids"></a> [folder\_ids](#input\_folder\_ids) | Map of folder UIDs to their IDs | `map(string)` | n/a | yes |
+| <a name="input_mute_timings"></a> [mute\_timings](#input\_mute\_timings) | Mute timings configuration from YAML | `any` | `{ mute_timings = [] }` | no |
 | <a name="input_notification_policies"></a> [notification\_policies](#input\_notification\_policies) | Notification policies configuration from YAML | `any` | n/a | yes |
+| <a name="input_org_ids"></a> [org\_ids](#input\_org\_ids) | Map of organization names to their IDs | `map(string)` | `{}` | no |
 | <a name="input_vault_credentials"></a> [vault\_credentials](#input\_vault\_credentials) | Map of contact point names to their credentials from Vault | `map(map(string))` | `{}` | no |
 
 ## Outputs
 
 | Name | Description |
 |------|-------------|
+| <a name="output_alert_rule_count"></a> [alert\_rule\_count](#output\_alert\_rule\_count) | Total number of alert rules deployed |
 | <a name="output_contact_point_names"></a> [contact\_point\_names](#output\_contact\_point\_names) | List of contact point names |
 | <a name="output_rule_group_names"></a> [rule\_group\_names](#output\_rule\_group\_names) | List of rule group names |

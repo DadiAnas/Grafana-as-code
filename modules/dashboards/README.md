@@ -25,7 +25,10 @@ No modules.
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
 | <a name="input_dashboards_path"></a> [dashboards\_path](#input\_dashboards\_path) | Path to the dashboards directory | `string` | n/a | yes |
+| <a name="input_environment"></a> [environment](#input\_environment) | Environment name | `string` | n/a | yes |
 | <a name="input_folder_ids"></a> [folder\_ids](#input\_folder\_ids) | Map of folder UIDs to their IDs | `map(string)` | n/a | yes |
+| <a name="input_folder_org_ids"></a> [folder\_org\_ids](#input\_folder\_org\_ids) | Map of folder UIDs to their organization IDs | `map(number)` | `{}` | no |
+| <a name="input_exclude_folders"></a> [exclude\_folders](#input\_exclude\_folders) | List of folder paths (org/folder) to exclude from dashboard management | `list(string)` | `[]` | no |
 
 ## Outputs
 

@@ -6,16 +6,16 @@ This module manages Grafana folders and their **granular permissions**.
 
 - **Create folders** across multiple organizations
 - **Granular permissions** per team, user, or org role
-- **Permission inheritance** - teams inherit org-level access by default
-- **Override when needed** - specify folder-specific permissions
+- **Zero-default permissions** — Grafana's built-in Viewer/Editor access is removed for all folders
+- **Only explicit permissions apply** — folders with no `permissions` key get no access (except Org Admins)
 
-## Permission Inheritance
+## Zero-Default Permission Model
 
-By default, teams inherit their **organization-level role permissions**:
-- If a team is an Editor in an org, they get Edit access to all folders
-- If a team is a Viewer in an org, they get View access to all folders
-
-You only need to define `permissions` when you want to **override the defaults**.
+All folders are managed with zero-default permissions:
+- Grafana's built-in Viewer/Editor role access is **removed** from every folder
+- Only explicitly listed permissions (team, role, or user) apply
+- Folders without `permissions` defined get **no access** except for Org Admins
+- Teams are looked up using composite keys (`team_name/org_name`) to support the same team name across different orgs
 
 ## Permission Levels
 
@@ -85,24 +85,27 @@ folders:
 
 | Name | Description | Type | Required |
 |------|-------------|------|----------|
-| `folders` | Folders configuration from YAML | `any` | Yes |
+| `folder_permissions` | Folder permissions configuration from YAML | `any` | No (defaults `{}`) |
+| `dashboards_path` | Path to the dashboards directory for auto-discovery | `string` | Yes |
+| `environment` | Current environment name | `string` | Yes |
 | `org_ids` | Map of organization names to IDs | `map(number)` | No |
-| `team_ids` | Map of team names to numeric IDs | `map(number)` | No |
+| `team_details` | Map of team composite keys to `{team_id, org_id}` | `map(object)` | No |
 | `user_ids` | Map of user emails to IDs | `map(number)` | No |
 
 ## Outputs
 
 | Name | Description |
 |------|-------------|
-| `folder_ids` | Map of folder UIDs to their full IDs |
-| `folder_uids` | Map of folder UIDs (for compatibility) |
-| `folder_org_ids` | Map of folder UIDs to organization IDs |
-| `folder_permissions_count` | Count of folders with explicit permissions |
-| `folders_with_permissions` | List of folder UIDs with explicit permissions |
+| `folder_ids` | Map of folder paths to their IDs |
+| `folder_uids` | Map of folder paths to their UIDs |
+| `folder_org_ids` | Map of folder paths to their organization IDs |
+| `folder_permissions_count` | Number of folders with permission overrides (all folders — defaults are removed) |
+| `folders_with_permissions` | List of folder paths that have permissions managed (all folders) |
 
 ## How It Works
 
-1. **Folders are created first** using `grafana_folder` resource
-2. **Permissions are applied** using `grafana_folder_permission` resource
-3. **Only explicit permissions are managed** - folders without `permissions` defined inherit defaults
-4. **Environment-specific overrides** - NPR/PreProd/Prod can override shared folder permissions
+1. **Folders are created** using `grafana_folder` resource
+2. **Zero-default permissions are applied** using `grafana_folder_permission` — built-in Viewer/Editor access is removed
+3. **Only explicit permissions apply** — teams, roles, and users listed in `permissions` get access
+4. **Auto-discovery** — folders are discovered from the dashboards directory structure
+5. **Environment-specific overrides** — env config can override shared folder permissions

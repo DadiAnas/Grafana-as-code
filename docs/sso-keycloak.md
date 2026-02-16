@@ -118,44 +118,63 @@ Create the following groups in Keycloak:
 
 ### Configuration Files
 
-SSO is configured via two files:
+SSO is configured via two YAML files:
 
-1. **Shared settings**: `config/shared/sso/keycloak.yaml`
-2. **Environment-specific**: `config/{env}/grafana-sso.ini`
+1. **Shared settings**: `config/shared/sso.yaml`
+2. **Environment-specific overrides**: `config/{env}/sso.yaml`
 
-### grafana-sso.ini (Per Environment)
+### sso.yaml (Per Environment)
 
-```ini
-# config/npr/grafana-sso.ini
+```yaml
+# config/shared/sso.yaml — or override in config/{env}/sso.yaml
 
-[auth.generic_oauth]
-enabled = true
-name = Keycloak
-allow_sign_up = true
-auto_login = false
+sso:
+  enabled: true
+  name: "Keycloak"
 
-# Keycloak endpoints
-client_id = grafana-npr
-client_secret = ${KEYCLOAK_CLIENT_SECRET}
-scopes = openid profile email groups
-auth_url = https://keycloak-npr.example.com/realms/grafana/protocol/openid-connect/auth
-token_url = https://keycloak-npr.example.com/realms/grafana/protocol/openid-connect/token
-api_url = https://keycloak-npr.example.com/realms/grafana/protocol/openid-connect/userinfo
+  # OAuth2 endpoints
+  auth_url: "https://keycloak.example.com/realms/grafana/protocol/openid-connect/auth"
+  token_url: "https://keycloak.example.com/realms/grafana/protocol/openid-connect/token"
+  api_url: "https://keycloak.example.com/realms/grafana/protocol/openid-connect/userinfo"
 
-# Attribute mapping
-login_attribute_path = preferred_username
-email_attribute_path = email
-name_attribute_path = name
-groups_attribute_path = groups
+  # Client configuration (client_secret stored in Vault at <env>/sso/keycloak)
+  client_id: "grafana-npr"
 
-# Role mapping
-role_attribute_path = contains(groups[*], 'grafana-admin') && 'Admin' || contains(groups[*], 'grafana-editor') && 'Editor' || 'Viewer'
+  # OAuth settings
+  allow_sign_up: true
+  auto_login: false
+  scopes: "openid profile email groups"
+  use_pkce: true
+  use_refresh_token: true
 
-# Organization mapping
-org_mapping = platform-team:Platform Team:Editor, platform-admins:Platform Team:Admin, app-team:Application Team:Editor, bi-team:Business Intelligence:Viewer
+  # Role mapping
+  role_attribute_strict: false
 
-# Allow users in multiple orgs
-allow_assign_grafana_admin = true
+  # Team sync
+  teams_url: "https://keycloak.example.com/realms/grafana/protocol/openid-connect/userinfo"
+  team_ids_attribute_path: "groups[*]"
+
+  # Sign out redirect
+  signout_redirect_url: "https://keycloak.example.com/realms/grafana/protocol/openid-connect/logout"
+
+  # Organization mapping via groups (see below)
+  groups:
+    - name: "platform-team"
+      org_mappings:
+        - org: "Platform Team"
+          role: "Editor"
+    - name: "platform-admins"
+      org_mappings:
+        - org: "Platform Team"
+          role: "Admin"
+    - name: "app-team"
+      org_mappings:
+        - org: "Application Team"
+          role: "Editor"
+    - name: "grafana-users"
+      org_mappings:
+        - org: "Public"
+          role: "Viewer"
 ```
 
 ### Storing Client Secret in Vault
@@ -171,56 +190,67 @@ vault kv put grafana/npr/sso/keycloak \
 
 ### Mapping Configuration
 
-The `keycloak.yaml` defines how Keycloak groups map to Grafana organizations:
+Organization mapping is defined in `sso.yaml` using the `groups` array, where each group has `org_mappings`:
 
 ```yaml
-# config/shared/sso/keycloak.yaml
-org_mapping:
-  mappings:
+# config/shared/sso.yaml
+sso:
+  enabled: true
+  # ... (OAuth settings above)
+
+  groups:
     # Platform Team
-    - keycloak_group: "platform-team"
-      grafana_org: "Platform Team"
-      role: "Editor"
-    
-    - keycloak_group: "platform-admins"
-      grafana_org: "Platform Team"
-      role: "Admin"
-    
+    - name: "platform-team"
+      org_mappings:
+        - org: "Platform Team"
+          role: "Editor"
+
+    - name: "platform-admins"
+      org_mappings:
+        - org: "Platform Team"
+          role: "Admin"
+
     # Application Team
-    - keycloak_group: "app-team"
-      grafana_org: "Application Team"
-      role: "Editor"
-    
-    - keycloak_group: "app-admins"
-      grafana_org: "Application Team"
-      role: "Admin"
-    
+    - name: "app-team"
+      org_mappings:
+        - org: "Application Team"
+          role: "Editor"
+
+    - name: "app-admins"
+      org_mappings:
+        - org: "Application Team"
+          role: "Admin"
+
     # Business Intelligence
-    - keycloak_group: "bi-team"
-      grafana_org: "Business Intelligence"
-      role: "Viewer"
-    
-    - keycloak_group: "bi-admins"
-      grafana_org: "Business Intelligence"
-      role: "Admin"
-    
+    - name: "bi-team"
+      org_mappings:
+        - org: "Business Intelligence"
+          role: "Viewer"
+
+    - name: "bi-admins"
+      org_mappings:
+        - org: "Business Intelligence"
+          role: "Admin"
+
     # Public Organization - Everyone gets Viewer access
-    - keycloak_group: "platform-team"
-      grafana_org: "Public"
-      role: "Viewer"
-    
-    - keycloak_group: "app-team"
-      grafana_org: "Public"
-      role: "Viewer"
-    
-    - keycloak_group: "bi-team"
-      grafana_org: "Public"
-      role: "Viewer"
-    
-    - keycloak_group: "grafana-users"
-      grafana_org: "Public"
-      role: "Viewer"
+    - name: "platform-team"
+      org_mappings:
+        - org: "Public"
+          role: "Viewer"
+
+    - name: "grafana-users"
+      org_mappings:
+        - org: "Public"
+          role: "Viewer"
+
+    # Wildcard: all orgs
+    - name: "grafana-admin"
+      org_mappings:
+        - org: "*"
+          role: "GrafanaAdmin"
 ```
+
+The SSO module generates `org_mapping` strings from these groups using org numeric IDs (to avoid issues with spaces in org names). `GrafanaAdmin` mappings are handled via `role_attribute_path` instead of `org_mapping`.
 
 ### Mapping Matrix
 

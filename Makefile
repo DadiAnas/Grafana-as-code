@@ -70,6 +70,8 @@ help:
 	@echo "  import         Import from existing Grafana      ENV=staging AUTH=admin:admin"
 	@echo "  promote        Promote configs between envs      FROM=staging TO=prod"
 	@echo "  dashboard-diff Human-readable dashboard diff     ENV=staging"
+	@echo "  team-sync      Sync Keycloak groups → teams      ENV=prod GRAFANA_URL=... AUTH=..."
+	@echo "                                                   KEYCLOAK_URL=... KEYCLOAK_USER=... KEYCLOAK_PASS=..."
 	@echo ""
 	@echo "  ─── Local Development ────────────────────────────────────"
 	@echo "  dev-up         Start Grafana+Vault+Keycloak      (docker compose)"
@@ -234,9 +236,9 @@ backup:
 # Sync Keycloak groups → Grafana teams (OSS — no Enterprise needed)
 # Usage: make team-sync ENV=prod GRAFANA_URL=http://localhost:3000 AUTH=admin:admin \
 #        KEYCLOAK_URL=https://auth.example.com KEYCLOAK_USER=admin KEYCLOAK_PASS=secret
-# Optional: KEYCLOAK_REALM=grafana-realm (default) DRY_RUN=true
+# Optional: KEYCLOAK_REALM=master (default) DRY_RUN=true
 KEYCLOAK_URL   ?=
-KEYCLOAK_REALM ?= grafana-realm
+KEYCLOAK_REALM ?= master
 KEYCLOAK_USER  ?=
 KEYCLOAK_PASS  ?=
 DRY_RUN        ?= false
@@ -246,7 +248,7 @@ team-sync:
 		echo "  Usage: make team-sync ENV=prod GRAFANA_URL=http://localhost:3000 AUTH=admin:admin \\"; \
 		echo "         KEYCLOAK_URL=https://auth.example.com KEYCLOAK_USER=admin KEYCLOAK_PASS=secret"; \
 		echo ""; \
-		echo "  Optional: KEYCLOAK_REALM=grafana-realm DRY_RUN=true"; \
+		echo "  Optional: KEYCLOAK_REALM=master DRY_RUN=true"; \
 		echo ""; \
 		exit 1; \
 	fi

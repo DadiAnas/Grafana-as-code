@@ -1,6 +1,6 @@
 # Grafana as Code with Terraform
 
-[![Terraform](https://img.shields.io/badge/Terraform-%3E%3D1.0.0-623CE4?logo=terraform)](https://terraform.io)
+[![Terraform](https://img.shields.io/badge/Terraform-%3E%3D1.6.0-623CE4?logo=terraform)](https://terraform.io)
 [![Grafana](https://img.shields.io/badge/Grafana-Provider%204.25.0-F46800?logo=grafana)](https://registry.terraform.io/providers/grafana/grafana)
 [![Vault](https://img.shields.io/badge/Vault-Integrated-FFD814?logo=vault)](https://www.vaultproject.io/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -140,7 +140,7 @@ All resources follow a **shared + environment override** pattern:
 | Folders | `config/shared/folders.yaml` | `config/<env>/folders.yaml` | `uid` |
 | Teams | `config/shared/teams.yaml` | `config/<env>/teams.yaml` | `name` |
 | Datasources | `config/shared/datasources.yaml` | `config/<env>/datasources.yaml` | `uid` |
-| Alert Rules | `config/shared/alerting/alert_rules.yaml` | `config/<env>/alerting/alert_rules.yaml` | `folder-name` |
+| Alert Rules | `config/shared/alerting/alert_rules.yaml` | `config/<env>/alerting/alert_rules.yaml` | `org:folder-name` |
 | Contact Points | `config/shared/alerting/contact_points.yaml` | `config/<env>/alerting/contact_points.yaml` | `name` |
 | Notification Policies | `config/shared/alerting/notification_policies.yaml` | `config/<env>/alerting/notification_policies.yaml` | `org` |
 | Dashboards | `dashboards/shared/` | `dashboards/<env>/` | filename |
@@ -341,7 +341,10 @@ make apply ENV=staging                         # Deploy
 make destroy ENV=staging                       # Tear down (with confirmation)
 
 # ─── Team Sync (Keycloak → Grafana, OSS only) ───
-make team-sync                                 # Sync team membership from Keycloak
+make team-sync ENV=prod \                       # Sync team membership from Keycloak
+  GRAFANA_URL=http://localhost:3000 AUTH=admin:admin \
+  KEYCLOAK_URL=https://auth.example.com \
+  KEYCLOAK_USER=admin KEYCLOAK_PASS=secret
 
 # ─── Vault ───
 make vault-setup  ENV=staging                  # Create Vault secrets

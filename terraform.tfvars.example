@@ -1,5 +1,12 @@
 # Copy this file to terraform.tfvars and update with your values
+# Or use an environment file: terraform apply -var-file=environments/<env>.tfvars
 
 grafana_url  = "http://localhost:3000"
-grafana_auth = "admin:admin"  # or use API key: "glsa_xxxx"
-environment  = "dev"
+environment  = "myenv"
+
+# Vault — stores Grafana auth, datasource passwords, SSO secrets, etc.
+vault_address = "http://localhost:8200"
+# vault_mount = "grafana"  # default
+
+# Keycloak (optional) — only needed if keycloak.enabled: true in config
+# keycloak_url = "https://keycloak.example.com"
