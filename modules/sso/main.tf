@@ -27,10 +27,11 @@ locals {
   # Generate org_mapping from SSO groups config with granular per-org roles
   # Format: group_name:org_id:role (using org IDs to avoid space issues)
   # IMPORTANT: Filter out GrafanaAdmin mappings - they must use role_attribute_path instead
+  # Supports org: "*" wildcard — meaning "all organizations"
   dynamic_org_mappings = flatten([
     for group in local.sso_groups : [
-      for mapping in group.org_mappings : 
-        "${group.name}:${var.org_ids[mapping.org]}:${mapping.role}"
+      for mapping in group.org_mappings :
+        mapping.org == "*" ? "${group.name}:*:${mapping.role}" : "${group.name}:${var.org_ids[mapping.org]}:${mapping.role}"
         if mapping.role != "GrafanaAdmin"
     ]
   ])

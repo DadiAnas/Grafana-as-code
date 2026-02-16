@@ -231,6 +231,31 @@ drift:
 backup:
 	@bash scripts/backup.sh "$(ENV)"
 
+# Sync Keycloak groups → Grafana teams (OSS — no Enterprise needed)
+# Usage: make team-sync ENV=prod GRAFANA_URL=http://localhost:3000 AUTH=admin:admin \
+#        KEYCLOAK_URL=https://auth.example.com KEYCLOAK_USER=admin KEYCLOAK_PASS=secret
+# Optional: KEYCLOAK_REALM=grafana-realm (default) DRY_RUN=true
+KEYCLOAK_URL   ?=
+KEYCLOAK_REALM ?= grafana-realm
+KEYCLOAK_USER  ?=
+KEYCLOAK_PASS  ?=
+DRY_RUN        ?= false
+team-sync:
+	@if [ -z "$(GRAFANA_URL)" ] || [ -z "$(AUTH)" ] || [ -z "$(KEYCLOAK_URL)" ] || [ -z "$(KEYCLOAK_USER)" ] || [ -z "$(KEYCLOAK_PASS)" ]; then \
+		echo ""; \
+		echo "  Usage: make team-sync ENV=prod GRAFANA_URL=http://localhost:3000 AUTH=admin:admin \\"; \
+		echo "         KEYCLOAK_URL=https://auth.example.com KEYCLOAK_USER=admin KEYCLOAK_PASS=secret"; \
+		echo ""; \
+		echo "  Optional: KEYCLOAK_REALM=grafana-realm DRY_RUN=true"; \
+		echo ""; \
+		exit 1; \
+	fi
+	@GRAFANA_URL="$(GRAFANA_URL)" GRAFANA_AUTH="$(AUTH)" \
+		KEYCLOAK_URL="$(KEYCLOAK_URL)" KEYCLOAK_REALM="$(KEYCLOAK_REALM)" \
+		KEYCLOAK_USER="$(KEYCLOAK_USER)" KEYCLOAK_PASS="$(KEYCLOAK_PASS)" \
+		DRY_RUN="$(DRY_RUN)" \
+		bash scripts/team-sync.sh "config/$(ENV)/teams.yaml"
+
 # Import from existing Grafana instance
 # Usage: make import ENV=prod GRAFANA_URL=https://grafana.example.com AUTH=admin:admin
 AUTH ?=

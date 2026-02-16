@@ -46,9 +46,10 @@ locals {
   shared_teams = try(yamldecode(file("${path.module}/config/shared/teams.yaml")), { teams = [] })
   env_teams    = try(yamldecode(file("${path.module}/config/${local.env}/teams.yaml")), { teams = [] })
 
-  # Create maps by name for merging (env overrides shared)
-  shared_team_map = { for t in local.shared_teams.teams : t.name => t }
-  env_team_map    = { for t in local.env_teams.teams : t.name => t }
+  # Create maps by name/org for merging (env overrides shared)
+  # Composite key "name/org" supports same team name in different orgs
+  shared_team_map = { for t in local.shared_teams.teams : "${t.name}/${try(t.org, "Main Org.")}" => t }
+  env_team_map    = { for t in local.env_teams.teams : "${t.name}/${try(t.org, "Main Org.")}" => t }
   merged_team_map = merge(local.shared_team_map, local.env_team_map)
 
   teams_config = {

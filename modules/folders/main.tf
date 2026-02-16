@@ -61,13 +61,19 @@ locals {
     for path, data in local.parse_folder : path => {
       uid = data.uid
       name = try(
-        [for f in try(var.folder_permissions.folders, []) : f.name if f.uid == data.uid][0],
-        title(replace(data.uid, "-", " "))
+        [for f in try(var.folder_permissions.folders, []) : f.name if f.uid == data.uid && try(f.org, "") == data.org][0],
+        try(
+          [for f in try(var.folder_permissions.folders, []) : f.name if f.uid == data.uid][0],
+          title(replace(data.uid, "-", " "))
+        )
       )
       org = data.org
       permissions = try(
-        [for f in try(var.folder_permissions.folders, []) : f.permissions if f.uid == data.uid][0],
-        null
+        [for f in try(var.folder_permissions.folders, []) : f.permissions if f.uid == data.uid && try(f.org, "") == data.org][0],
+        try(
+          [for f in try(var.folder_permissions.folders, []) : f.permissions if f.uid == data.uid][0],
+          null
+        )
       )
     }
     if length(data.segments) == 2
@@ -78,8 +84,11 @@ locals {
     for path, data in local.parse_folder : path => {
       uid = data.uid
       name = try(
-        [for f in try(var.folder_permissions.folders, []) : f.name if f.uid == data.uid][0],
-        title(replace(data.uid, "-", " "))
+        [for f in try(var.folder_permissions.folders, []) : f.name if f.uid == data.uid && try(f.org, "") == data.org][0],
+        try(
+          [for f in try(var.folder_permissions.folders, []) : f.name if f.uid == data.uid][0],
+          title(replace(data.uid, "-", " "))
+        )
       )
       org = data.org
       # Parent path: e.g. "Org/A/B" -> "Org/A"
@@ -87,8 +96,11 @@ locals {
       # Is the parent a top-level folder? (depth == 2)
       parent_is_top_level = length(data.segments) == 3
       permissions = try(
-        [for f in try(var.folder_permissions.folders, []) : f.permissions if f.uid == data.uid][0],
-        null
+        [for f in try(var.folder_permissions.folders, []) : f.permissions if f.uid == data.uid && try(f.org, "") == data.org][0],
+        try(
+          [for f in try(var.folder_permissions.folders, []) : f.permissions if f.uid == data.uid][0],
+          null
+        )
       )
     }
     if length(data.segments) > 2
@@ -119,7 +131,7 @@ resource "grafana_folder" "folders" {
 
   title  = each.value.name
   uid    = each.value.uid
-  org_id = try(var.org_ids[each.value.org], null)
+  org_id = try(var.org_ids[each.value.org], null) != null ? var.org_ids[each.value.org] : try(tonumber(each.value.orgId), null)
 }
 
 # -----------------------------------------------------------------------------
@@ -130,7 +142,7 @@ resource "grafana_folder" "subfolders" {
 
   title  = each.value.name
   uid    = each.value.uid
-  org_id = try(var.org_ids[each.value.org], null)
+  org_id = try(var.org_ids[each.value.org], null) != null ? var.org_ids[each.value.org] : try(tonumber(each.value.orgId), null)
 
   # All current subfolders have top-level parents (depth 3: Org/Parent/Child).
   # Referencing grafana_folder.folders avoids a self-referencing cycle.
@@ -145,10 +157,16 @@ locals {
 # -----------------------------------------------------------------------------
 # FOLDER PERMISSIONS
 # -----------------------------------------------------------------------------
+# By default Grafana gives Viewer=View and Editor=Edit to all folders.
+# We override permissions for EVERY folder so that access is team-based only.
+# Folders with no explicit permissions in folders.yaml get only Admin access.
+# -----------------------------------------------------------------------------
 locals {
   # Create a map of folder path -> resolved org_id
   folder_org_map = {
-    for path, folder in local.auto_folders_combined : path => try(var.org_ids[folder.org], 1)
+    for path, folder in local.auto_folders_combined : path => (
+      try(var.org_ids[folder.org], null) != null ? var.org_ids[folder.org] : try(tonumber(folder.orgId), 1)
+    )
   }
 
   # Flatten folder permissions
@@ -162,12 +180,15 @@ locals {
         user        = try(perm.user, null)
         role        = try(perm.role, null)
         permission  = perm.permission
+        # Lookup team using composite key "team_name/folder_org"
         team_in_same_org = try(perm.team, null) != null ? (
-          try(var.team_details[perm.team].org_id, -1) == try(var.org_ids[folder.org], 1)
+          tonumber(try(var.team_details["${perm.team}/${folder.org}"].org_id, -1)) == (
+            try(var.org_ids[folder.org], null) != null ? var.org_ids[folder.org] : try(tonumber(folder.orgId), 1)
+          )
         ) : true
       }
     ]
-    if folder.permissions != null
+    if folder.permissions != null && length(try(folder.permissions, [])) > 0
   ])
 
   # Filter valid permissions
@@ -176,17 +197,13 @@ locals {
     if perm.team == null || perm.team_in_same_org
   ]
 
-  # Group permissions by folder path
-  folders_with_permissions = distinct([
-    for perm in local.valid_folder_permissions : perm.folder_path
-  ])
-
-  # Create map for resource iteration
+  # Create permission map for ALL folders (not just ones with explicit perms)
+  # This ensures default Viewer/Editor access is removed from every folder
   folder_permissions_map = {
-    for folder_path in local.folders_with_permissions :
+    for folder_path, folder in local.auto_folders_combined :
     folder_path => {
-      folder_uid = local.auto_folders_combined[folder_path].uid
-      folder_org = local.auto_folders_combined[folder_path].org
+      folder_uid = folder.uid
+      folder_org = folder.org
       perms = [
         for perm in local.valid_folder_permissions : perm if perm.folder_path == folder_path
       ]
@@ -199,12 +216,12 @@ resource "grafana_folder_permission" "permissions" {
 
   # Use statically-known values to avoid dependency cycle
   folder_uid = each.value.folder_uid
-  org_id     = try(var.org_ids[each.value.folder_org], null)
+  org_id     = try(var.org_ids[each.value.folder_org], null) != null ? var.org_ids[each.value.folder_org] : try(tonumber(each.value.folder_orgId), null)
 
   dynamic "permissions" {
     for_each = [for p in each.value.perms : p if p.team != null]
     content {
-      team_id    = try(var.team_details[permissions.value.team].team_id, null)
+      team_id    = try(var.team_details["${permissions.value.team}/${each.value.folder_org}"].team_id, null)
       permission = permissions.value.permission
     }
   }

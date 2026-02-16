@@ -4,7 +4,7 @@ resource "grafana_service_account" "service_accounts" {
   name        = each.value.name
   role        = each.value.role
   is_disabled = try(each.value.is_disabled, false)
-  org_id      = try(var.org_ids[each.value.org], null)
+  org_id      = try(var.org_ids[each.value.org], null) != null ? var.org_ids[each.value.org] : try(tonumber(each.value.orgId), null)
 }
 
 # Flatten tokens for creation

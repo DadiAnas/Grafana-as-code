@@ -89,7 +89,23 @@ folders:
   - title: "Folder Name"          # Required: Display name
     uid: "folder-uid"             # Required: Unique identifier
     org: "Organization Name"      # Optional: Parent organization (defaults to Main)
+    permissions:                   # Optional: Access control (see below)
+      - team: "Team Name"         # Grant access to a team
+        permission: "View"        # View, Edit, or Admin
+      - role: "Viewer"            # Grant access to an org role
+        permission: "View"
 ```
+
+### Folder Permissions
+
+By default, **all folders** are managed with zero-default permissions — Grafana's built-in Viewer/Editor access is removed. Only explicitly listed permissions apply. This ensures team-based access control:
+
+- Folders with `permissions: [...]` get only those permissions
+- Folders with `permissions: []` or no permissions key get **no access** (except Org Admins)
+- Permission values: `View`, `Edit`, `Admin`
+- Permission targets: `team` (team name), `role` (Viewer/Editor), `user` (user ID)
+
+> **Note:** Teams referenced in permissions must exist in the same organization as the folder. The team is looked up using a composite key (`team_name/org_name`) to support teams with the same name across different orgs.
 
 ### Example
 
@@ -99,15 +115,24 @@ folders:
   - title: "Infrastructure"
     uid: "infrastructure"
     org: "Main Organization"
-    
+    permissions:
+      - team: "SRE Team"
+        permission: "Edit"
+      - team: "grafana-viewers"
+        permission: "View"
+
   - title: "Applications"
     uid: "applications"
     org: "Main Organization"
+    permissions: []               # No access except Org Admins
     
   # Platform Team folders
   - title: "Kubernetes"
     uid: "platform-kubernetes"
     org: "Platform Team"
+    permissions:
+      - role: "Viewer"
+        permission: "View"
     
   # Application Team folders
   - title: "API Services"
@@ -221,17 +246,47 @@ datasources:
 
 **File**: `config/shared/teams.yaml`
 
-Defines teams for access control.
+Defines teams for access control. Teams use a **composite key** (`name/org`) internally, so the same team name can exist in different organizations.
 
 ```yaml
 teams:
   - name: "Team Name"             # Required: Display name
-    org: "Organization Name"      # Optional: Parent organization
+    org: "Organization Name"      # Optional: Parent organization (default: Main Org.)
     email: "team@example.com"     # Optional: Team email
+    external_groups:              # Optional: IdP groups for team sync
+      - "keycloak-group-name"
     members:                      # Optional: Team members
       - email: "user@example.com"
         role: "Member"            # Member or Admin
 ```
+
+### Team Sync
+
+Team membership can be synchronized from an identity provider (Keycloak, Okta, etc.):
+
+- **Grafana Enterprise/Cloud**: Set `enable_team_sync = true` in tfvars. Uses the `grafana_team_external_group` resource to map `external_groups` automatically.
+- **Grafana OSS**: Run `make team-sync` to sync Keycloak group membership to Grafana teams via API. This is a standalone operation — not run by Terraform.
+
+The `external_groups` field specifies which IdP groups map to each Grafana team. Terraform ignores `members` changes (`lifecycle { ignore_changes = [members] }`) so that team-sync membership is preserved across applies.
+
+> **Note:** For OSS team sync, users must log in via SSO at least once before they can be added to teams. The sync script warns if a user hasn't logged in yet.
+
+### Same Team in Multiple Orgs
+
+Teams are identified by a composite key `name/org`. This allows the same team name in different organizations:
+
+```yaml
+teams:
+  - name: "grafana-viewers"
+    org: "Main Org."
+    external_groups: ["grafana-viewers"]
+
+  - name: "grafana-viewers"
+    org: "Public"
+    external_groups: ["grafana-viewers"]
+```
+
+These create two separate teams, each synced from the same Keycloak group but scoped to their respective orgs.
 
 ### Example
 
@@ -240,6 +295,8 @@ teams:
   - name: "Platform Engineering"
     org: "Platform Team"
     email: "platform@example.com"
+    external_groups:
+      - "grafana-platform-team"
     members:
       - email: "alice@example.com"
         role: "Admin"
@@ -247,7 +304,9 @@ teams:
         role: "Member"
 
   - name: "SRE"
-    org: "Platform Team"
+    org: "Main Org."
+    external_groups:
+      - "grafana-sre"
     members:
       - email: "sre@example.com"
         role: "Admin"

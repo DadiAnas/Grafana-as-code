@@ -96,8 +96,9 @@ module "vault_secrets" {
 module "teams" {
   source = "./modules/teams"
 
-  teams   = local.teams_config
-  org_ids = module.organizations.organization_ids
+  teams            = local.teams_config
+  org_ids          = module.organizations.organization_ids
+  enable_team_sync = var.enable_team_sync
 
   depends_on = [module.organizations]
 }
@@ -127,10 +128,11 @@ module "datasources" {
 module "dashboards" {
   source = "./modules/dashboards"
 
-  dashboards_path = "${path.module}/dashboards"
-  environment     = var.environment
-  folder_ids      = module.folders.folder_ids
-  folder_org_ids  = module.folders.folder_org_ids
+  dashboards_path    = "${path.module}/dashboards"
+  environment        = var.environment
+  folder_ids         = module.folders.folder_ids
+  folder_org_ids     = module.folders.folder_org_ids
+  exclude_folders    = var.exclude_dashboard_folders
 
   depends_on = [module.folders, module.datasources]
 }

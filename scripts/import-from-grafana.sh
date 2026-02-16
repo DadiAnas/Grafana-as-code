@@ -84,7 +84,7 @@ CURRENT_ORG_ID=""
 # =========================================================================
 grafana_api() {
     local endpoint="$1"
-    local opts=("-sf")
+    local opts=("-sf" "--connect-timeout" "5" "--max-time" "15")
 
     # Add Auth
     if [[ "$AUTH" == *":"* ]]; then
@@ -199,22 +199,57 @@ TOTAL_DS=0
 
         if [ "$DS_COUNT" -gt 0 ]; then
             echo "$DS_JSON" | python3 -c "
-import json, sys, re
+import json, sys, re, copy
+
+try:
+    import yaml
+    HAS_YAML = True
+except ImportError:
+    HAS_YAML = False
+
 org_name = '$ORG_NAME'
+org_id = $ORG_ID
 datasources = json.load(sys.stdin)
+
+def simple_yaml_val(k, v, indent=6):
+    prefix = ' ' * indent
+    if isinstance(v, bool):
+        print(f'{prefix}{k}: {str(v).lower()}')
+    elif isinstance(v, (int, float)):
+        print(f'{prefix}{k}: {v}')
+    elif isinstance(v, dict):
+        print(f'{prefix}{k}:')
+        for dk, dv in v.items():
+            simple_yaml_val(dk, dv, indent + 2)
+    elif isinstance(v, list):
+        print(f'{prefix}{k}:')
+        sub = ' ' * (indent + 2)
+        for item in v:
+            if isinstance(item, dict):
+                first = True
+                for dk, dv in item.items():
+                    if first:
+                        print(f'{sub}- {dk}: {json.dumps(dv) if not isinstance(dv, str) else dv}')
+                        first = False
+                    else:
+                        simple_yaml_val(dk, dv, indent + 4)
+            else:
+                print(f'{sub}- {json.dumps(item) if not isinstance(item, str) else item}')
+    elif v is None:
+        print(f'{prefix}{k}: null')
+    else:
+        s = str(v)
+        print(f'{prefix}{k}: \"{s}\"')
+
 for ds in datasources:
-    print(f'  - name: \"{ds[\"name\"]}\"')
-    print(f'    uid: \"{ds.get(\"uid\", ds[\"name\"].lower().replace(\" \", \"-\"))}\"')
-    print(f'    type: \"{ds[\"type\"]}\"')
-    print(f'    url: \"{ds.get(\"url\", \"\")}\"')
-    print(f'    org: \"{org_name}\"')
-    print(f'    access: \"{ds.get(\"access\", \"proxy\")}\"')
-    print(f'    is_default: {str(ds.get(\"isDefault\", False)).lower()}')
-    json_data = ds.get('jsonData', {})
-    # Extract httpHeaderName*/httpHeaderValue* into http_headers
+    ds_type = ds['type']
+    json_data = copy.deepcopy(ds.get('jsonData', {}))
+    secure_fields = ds.get('secureJsonFields', {})
+
+    # ---- Extract httpHeaderName*/httpHeaderValue* into http_headers ----
     http_headers = {}
     header_keys_to_remove = []
-    for k, v in json_data.items():
+    for k, v in list(json_data.items()):
         m = re.match(r'^httpHeaderName(\d+)$', k)
         if m:
             idx = m.group(1)
@@ -228,19 +263,60 @@ for ds in datasources:
                 http_headers[header_name] = ''
         elif re.match(r'^httpHeaderValue\d+$', k):
             header_keys_to_remove.append(k)
-    # Remove header keys from json_data
     for hk in set(header_keys_to_remove):
         json_data.pop(hk, None)
+
+    # ---- Core fields ----
+    print(f'  - name: \"{ds[\"name\"]}\"')
+    print(f'    uid: \"{ds.get(\"uid\", ds[\"name\"].lower().replace(\" \", \"-\"))}\"')
+    print(f'    type: \"{ds_type}\"')
+    print(f'    url: \"{ds.get(\"url\", \"\")}\"')
+    print(f'    org: \"{org_name}\"')
+    print(f'    orgId: {org_id}')
+    print(f'    access: \"{ds.get(\"access\", \"proxy\")}\"')
+    print(f'    is_default: {str(ds.get(\"isDefault\", False)).lower()}')
+
+    # ---- Basic auth ----
+    if ds.get('basicAuth'):
+        print(f'    basic_auth_enabled: true')
+        if ds.get('basicAuthUser'):
+            print(f'    basic_auth_username: \"{ds[\"basicAuthUser\"]}\"')
+
+    # ---- Database / username (postgres, mysql, etc.) ----
+    if ds.get('database'):
+        print(f'    database_name: \"{ds[\"database\"]}\"')
+    if ds.get('user'):
+        print(f'    username: \"{ds[\"user\"]}\"')
+
+    # ---- json_data: type-aware extraction ----
+    # For these types, we pull well-known keys out as first-class YAML
+    # and also keep the full json_data for anything else.
+
     if json_data:
-        print(f'    json_data:')
-        for k, v in json_data.items():
-            if isinstance(v, bool): print(f'      {k}: {str(v).lower()}')
-            elif isinstance(v, (int, float)): print(f'      {k}: {v}')
-            else: print(f'      {k}: \"{v}\"')
+        if HAS_YAML:
+            # Use PyYAML for proper nested structure output
+            rendered = yaml.dump({'json_data': json_data}, default_flow_style=False, sort_keys=False).rstrip()
+            for line in rendered.split('\n'):
+                print(f'    {line}')
+        else:
+            print(f'    json_data:')
+            for k, v in json_data.items():
+                simple_yaml_val(k, v, 6)
+
+    # ---- http_headers ----
     if http_headers:
         print(f'    http_headers:')
         for hname, hval in http_headers.items():
             print(f'      \"{hname}\": \"{hval}\"')
+
+    # ---- secure_json_data placeholder for fields the API masks ----
+    if secure_fields:
+        print(f'    # NOTE: secure fields detected (values hidden by Grafana API)')
+        print(f'    # Configure via Vault (use_vault: true) or set manually:')
+        print(f'    # secure_json_data:')
+        for sk in secure_fields:
+            print(f'    #   {sk}: \"\"')
+
     print()
 " 2>/dev/null
             TOTAL_DS=$((TOTAL_DS + DS_COUNT))
@@ -276,17 +352,76 @@ TOTAL_FOLDERS=0
 
         if [ "$FOLDER_COUNT" -gt 0 ]; then
             echo "$FOLDERS_JSON" | python3 -c "
-import json, sys
+import json, sys, subprocess, os
+
 org_name = '$ORG_NAME'
+org_id = $ORG_ID
+grafana_url = os.environ.get('GRAFANA_URL', '${GRAFANA_URL}')
+auth = os.environ.get('AUTH', '${AUTH}')
 folders = json.load(sys.stdin)
+
+# Build team id->name map for this org
+try:
+    result = subprocess.run(
+        ['curl', '-sf', '-u', auth, '-H', f'X-Grafana-Org-Id: {org_id}',
+         f'{grafana_url}/api/teams/search?perpage=1000'],
+        capture_output=True, text=True, timeout=10)
+    teams_data = json.loads(result.stdout) if result.returncode == 0 else {}
+    team_map = {t['id']: t['name'] for t in teams_data.get('teams', [])}
+except Exception:
+    team_map = {}
+
+# Build user id->login map for this org
+try:
+    result = subprocess.run(
+        ['curl', '-sf', '-u', auth, '-H', f'X-Grafana-Org-Id: {org_id}',
+         f'{grafana_url}/api/org/users?perpage=1000'],
+        capture_output=True, text=True, timeout=10)
+    users_data = json.loads(result.stdout) if result.returncode == 0 else []
+    user_map = {u['userId']: u['login'] for u in users_data}
+except Exception:
+    user_map = {}
+
 for f in folders:
     print(f'  - title: \"{f[\"title\"]}\"')
     print(f'    uid: \"{f[\"uid\"]}\"')
     print(f'    org: \"{org_name}\"')
+    print(f'    orgId: {org_id}')
     parent = f.get('parentUid', '')
     if parent:
         print(f'    parent_uid: \"{parent}\"')
-    print(f'    permissions: []')
+
+    # Fetch folder permissions
+    try:
+        result = subprocess.run(
+            ['curl', '-sf', '-u', auth, '-H', f'X-Grafana-Org-Id: {org_id}',
+             f'{grafana_url}/api/folders/{f[\"uid\"]}/permissions'],
+            capture_output=True, text=True, timeout=10)
+        perms = json.loads(result.stdout) if result.returncode == 0 else []
+    except Exception:
+        perms = []
+
+    # Filter to non-inherited, non-zero permissions
+    explicit_perms = [p for p in perms if not p.get('inherited', False) and p.get('permission', 0) > 0]
+
+    if not explicit_perms:
+        print(f'    permissions: []')
+    else:
+        perm_names = {1: 'View', 2: 'Edit', 4: 'Admin'}
+        print(f'    permissions:')
+        for p in explicit_perms:
+            perm_str = perm_names.get(p['permission'], str(p['permission']))
+            if p.get('teamId', 0) > 0:
+                team_name = team_map.get(p['teamId'], f'team-{p[\"teamId\"]}')
+                print(f'      - team: \"{team_name}\"')
+                print(f'        permission: \"{perm_str}\"')
+            elif p.get('userId', 0) > 0:
+                user_login = user_map.get(p['userId'], f'user-{p[\"userId\"]}')
+                print(f'      - user: \"{user_login}\"')
+                print(f'        permission: \"{perm_str}\"')
+            elif p.get('role', ''):
+                print(f'      - role: \"{p[\"role\"]}\"')
+                print(f'        permission: \"{perm_str}\"')
     print()
 " 2>/dev/null
             TOTAL_FOLDERS=$((TOTAL_FOLDERS + FOLDER_COUNT))
@@ -309,7 +444,7 @@ for f in json.load(sys.stdin):
 " 2>/dev/null | while read -r fuid; do
         [ -z "$fuid" ] && continue
         mkdir -p "${DASH_BASE}/${ORG_NAME}/${fuid}"
-        [ ! -f "${DASH_BASE}/${ORG_NAME}/${fuid}/.gitkeep" ] && touch "${DASH_BASE}/${ORG_NAME}/${fuid}/.gitkeep"
+        [ ! -f "${DASH_BASE}/${ORG_NAME}/${fuid}/.gitkeep" ] && touch "${DASH_BASE}/${ORG_NAME}/${fuid}/.gitkeep" || true
     done
 done
 export CURRENT_ORG_ID=""
@@ -348,16 +483,67 @@ if isinstance(teams, list):
         TEAM_COUNT=$(echo "$TEAM_LIST" | grep -c '.' 2>/dev/null || true)
 
         if [ "$TEAM_COUNT" -gt 0 ] && [ -n "$TEAM_LIST" ]; then
-            echo "$TEAMS_JSON" | python3 -c "
+            # Try to fetch external group mappings per team (Enterprise/Cloud only)
+            # Build a JSON map of team_id -> [group_names]
+            TEAM_GROUPS_MAP="{}"
+            # Get team IDs from the JSON
+            TEAM_IDS_LIST=$(echo "$TEAMS_JSON" | python3 -c "
 import json, sys
-org_name = '$ORG_NAME'
 data = json.load(sys.stdin)
+teams = data.get('teams', data) if isinstance(data, dict) else data
+if isinstance(teams, list):
+    for t in teams: print(t.get('id',''))
+" 2>/dev/null || true)
+
+            if [ -n "$TEAM_IDS_LIST" ]; then
+                TEAM_GROUPS_MAP=$(
+                    echo "{"
+                    FIRST=true
+                    while IFS= read -r TID; do
+                        [ -z "$TID" ] && continue
+                        GROUPS_RESP=$(grafana_api "/api/teams/$TID/groups" 2>/dev/null || echo "")
+                        # Parse response — if it's a JSON array of objects with groupId field
+                        GROUPS_LIST=$(echo "$GROUPS_RESP" | python3 -c "
+import json, sys
+try:
+    data = json.load(sys.stdin)
+    if isinstance(data, list):
+        groups = [g.get('groupId', '') for g in data if g.get('groupId')]
+        if groups:
+            print(json.dumps(groups))
+except: pass
+" 2>/dev/null || true)
+                        if [ -n "$GROUPS_LIST" ]; then
+                            if [ "$FIRST" = true ]; then FIRST=false; else echo ","; fi
+                            echo "\"$TID\": $GROUPS_LIST"
+                        fi
+                    done <<< "$TEAM_IDS_LIST"
+                    echo "}"
+                )
+            fi
+
+            echo "$TEAMS_JSON" | TEAM_GROUPS="$TEAM_GROUPS_MAP" python3 -c "
+import json, sys, os
+org_name = '$ORG_NAME'
+org_id = $ORG_ID
+data = json.load(sys.stdin)
+try:
+    team_groups = json.loads(os.environ.get('TEAM_GROUPS', '{}'))
+except:
+    team_groups = {}
 teams = data.get('teams', data) if isinstance(data, dict) else data
 if isinstance(teams, list):
     for t in teams:
         print(f'  - name: \"{t[\"name\"]}\"')
         if t.get('email'): print(f'    email: \"{t[\"email\"]}\"')
         print(f'    org: \"{org_name}\"')
+        print(f'    orgId: {org_id}')
+        # External group sync (Enterprise/Cloud)
+        ext_groups = team_groups.get(str(t.get('id', '')), [])
+        if ext_groups:
+            print(f'    external_groups:')
+            for g in ext_groups:
+                print(f'      - \"{g}\"')
         print(f'    members: []')
         print()
 " 2>/dev/null
@@ -401,12 +587,14 @@ print(len(sas))
             echo "$SA_JSON" | python3 -c "
 import json, sys
 org_name = '$ORG_NAME'
+org_id = $ORG_ID
 data = json.load(sys.stdin)
 for sa in data.get('serviceAccounts', []):
     print(f'  - name: \"{sa[\"name\"]}\"')
     print(f'    role: \"{sa.get(\"role\", \"Viewer\")}\"')
     print(f'    is_disabled: {str(sa.get(\"isDisabled\", False)).lower()}')
     print(f'    org: \"{org_name}\"')
+    print(f'    orgId: {org_id}')
     print()
 " 2>/dev/null
             TOTAL_SA=$((TOTAL_SA + SA_COUNT))
@@ -465,7 +653,7 @@ for cp in cps:
     grouped[name]['receivers'].append(recv)
 
 for name, cp in grouped.items():
-    entry = {'name': name, 'org': org_name, 'receivers': cp['receivers']}
+    entry = {'name': name, 'org': org_name, 'orgId': int('$ORG_ID'), 'receivers': cp['receivers']}
     if HAS_YAML:
         lines = yaml.dump([entry], default_flow_style=False, sort_keys=False).rstrip()
         # indent to match contactPoints array
@@ -474,6 +662,7 @@ for name, cp in grouped.items():
     else:
         print(f'  - name: \"{name}\"')
         print(f'    org: \"{org_name}\"')
+        print(f'    orgId: $ORG_ID')
         print(f'    receivers:')
         for r in cp['receivers']:
             print(f'      - type: \"{r[\"type\"]}\"')
@@ -542,6 +731,7 @@ for rule in rules:
             'name': group_name,
             'folder': folder,
             'org': org_name,
+            'orgId': int('$ORG_ID'),
             'interval': '1m',
             'rules': []
         }
@@ -574,12 +764,155 @@ if [ "$TOTAL_AR" -gt 0 ]; then
     IMPORTED_COUNT=$((IMPORTED_COUNT + 1))
 fi
 
-# Placeholder for notification policies
-cat > "${CONFIG_DIR}/alerting/notification_policies.yaml" << EOF
-# Imported from ${GRAFANA_URL} on $(date -Iseconds)
-# NOTE: Notification policies need manual configuration.
-policies: []
-EOF
+# -------------------------------------------------------------------------
+# Notification Policies (all orgs)
+# -------------------------------------------------------------------------
+
+TOTAL_NP=0
+{
+    echo "# Imported from ${GRAFANA_URL} on $(date -Iseconds)"
+    echo "#"
+    echo "# Notification Policies define how alerts are routed to contact points."
+    echo "# Format follows Grafana's provisioning API structure."
+    echo ""
+    echo "policies:"
+
+    for ORG_ID in "${ORG_IDS[@]}"; do
+        export CURRENT_ORG_ID="$ORG_ID"
+        ORG_NAME="${ORG_NAME_MAP[$ORG_ID]:-Org $ORG_ID}"
+
+        NP_JSON=$(grafana_api "/api/v1/provisioning/policies" || echo "{}")
+
+        # Check if we got a valid policy tree (must have a receiver)
+        HAS_RECEIVER=$(echo "$NP_JSON" | python3 -c "
+import json, sys
+try:
+    data = json.load(sys.stdin)
+    print('yes' if data.get('receiver') else 'no')
+except:
+    print('no')
+" 2>/dev/null || echo "no")
+
+        if [ "$HAS_RECEIVER" = "yes" ]; then
+            echo "$NP_JSON" | python3 -c "
+import json, sys
+
+org_id = $ORG_ID
+org_name = '$ORG_NAME'
+
+def emit_route(route, indent):
+    \"\"\"Recursively emit a route (child policy) as YAML.\"\"\"
+    prefix = '  ' * indent
+
+    receiver = route.get('receiver')
+    if receiver:
+        print(f'{prefix}- receiver: {receiver}')
+    else:
+        print(f'{prefix}- receiver: null')
+
+    group_by = route.get('group_by')
+    if group_by:
+        print(f'{prefix}  group_by:')
+        for g in group_by:
+            print(f'{prefix}    - {g}')
+
+    matchers = route.get('object_matchers', [])
+    if matchers:
+        print(f'{prefix}  object_matchers:')
+        for m in matchers:
+            # Each matcher is [label, operator, value]
+            if isinstance(m, list) and len(m) == 3:
+                print(f'{prefix}    - - {m[0]}')
+                print(f'{prefix}      - \"{m[1]}\"')
+                print(f'{prefix}      - {m[2]}')
+
+    cont = route.get('continue')
+    if cont is not None:
+        print(f'{prefix}  continue: {str(cont).lower()}')
+
+    gw = route.get('group_wait')
+    if gw:
+        print(f'{prefix}  group_wait: {gw}')
+
+    gi = route.get('group_interval')
+    if gi:
+        print(f'{prefix}  group_interval: {gi}')
+
+    ri = route.get('repeat_interval')
+    if ri:
+        print(f'{prefix}  repeat_interval: {ri}')
+
+    # mute_time_intervals from API → mute_timings in YAML (what Terraform expects)
+    mute = route.get('mute_time_intervals', [])
+    if mute:
+        print(f'{prefix}  mute_timings:')
+        for mt in mute:
+            print(f'{prefix}    - {mt}')
+
+    # Nested routes (recursive)
+    child_routes = route.get('routes', [])
+    if child_routes:
+        print(f'{prefix}  routes:')
+        for child in child_routes:
+            emit_route(child, indent + 2)
+
+
+try:
+    data = json.load(sys.stdin)
+except:
+    sys.exit(0)
+
+# Root-level policy
+print(f'  - orgId: {org_id}')
+print(f'    org: \"{org_name}\"')
+print(f'    receiver: {data.get(\"receiver\", \"grafana-default-email\")}')
+
+group_by = data.get('group_by')
+if group_by:
+    print(f'    group_by:')
+    for g in group_by:
+        print(f'      - {g}')
+
+gw = data.get('group_wait')
+if gw:
+    print(f'    group_wait: {gw}')
+
+gi = data.get('group_interval')
+if gi:
+    print(f'    group_interval: {gi}')
+
+ri = data.get('repeat_interval')
+if ri:
+    print(f'    repeat_interval: {ri}')
+
+# Root-level mute_time_intervals → mute_timings
+mute = data.get('mute_time_intervals', [])
+if mute:
+    print(f'    mute_timings:')
+    for mt in mute:
+        print(f'      - {mt}')
+
+# Child routes
+routes = data.get('routes', [])
+if routes:
+    print(f'    routes:')
+    for route in routes:
+        emit_route(route, 3)
+
+print()
+" 2>/dev/null
+            TOTAL_NP=$((TOTAL_NP + 1))
+        fi
+    done
+} > "${CONFIG_DIR}/alerting/notification_policies.yaml"
+export CURRENT_ORG_ID=""
+
+if [ "$TOTAL_NP" -gt 0 ]; then
+    echo -e "  ${GREEN}✓${NC} ${TOTAL_NP} notification policy tree(s) across ${#ORG_IDS[@]} org(s)"
+    IMPORTED_COUNT=$((IMPORTED_COUNT + 1))
+else
+    echo -e "  ${DIM}  No notification policies found${NC}"
+fi
 
 # =========================================================================
 # 7. Dashboards (all orgs)
@@ -720,10 +1053,16 @@ else:
     if org_mapping_str:
         print('  # Group-to-org role mappings')
         print('  # Generated from Grafana org_mapping config')
+        print('  # Use org: \"*\" to apply a role to all organizations')
         print('  groups:')
-        # org_mapping format: group_name:org_id:role (newline separated)
+        # org_mapping format: group_name:org_id_or_*:role (newline separated)
         mappings = [m.strip() for m in org_mapping_str.strip().replace('\\n', '\n').split('\n') if m.strip()]
+
+        # Collect all known org IDs from the org_map
+        all_org_ids = set(org_map.keys())
+
         groups = {}
+        group_order = []
         for m in mappings:
             parts = m.split(':')
             if len(parts) >= 3:
@@ -732,14 +1071,38 @@ else:
                 role = parts[2]
                 if group_name not in groups:
                     groups[group_name] = []
-                # Resolve org_id to org_name
-                org_name = org_map.get(org_id, org_id)
-                groups[group_name].append({'org': org_name, 'role': role})
+                    group_order.append(group_name)
+                if org_id == '*':
+                    # Wildcard already in source — preserve it
+                    groups[group_name].append({'org': '*', 'role': role})
+                else:
+                    org_name = org_map.get(org_id, org_id)
+                    groups[group_name].append({'org': org_name, 'role': role, '_org_id': org_id})
 
-        for group_name, org_mappings in groups.items():
+        # Collapse: if a group maps to ALL orgs with the same role, use org: \"*\"
+        for group_name in group_order:
+            mappings_list = groups[group_name]
+            # Skip if already contains a wildcard
+            if any(m['org'] == '*' for m in mappings_list):
+                continue
+            # Check by role: count how many orgs share the same role
+            role_counts = {}
+            for m in mappings_list:
+                role_counts.setdefault(m['role'], []).append(m)
+            # If one role covers ALL known orgs, collapse to *
+            for role, role_mappings in role_counts.items():
+                covered_ids = {m['_org_id'] for m in role_mappings}
+                if len(all_org_ids) > 1 and covered_ids >= all_org_ids:
+                    # This role covers all orgs — collapse to *
+                    remaining = [m for m in mappings_list if m['role'] != role]
+                    remaining.insert(0, {'org': '*', 'role': role})
+                    groups[group_name] = remaining
+                    break
+
+        for group_name in group_order:
             print(f'    - name: \"{group_name}\"')
             print(f'      org_mappings:')
-            for om in org_mappings:
+            for om in groups[group_name]:
                 print(f'        - org: \"{om[\"org\"]}\"')
                 print(f'          role: \"{om[\"role\"]}\"')
     print()
@@ -783,6 +1146,17 @@ keycloak:
   client_id: "grafana"
   root_url: "${GRAFANA_URL}"
 EOFKC
+
+# Clean up any orphaned Keycloak resources from Terraform state
+# (keycloak.yaml defaults to enabled: false, so state entries would cause errors)
+KC_STATE=$(terraform state list 2>/dev/null | grep '^module\.keycloak\.' || true)
+if [ -n "$KC_STATE" ]; then
+    echo -e "  ${YELLOW}Removing orphaned Keycloak resources from Terraform state...${NC}"
+    echo "$KC_STATE" | while IFS= read -r resource; do
+        terraform state rm "$resource" >/dev/null 2>&1 || true
+    done
+    echo -e "  ${GREEN}✓${NC} Cleaned $(echo "$KC_STATE" | wc -l) Keycloak state entries"
+fi
 
 # =========================================================================
 # Generate tfvars file

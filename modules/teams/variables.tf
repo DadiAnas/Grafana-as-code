@@ -8,3 +8,9 @@ variable "org_ids" {
   type        = map(number)
   default     = {}
 }
+
+variable "enable_team_sync" {
+  description = "Enable team external group sync (requires Grafana Enterprise or Cloud)"
+  type        = bool
+  default     = false
+}

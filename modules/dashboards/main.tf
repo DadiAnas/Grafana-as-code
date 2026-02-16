@@ -46,7 +46,11 @@ locals {
   }
 
   # Merge: environment-specific dashboards override shared ones
-  dashboards = merge(local.shared_dashboards, local.env_dashboards)
+  dashboards = {
+    for key, dash in merge(local.shared_dashboards, local.env_dashboards) :
+    key => dash
+    if !contains(var.exclude_folders, dash.folder_uid)
+  }
 }
 
 resource "grafana_dashboard" "dashboards" {

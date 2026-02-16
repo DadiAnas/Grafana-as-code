@@ -77,3 +77,19 @@ variable "keycloak_client_id" {
   type        = string
   default     = "admin-cli"
 }
+
+# =============================================================================
+# GRAFANA EDITION
+# =============================================================================
+
+variable "enable_team_sync" {
+  description = "Enable team external group sync — requires Grafana Enterprise or Cloud. Set to true when targeting an Enterprise/Cloud instance."
+  type        = bool
+  default     = false
+}
+
+variable "exclude_dashboard_folders" {
+  description = "List of folder paths (org/folder) to exclude from dashboard management. Dashboards in these folders will be ignored by Terraform. Example: [\"Main Org./General\", \"Public/Sandbox\"]"
+  type        = list(string)
+  default     = []
+}

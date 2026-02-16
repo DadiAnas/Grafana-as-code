@@ -18,3 +18,9 @@ variable "folder_org_ids" {
   type        = map(number)
   default     = {}
 }
+
+variable "exclude_folders" {
+  description = "List of folder paths (org/folder) to exclude from dashboard management. Dashboards in these folders will be ignored by Terraform."
+  type        = list(string)
+  default     = []
+}

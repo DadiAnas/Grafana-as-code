@@ -368,6 +368,54 @@ echo '{"groups": ["platform-team", "grafana-users"]}' | \
 4. **Audit Logs**: Enable Keycloak event logging
 5. **Session Timeout**: Configure appropriate session timeouts
 
+## Team Sync (Keycloak → Grafana)
+
+After SSO maps users to organizations, team sync maps Keycloak group membership to Grafana teams.
+
+### Grafana OSS
+
+Run the standalone sync script:
+
+```bash
+make team-sync
+```
+
+The script reads `external_groups` from `teams.yaml`, queries Keycloak for group members, and adds matching Grafana users to the corresponding teams via the Grafana API. It is **one-way** (Keycloak is the source of truth) and does not auto-add users to organizations — they must log in via SSO first.
+
+### Grafana Enterprise / Cloud
+
+Set `enable_team_sync = true` in your tfvars:
+
+```hcl
+enable_team_sync = true
+```
+
+This enables the `grafana_team_external_group` Terraform resource, which natively maps `external_groups` to Grafana teams without a separate script.
+
+### Configuration
+
+Define `external_groups` on each team in `teams.yaml`:
+
+```yaml
+teams:
+  - name: "Backend Team"
+    org: "Main Org."
+    external_groups:
+      - "grafana-developers"
+
+  - name: "grafana-viewers"
+    org: "Main Org."
+    external_groups:
+      - "grafana-viewers"
+
+  - name: "grafana-viewers"
+    org: "Public"
+    external_groups:
+      - "grafana-viewers"
+```
+
+> **Note:** The same team name can exist in multiple organizations. Each is synced independently.
+
 ## Additional Resources
 
 - [Grafana OAuth Documentation](https://grafana.com/docs/grafana/latest/setup-grafana/configure-security/configure-authentication/generic-oauth/)

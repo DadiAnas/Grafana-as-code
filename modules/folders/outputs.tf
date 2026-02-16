@@ -14,11 +14,11 @@ output "folder_org_ids" {
 }
 
 output "folder_permissions_count" {
-  description = "Number of folders with explicit permission overrides"
-  value       = length(local.folders_with_permissions)
+  description = "Number of folders with permission overrides (all folders — defaults are removed)"
+  value       = length(local.folder_permissions_map)
 }
 
 output "folders_with_permissions" {
-  description = "List of folder paths that have explicit permissions configured"
-  value       = local.folders_with_permissions
+  description = "List of folder paths that have permissions managed (all folders)"
+  value       = keys(local.folder_permissions_map)
 }

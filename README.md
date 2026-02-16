@@ -13,11 +13,15 @@ Manage your **existing Grafana instance** entirely as code using Terraform. Defi
 
 - **Multi-Environment**: Separate configs per environment (dev, staging, production, etc.)
 - **Multi-Organization**: Manage multiple Grafana orgs with role-based access
-- **Nested Folders**: Auto-discovered from directory structure with optional permissions
+- **Nested Folders**: Auto-discovered from directory structure with team-based permissions
+- **Zero-Default Permissions**: Folders have no built-in access — only explicitly listed team/role permissions apply
 - **Dashboard as Code**: Version-controlled JSON dashboards organized by folder
+- **Dashboard Exclusions**: Exclude specific folders from Terraform management
 - **Full Alerting**: Alert rules, 20+ contact point types, notification policies, mute timings
 - **Dynamic Datasources**: All datasource types with Vault-managed credentials
 - **SSO Integration**: OAuth2/OIDC (Keycloak, Okta, Azure AD, etc.)
+- **Team Sync**: Keycloak → Grafana team membership sync (OSS via script, Enterprise via native resource)
+- **Multi-Org Teams**: Same team name in different organizations via composite keys
 - **Secrets Management**: HashiCorp Vault for all sensitive credentials
 - **CI/CD Ready**: GitHub Actions + GitLab CI pipelines included
 - **Local Dev Environment**: Docker Compose with Grafana + Vault + Keycloak
@@ -336,6 +340,9 @@ make plan  ENV=staging                         # Preview changes
 make apply ENV=staging                         # Deploy
 make destroy ENV=staging                       # Tear down (with confirmation)
 
+# ─── Team Sync (Keycloak → Grafana, OSS only) ───
+make team-sync                                 # Sync team membership from Keycloak
+
 # ─── Vault ───
 make vault-setup  ENV=staging                  # Create Vault secrets
 make vault-verify ENV=staging                  # Check secrets exist
@@ -388,6 +395,30 @@ The `.gitlab-ci.yml` pipeline uses reusable templates:
 GitLab HTTP backend authentication uses `CI_JOB_TOKEN` automatically.
 
 ## 🔍 Operations
+
+### Access Management
+
+Access is managed through three layers, each with a different owner:
+
+| Layer | Managed By | What It Controls |
+|-------|-----------|-----------------|
+| **SSO** | Keycloak (via `sso.yaml`) | Org membership & role (who can log in to which org) |
+| **Team Sync** | `make team-sync` or Enterprise native | Team membership (which users are in which teams) |
+| **Folder Permissions** | Terraform (via `folders.yaml`) | Folder access (which teams/roles can see or edit each folder) |
+
+**Key behaviors:**
+- Terraform uses `lifecycle { ignore_changes }` for org members and team members, so SSO and team-sync changes are preserved across `terraform apply`.
+- Folder permissions use **zero defaults** — Grafana's built-in Viewer/Editor access is removed. Only explicitly listed permissions (team, role, or user) apply.
+- Users must log in via SSO at least once before team-sync can add them to teams.
+
+### Dashboard Folder Exclusions
+
+Exclude specific folders from Terraform management using the `exclude_dashboard_folders` variable. Dashboards in excluded folders won't be created, updated, or destroyed by Terraform:
+
+```hcl
+# In your .tfvars file
+exclude_dashboard_folders = ["Main Org./General", "Public/Sandbox"]
+```
 
 ### Import from Existing Grafana
 

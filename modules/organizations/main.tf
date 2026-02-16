@@ -9,6 +9,12 @@ resource "grafana_organization" "orgs" {
   admins  = try(each.value.admins, [])
   editors = try(each.value.editors, [])
   viewers = try(each.value.viewers, [])
+
+  # Org membership is managed by SSO group mappings at login time.
+  # Ignore member lists so terraform apply doesn't revert SSO-assigned users.
+  lifecycle {
+    ignore_changes = [admins, editors, viewers]
+  }
 }
 
 # Output for the default org
