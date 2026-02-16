@@ -20,7 +20,7 @@ terraform {
 # Vault provider for secrets management
 provider "vault" {
   address   = var.vault_address
-  token     = var.vault_token
+  token     = var.vault_token != "" ? var.vault_token : null
   namespace = var.vault_namespace != "" ? var.vault_namespace : null
   # Or use other auth methods like approle, kubernetes, etc.
 }
