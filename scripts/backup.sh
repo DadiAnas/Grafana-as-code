@@ -137,5 +137,5 @@ echo "  Files:"
 ls -1 "$BACKUP_DIR" | sed 's/^/    /'
 echo ""
 echo "  To restore, use the Grafana API or re-import:"
-echo "    bash scripts/import-from-grafana.sh ${ENV}-restored --grafana-url=${GRAFANA_URL} --auth=\$AUTH"
+echo "    python3 scripts/import_from_grafana.py ${ENV}-restored --grafana-url=${GRAFANA_URL} --auth=\$AUTH"
 echo ""
