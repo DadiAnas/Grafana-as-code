@@ -1,0 +1,223 @@
+{
+  "description": "Service Level Objectives overview dashboard",
+  "panels": [
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "max": 1,
+          "min": 0.99,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": 0
+              },
+              {
+                "color": "yellow",
+                "value": 0.999
+              },
+              {
+                "color": "green",
+                "value": 0.9995
+              }
+            ]
+          },
+          "unit": "percentunit"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "targets": [
+        {
+          "expr": "1 - (sum(increase(http_requests_total{service=\"$service\", status=~\"5..\"}[7d])) / sum(increase(http_requests_total{service=\"$service\"}[7d])))",
+          "refId": "A"
+        }
+      ],
+      "title": "Availability SLO (99.9%)",
+      "type": "gauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "max": 1,
+          "min": 0.95,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": 0
+              },
+              {
+                "color": "yellow",
+                "value": 0.99
+              },
+              {
+                "color": "green",
+                "value": 0.995
+              }
+            ]
+          },
+          "unit": "percentunit"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 0
+      },
+      "id": 2,
+      "targets": [
+        {
+          "expr": "sum(increase(http_request_duration_seconds_bucket{service=\"$service\", le=\"0.5\"}[7d])) / sum(increase(http_request_duration_seconds_count{service=\"$service\"}[7d]))",
+          "refId": "A"
+        }
+      ],
+      "title": "Latency SLO (P99 < 500ms)",
+      "type": "gauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": -0.001
+              },
+              {
+                "color": "yellow",
+                "value": 0
+              },
+              {
+                "color": "green",
+                "value": 0.0005
+              }
+            ]
+          },
+          "unit": "percentunit"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 0
+      },
+      "id": 3,
+      "targets": [
+        {
+          "expr": "(1 - 0.999) - (sum(increase(http_requests_total{service=\"$service\", status=~\"5..\"}[30d])) / sum(increase(http_requests_total{service=\"$service\"}[30d])))",
+          "refId": "A"
+        }
+      ],
+      "title": "Error Budget Remaining",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 14.4
+              }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 8
+      },
+      "id": 4,
+      "targets": [
+        {
+          "expr": "(sum(rate(http_requests_total{service=\"$service\", status=~\"5..\"}[1h])) / sum(rate(http_requests_total{service=\"$service\"}[1h]))) / (1 - 0.999)",
+          "legendFormat": "1h burn rate",
+          "refId": "A"
+        },
+        {
+          "expr": "(sum(rate(http_requests_total{service=\"$service\", status=~\"5..\"}[6h])) / sum(rate(http_requests_total{service=\"$service\"}[6h]))) / (1 - 0.999)",
+          "legendFormat": "6h burn rate",
+          "refId": "B"
+        }
+      ],
+      "title": "Error Budget Burn Rate",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "1m",
+  "schemaVersion": 38,
+  "tags": [
+    "slo",
+    "sli",
+    "reliability"
+  ],
+  "templating": {
+    "list": [
+      {
+        "current": {},
+        "name": "datasource",
+        "query": "prometheus",
+        "type": "datasource"
+      },
+      {
+        "current": {},
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "includeAll": false,
+        "multi": false,
+        "name": "service",
+        "query": "label_values(http_requests_total, service)",
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
+  "timezone": "browser",
+  "title": "SLO Overview",
+  "uid": "slo-overview"
+}

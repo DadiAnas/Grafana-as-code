@@ -1,0 +1,85 @@
+# Imported from Grafana SSO settings
+#
+# This file follows the project format expected by modules/sso.
+# Client secret is stored in Vault — see vault-setup.
+
+sso:
+  enabled: true
+  name: "Keycloak NPR"
+
+  # OAuth2 endpoints
+  auth_url: "https://auth.dev.com/realms/grafana-realm/protocol/openid-connect/auth"
+  token_url: "https://auth.dev.com/realms/grafana-realm/protocol/openid-connect/token"
+  api_url: "https://auth.dev.com/realms/grafana-realm/protocol/openid-connect/userinfo"
+
+  # Client configuration (client_secret stored in Vault)
+  client_id: "grafana"
+
+  # OAuth settings
+  allow_sign_up: true
+  auto_login: false
+  scopes: "openid profile email groups"
+  use_pkce: true
+  use_refresh_token: true
+
+  role_attribute_strict: false
+  skip_org_role_sync: false
+
+  groups_attribute_path: "groups[*]"
+
+  allowed_groups: "grafana-admins,grafana-platform-team,grafana-app-team,grafana-bi-team,grafana-developers,grafana-viewers"
+
+  # Group-to-org role mappings
+  # Generated from Grafana org_mapping config
+  # Use org: * to apply a role to all organizations
+  # Use name: * (wildcard_group: true) to apply to all groups
+  groups:
+    - name: "grafana-admins"
+      org_mappings:
+        - org: "Main Org."
+          role: "Admin"
+        - org: "Platform Team"
+          role: "Admin"
+        - org: "Application Team"
+          role: "Admin"
+        - org: "Business Intelligence"
+          role: "Admin"
+        - org: "Public"
+          role: "Viewer"
+        - org: "Development"
+          role: "Editor"
+    - name: "grafana-platform-team"
+      org_mappings:
+        - org: "Platform Team"
+          role: "Admin"
+    - name: "grafana-app-team"
+      org_mappings:
+        - org: "Application Team"
+          role: "Admin"
+    - name: "grafana-bi-team"
+      org_mappings:
+        - org: "Business Intelligence"
+          role: "Admin"
+    - name: "grafana-developers"
+      org_mappings:
+        - org: "Development"
+          role: "Editor"
+    - name: "grafana-viewers"
+      org_mappings:
+        - org: "Main Org."
+          role: "Viewer"
+        - org: "Public"
+          role: "Viewer"
+    - name: "grafaba-viewers"
+      org_mappings:
+        - org: "*"
+          role: "Viewer"
+    - name: "*"
+      wildcard_group: true
+      org_mappings:
+        - org: "Main Org."
+          role: "Viewer"
+
+  teams_url: "https://auth.dev.com/realms/grafana-realm/protocol/openid-connect/userinfo"
+  team_ids_attribute_path: "groups[*]"
+  signout_redirect_url: "https://auth.dev.com/realms/grafana-realm/protocol/openid-connect/logout"

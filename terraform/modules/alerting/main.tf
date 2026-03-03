@@ -7,13 +7,14 @@
 
 locals {
   # Helper function to resolve org name or ID to numeric ID
-  # Priority: orgId (if numeric) > org (name lookup) > default to 1
+  # Priority: org (name lookup) > orgId (numeric fallback) > default to 1
+  # Org names are stable across environments; numeric IDs are not.
   resolve_org_id = {
     for cp in try(var.contact_points.contactPoints, []) : "${try(cp.org, "_")}:${cp.name}" => (
-      # If orgId is provided and is a number, use it directly
+      # If org name is provided, look it up in org_ids map (preferred — stable across envs)
+      try(cp.org, null) != null && try(var.org_ids[cp.org], null) != null ? var.org_ids[cp.org] :
+      # Fallback: if orgId is provided and is a number, use it directly
       try(tonumber(cp.orgId), null) != null ? tonumber(cp.orgId) :
-      # If org name is provided, look it up in org_ids map
-      try(cp.org, null) != null ? try(var.org_ids[cp.org], 1) :
       # Default to org 1 (Main Organization)
       1
     )
@@ -418,10 +419,11 @@ locals {
       folder           = group.folder
       name             = group.name
       interval_seconds = try(tonumber(trimsuffix(group.interval, "m")) * 60, try(tonumber(trimsuffix(group.interval, "s")), 60))
-      # Resolve org ID: priority is orgId (if numeric) > org (name lookup) > null
+      # Resolve org ID: priority is org (name lookup) > orgId (numeric fallback) > null
+      # Org names are stable across environments; numeric IDs are not.
       resolved_org_id = (
+        try(group.org, null) != null && try(var.org_ids[group.org], null) != null ? var.org_ids[group.org] :
         try(tonumber(group.orgId), null) != null ? tonumber(group.orgId) :
-        try(group.org, null) != null ? try(var.org_ids[group.org], null) :
         null
       )
       rules = [
@@ -517,13 +519,13 @@ locals {
   # Helper function to resolve org name or ID to numeric ID for notification policies
   resolve_np_org_id = {
     for np in try(var.notification_policies.policies, []) : (
-      # Use orgId if provided, otherwise use org name, fallback to index
-      try(tostring(np.orgId), try(np.org, "unknown"))
+      # Use org name if provided, otherwise use orgId, fallback to index
+      try(np.org, try(tostring(np.orgId), "unknown"))
       ) => (
-      # If orgId is provided and is a number, use it directly
+      # If org name is provided, look it up in org_ids map (preferred — stable across envs)
+      try(np.org, null) != null && try(var.org_ids[np.org], null) != null ? var.org_ids[np.org] :
+      # Fallback: if orgId is provided and is a number, use it directly
       try(tonumber(np.orgId), null) != null ? tonumber(np.orgId) :
-      # If org name is provided, look it up in org_ids map
-      try(np.org, null) != null ? try(var.org_ids[np.org], 1) :
       # Default to org 1 (Main Organization)
       1
     )
@@ -543,9 +545,10 @@ locals {
         meaningful_id = try(np.org, try(tostring(np.orgId), "default"))
 
         # resolved_org_id is used for the resource attribute (can be dynamic)
+        # Priority: org name lookup (stable) > orgId numeric (fallback) > default 1
         resolved_org_id = (
+          try(np.org, null) != null && try(var.org_ids[np.org], null) != null ? var.org_ids[np.org] :
           try(tonumber(np.orgId), null) != null ? tonumber(np.orgId) :
-          try(np.org, null) != null ? try(var.org_ids[np.org], 1) :
           1
         )
     })

@@ -735,16 +735,19 @@ for cp in cps:
     grouped[name]['receivers'].append(recv)
 
 for name, cp in grouped.items():
-    entry = {'name': name, 'org': org_name, 'orgId': int('$ORG_ID'), 'receivers': cp['receivers']}
+    # Only emit org name — orgId is not stable across environments
+    entry = {'name': name, 'org': org_name, 'receivers': cp['receivers']}
     if HAS_YAML:
         lines = yaml.dump([entry], default_flow_style=False, sort_keys=False).rstrip()
         # indent to match contactPoints array
         for line in lines.split('\n'):
             print(f'  {line}')
+        # Add orgId as a comment for reference
+        print(f'    # orgId: {int("$ORG_ID")}')    
     else:
         print(f'  - name: \"{name}\"')
         print(f'    org: \"{org_name}\"')
-        print(f'    orgId: $ORG_ID')
+        print(f'    # orgId: $ORG_ID')
         print(f'    receivers:')
         for r in cp['receivers']:
             print(f'      - type: \"{r[\"type\"]}\"')
@@ -823,7 +826,6 @@ for rule in rules:
             'name': group_name,
             'folder': folder,
             'org': org_name,
-            'orgId': int('$ORG_ID'),
             'interval': '1m',
             'rules': []
         }
@@ -954,10 +956,12 @@ try:
 except:
     sys.exit(0)
 
-# Root-level policy
-print(f'  - orgId: {org_id}')
-print(f'    org: \"{org_name}\"')
-print(f'    receiver: {data.get(\"receiver\", \"grafana-default-email\")}')
+# Root-level policy — use org name (stable); orgId as comment only
+print(f'  - org: \"{org_name}\"')
+print(f'    # orgId: {org_id}')
+# Use the actual receiver name from the API — Grafana's built-in default is 'grafana-default-email'
+receiver = data.get('receiver', 'grafana-default-email')
+print(f'    receiver: {receiver}')
 
 group_by = data.get('group_by')
 if group_by:
@@ -1102,6 +1106,18 @@ else:
     s = enabled_provider.get('settings', {})
     provider_type = enabled_provider.get('provider', 'generic_oauth')
 
+    # Helper: parse a value that may be a JSON array string or a plain string
+    def parse_json_str(val, join_char=' '):
+        # If val looks like a JSON array string, parse and join; otherwise return as-is
+        if isinstance(val, str) and val.startswith('['):
+            try:
+                items = json.loads(val)
+                if isinstance(items, list):
+                    return join_char.join(str(i) for i in items)
+            except (json.JSONDecodeError, TypeError):
+                pass
+        return val
+
     print('sso:')
     print(f'  enabled: true')
     print(f'  name: \"{s.get(\"name\", provider_type)}\"')
@@ -1117,7 +1133,9 @@ else:
     print(f'  # OAuth settings')
     print(f'  allow_sign_up: {str(s.get(\"allowSignUp\", True)).lower()}')
     print(f'  auto_login: {str(s.get(\"autoLogin\", False)).lower()}')
-    print(f'  scopes: \"{s.get(\"scopes\", \"openid profile email groups\")}\"')
+    # scopes: Grafana API may return JSON array string; module expects space-separated
+    scopes_val = parse_json_str(s.get('scopes', 'openid profile email groups'), ' ')
+    print(f'  scopes: \"{scopes_val}\"')
     print(f'  use_pkce: {str(s.get(\"usePkce\", True)).lower()}')
     print(f'  use_refresh_token: {str(s.get(\"useRefreshToken\", True)).lower()}')
     print()
@@ -1136,10 +1154,11 @@ else:
         print(f'  groups_attribute_path: \"{gap}\"')
     print()
 
-    # Allowed groups
+    # Allowed groups — API may return JSON array string; module expects comma-separated
     ag = s.get('allowedGroups', '')
     if ag:
-        print(f'  allowed_groups: \"{ag}\"')
+        ag_val = parse_json_str(ag, ',')
+        print(f'  allowed_groups: \"{ag_val}\"')
         print()
 
     # Parse org_mapping into groups format
@@ -1150,9 +1169,15 @@ else:
         print('  # Use org: "*" to apply a role to all organizations')
         print('  # Use name: "*" (wildcard_group: true) to apply to all groups')
         print('  groups:')
-        # org_mapping format: group_name:org_id_or_*:role (newline separated)
-        # Both group_name and org_id can be "*" (wildcard / all)
-        mappings = [m.strip() for m in org_mapping_str.strip().replace('\\n', '\n').split('\n') if m.strip()]
+        # org_mapping format: group_name:org_id_or_*:role
+        # API may return as JSON array string or newline-separated string
+        if org_mapping_str.startswith('['):
+            try:
+                mappings = [m.strip() for m in json.loads(org_mapping_str) if m.strip()]
+            except (json.JSONDecodeError, TypeError):
+                mappings = [m.strip() for m in org_mapping_str.strip().replace('\\n', '\n').split('\n') if m.strip()]
+        else:
+            mappings = [m.strip() for m in org_mapping_str.strip().replace('\\n', '\n').split('\n') if m.strip()]
 
         # Collect all known org IDs from the org_map
         all_org_ids = set(org_map.keys())

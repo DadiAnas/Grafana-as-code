@@ -1,0 +1,79 @@
+# Imported from http://localhost:3000 on 2026-03-03T08:12:41+01:00
+#
+# Notification Policies define how alerts are routed to contact points.
+# Format follows Grafana's provisioning API structure.
+
+policies:
+  - org: "Application Team"
+    # orgId: 3
+    receiver: grafana-default-email
+    group_by:
+      - grafana_folder
+      - alertname
+    group_wait: 30s
+    group_interval: 5m
+    repeat_interval: 4h
+
+  - org: "Business Intelligence"
+    # orgId: 6
+    receiver: grafana-default-email
+    group_by:
+      - grafana_folder
+      - alertname
+    group_wait: 30s
+    group_interval: 5m
+    repeat_interval: 4h
+
+  - org: "Development"
+    # orgId: 4
+    receiver: grafana-default-email
+    group_by:
+      - grafana_folder
+      - alertname
+    group_wait: 30s
+    group_interval: 5m
+    repeat_interval: 4h
+
+  - org: "Main Org."
+    # orgId: 1
+    receiver: grafana-default-email
+    group_by:
+      - grafana_folder
+      - alertname
+    group_wait: 30s
+    group_interval: 5m
+    repeat_interval: 4h
+    routes:
+      - receiver: email-npr
+        group_by:
+          - grafana_folder
+          - alertname
+        object_matchers:
+          - - sdfds
+            - "="
+            - sdfds
+        continue: true
+        group_wait: 5m
+        group_interval: 3s
+        repeat_interval: 20s
+
+  - org: "Platform Team"
+    # orgId: 5
+    receiver: grafana-default-email
+    group_by:
+      - grafana_folder
+      - alertname
+    group_wait: 30s
+    group_interval: 5m
+    repeat_interval: 4h
+
+  - org: "Public"
+    # orgId: 2
+    receiver: grafana-default-email
+    group_by:
+      - grafana_folder
+      - alertname
+    group_wait: 30s
+    group_interval: 5m
+    repeat_interval: 4h
+
