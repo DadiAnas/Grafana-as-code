@@ -274,7 +274,7 @@ import:
 		echo ""; \
 		exit 1; \
 	fi
-	@bash scripts/import-from-grafana.sh "$(ENV)" --grafana-url="$(GRAFANA_URL)" --auth="$(AUTH)"
+	@python3 scripts/import_from_grafana.py "$(ENV)" --grafana-url="$(GRAFANA_URL)" --auth="$(AUTH)"
 
 # Promote configuration from one environment to another
 # Usage: make promote FROM=staging TO=prod

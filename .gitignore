@@ -71,3 +71,4 @@ plan.out
 
 # Backups (from make backup)
 backups/
+tfplan*
