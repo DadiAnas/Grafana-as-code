@@ -43,16 +43,52 @@ class Colors:
 # =============================================================================
 # YAML Helpers
 # =============================================================================
-class NoAliasDumper(yaml.SafeDumper):
-    """YAML dumper that doesn't use anchors/aliases."""
+class QuotedDumper(yaml.SafeDumper):
+    """YAML dumper that doesn't use anchors/aliases and quotes string values."""
 
     def ignore_aliases(self, data: Any) -> bool:
         return True
 
+    def represent_mapping(self, tag: str, mapping: Any, flow_style: bool | None = None) -> yaml.MappingNode:
+        """Override to avoid quoting keys."""
+        value: list[tuple[yaml.Node, yaml.Node]] = []
+        node = yaml.MappingNode(tag, value, flow_style=flow_style)
+        if self.alias_key is not None:
+            self.represented_objects[self.alias_key] = node
+        best_style = True
+        if hasattr(mapping, "items"):
+            mapping = list(mapping.items())
+        for item_key, item_value in mapping:
+            # For keys, use plain representation (no quotes)
+            if isinstance(item_key, str):
+                node_key = self.represent_scalar("tag:yaml.org,2002:str", item_key)
+            else:
+                node_key = self.represent_data(item_key)
+            node_value = self.represent_data(item_value)
+            if not (isinstance(node_key, yaml.ScalarNode) and not node_key.style):
+                best_style = False
+            if not (isinstance(node_value, yaml.ScalarNode) and not node_value.style):
+                best_style = False
+            value.append((node_key, node_value))
+        if flow_style is None:
+            if self.default_flow_style is not None:
+                node.flow_style = self.default_flow_style
+            else:
+                node.flow_style = best_style
+        return node
+
+
+def _quoted_str_representer(dumper: yaml.Dumper, data: str) -> yaml.ScalarNode:
+    """Represent all string values with double quotes for consistency."""
+    return dumper.represent_scalar("tag:yaml.org,2002:str", data, style='"')
+
+
+QuotedDumper.add_representer(str, _quoted_str_representer)
+
 
 def yaml_dump(data: Any, **kwargs: Any) -> str:
-    """Dump data to YAML without aliases."""
-    return yaml.dump(data, Dumper=NoAliasDumper, default_flow_style=False, sort_keys=False, **kwargs)
+    """Dump data to YAML without aliases, with proper string quoting."""
+    return yaml.dump(data, Dumper=QuotedDumper, default_flow_style=False, sort_keys=False, **kwargs)
 
 
 # =============================================================================
