@@ -818,6 +818,8 @@ def _process_sso_settings(provider: dict[str, Any], org_map: dict[int, str]) -> 
         config["role_attribute_path"] = s["roleAttributePath"]
     if s.get("groupsAttributePath"):
         config["groups_attribute_path"] = s["groupsAttributePath"]
+    if s.get("orgAttributePath"):
+        config["org_attribute_path"] = s["orgAttributePath"]
 
     # Allowed groups
     ag = s.get("allowedGroups", "")
