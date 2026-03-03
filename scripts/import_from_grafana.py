@@ -78,9 +78,27 @@ class QuotedDumper(yaml.SafeDumper):
         return node
 
 
+def _sanitize_string(data: str) -> str:
+    """Sanitize a string by removing/replacing problematic characters."""
+    # Remove control characters except newline and tab
+    import unicodedata
+    result = []
+    for char in data:
+        if char in ('\n', '\t'):
+            result.append(char)
+        elif unicodedata.category(char)[0] == 'C':  # Control characters
+            result.append(' ')  # Replace with space
+        else:
+            result.append(char)
+    # Strip leading/trailing whitespace and collapse multiple spaces
+    return ' '.join(''.join(result).split())
+
+
 def _quoted_str_representer(dumper: yaml.Dumper, data: str) -> yaml.ScalarNode:
     """Represent all string values with double quotes for consistency."""
-    return dumper.represent_scalar("tag:yaml.org,2002:str", data, style='"')
+    # Sanitize the string to remove control characters that break YAML
+    clean_data = _sanitize_string(data)
+    return dumper.represent_scalar("tag:yaml.org,2002:str", clean_data, style='"')
 
 
 QuotedDumper.add_representer(str, _quoted_str_representer)
@@ -863,14 +881,14 @@ def _process_org_mapping(org_mapping_str: str, org_map: dict[int, str]) -> list[
     for m in mappings:
         parts = m.split(":")
         if len(parts) >= 3:
-            group_name = parts[0]
-            org_id = parts[1]
-            role = parts[2]
+            group_name = _sanitize_string(parts[0])
+            org_id = _sanitize_string(parts[1])
+            role = _sanitize_string(parts[2])
         elif len(parts) == 2 and parts[1].startswith("*"):
             # Handle malformed entry like "group:*Role" (missing colon after *)
-            group_name = parts[0]
+            group_name = _sanitize_string(parts[0])
             org_id = "*"
-            role = parts[1][1:]  # Remove the leading *
+            role = _sanitize_string(parts[1][1:])  # Remove the leading *
             print(f'  {Colors.YELLOW}⚠{Colors.NC} Fixed malformed org_mapping: "{m}" → "{group_name}:*:{role}"', file=sys.stderr)
         else:
             print(f'  {Colors.YELLOW}⚠{Colors.NC} Skipping malformed org_mapping entry: "{m}"', file=sys.stderr)
