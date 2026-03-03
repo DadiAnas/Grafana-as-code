@@ -2,12 +2,12 @@
 # GITHUB ACTIONS — Terraform Plan/Apply for Grafana-as-Code
 # =============================================================================
 # Triggers:
-#   - On PR:    terraform fmt, validate, lint, plan (comment on PR)
-#   - On push:  terraform apply (after merge to main)
+#   - On PR:    fmt, validate, lint, plan (comment on PR)
+#   - On push:  apply (after merge to main)
 #
 # Requirements:
 #   - GitHub Secrets: VAULT_ADDR, VAULT_TOKEN, GRAFANA_URL (per environment)
-#   - Terraform state backend configured in backends/<env>.tfbackend
+#   - Terraform state backend configured in envs/<env>/backend.tfbackend
 #
 # STATUS: Disabled until real infrastructure secrets are configured.
 #         Re-enable by uncommenting the on: triggers below.
@@ -20,19 +20,15 @@ on:
   # pull_request:
   #   branches: [main]
   #   paths:
-  #     - '**.tf'
-  #     - '**.tfvars'
-  #     - '**.tfbackend'
-  #     - 'config/**'
-  #     - 'dashboards/**'
+  #     - 'terraform/**'
+  #     - 'envs/**'
+  #     - 'base/**'
   # push:
   #   branches: [main]
   #   paths:
-  #     - '**.tf'
-  #     - '**.tfvars'
-  #     - '**.tfbackend'
-  #     - 'config/**'
-  #     - 'dashboards/**'
+  #     - 'terraform/**'
+  #     - 'envs/**'
+  #     - 'base/**'
 
 permissions:
   contents: read
@@ -61,28 +57,22 @@ jobs:
           # Find which environments have changed files
           ENVS=()
           
-          # Check config/ and dashboards/ directories
+          # Check envs/ and base/ directories
           CHANGED_FILES=$(git diff --name-only ${{ github.event.before || 'HEAD~1' }} HEAD 2>/dev/null || git diff --name-only HEAD~1 HEAD)
           
           for file in $CHANGED_FILES; do
-            if [[ "$file" =~ ^config/([^/]+)/ ]]; then
-              ENV="${BASH_REMATCH[1]}"
-              [[ "$ENV" != "shared" ]] && ENVS+=("$ENV")
-            elif [[ "$file" =~ ^dashboards/([^/]+)/ ]]; then
-              ENV="${BASH_REMATCH[1]}"
-              [[ "$ENV" != "shared" ]] && ENVS+=("$ENV")
-            elif [[ "$file" =~ ^environments/([^.]+)\.tfvars$ ]]; then
+            if [[ "$file" =~ ^envs/([^/]+)/ ]]; then
               ENVS+=("${BASH_REMATCH[1]}")
             fi
           done
           
           # Also detect if shared configs changed (affects all envs)
           SHARED_CHANGED=false
-          if echo "$CHANGED_FILES" | grep -qE '^(config/shared/|dashboards/shared/|.*\.tf$)'; then
+          if echo "$CHANGED_FILES" | grep -qE '^(base/|base/dashboards/|.*\.tf$)'; then
             SHARED_CHANGED=true
             # Add all existing environments
-            for f in environments/*.tfvars; do
-              [ -f "$f" ] && ENVS+=("$(basename "$f" .tfvars)")
+            for f in envs/*/terraform.tfvars; do
+              [ -f "$f" ] && ENVS+=("$(basename "$(dirname "$f")")")  # envs/<name>/terraform.tfvars → <name>
             done
           fi
           
@@ -113,20 +103,21 @@ jobs:
 
       - name: Terraform Format Check
         id: fmt
-        run: terraform fmt -check -recursive -diff
+        run: terraform fmt -check -recursive -diff terraform/
         continue-on-error: true
 
       - name: Terraform Init (validation only)
-        run: terraform init -backend=false
+        run: terraform -chdir=terraform init -backend=false
 
       - name: Terraform Validate
         id: validate
-        run: terraform validate -no-color
+        run: terraform -chdir=terraform validate -no-color
 
       - name: YAML Lint
         uses: ibiqlik/action-yamllint@v3
         with:
-          file_or_dir: config/
+          file_or_dir: .
+          config_file: .yamllint.yml
           config_data: |
             extends: default
             rules:
@@ -198,8 +189,8 @@ jobs:
 
       - name: Terraform Init
         run: |
-          terraform init \
-            -backend-config="backends/${{ matrix.environment }}.tfbackend"
+          terraform -chdir=terraform init \
+            -backend-config="../envs/${{ matrix.environment }}/backend.tfbackend"
         env:
           VAULT_ADDR: ${{ secrets.VAULT_ADDR }}
           VAULT_TOKEN: ${{ secrets.VAULT_TOKEN }}
@@ -207,11 +198,11 @@ jobs:
       - name: Terraform Plan
         id: plan
         run: |
-          terraform plan \
-            -var-file="environments/${{ matrix.environment }}.tfvars" \
+          terraform -chdir=terraform plan \
+            -var-file="../envs/${{ matrix.environment }}/terraform.tfvars" \
             -var="environment=${{ matrix.environment }}" \
             -no-color \
-            -out=tfplan 2>&1 | tee plan_output.txt
+            -out=../tfplan 2>&1 | tee plan_output.txt
         env:
           VAULT_ADDR: ${{ secrets.VAULT_ADDR }}
           VAULT_TOKEN: ${{ secrets.VAULT_TOKEN }}
@@ -278,16 +269,16 @@ jobs:
 
       - name: Terraform Init
         run: |
-          terraform init \
-            -backend-config="backends/${{ matrix.environment }}.tfbackend"
+          terraform -chdir=terraform init \
+            -backend-config="../envs/${{ matrix.environment }}/backend.tfbackend"
         env:
           VAULT_ADDR: ${{ secrets.VAULT_ADDR }}
           VAULT_TOKEN: ${{ secrets.VAULT_TOKEN }}
 
       - name: Terraform Apply
         run: |
-          terraform apply \
-            -var-file="environments/${{ matrix.environment }}.tfvars" \
+          terraform -chdir=terraform apply \
+            -var-file="../envs/${{ matrix.environment }}/terraform.tfvars" \
             -var="environment=${{ matrix.environment }}" \
             -auto-approve \
             -no-color
@@ -315,9 +306,9 @@ jobs:
       - name: Check for drift
         id: drift
         run: |
-          terraform init -backend-config="backends/${{ matrix.environment }}.tfbackend"
-          terraform plan \
-            -var-file="environments/${{ matrix.environment }}.tfvars" \
+          terraform -chdir=terraform init -backend-config="../envs/${{ matrix.environment }}/backend.tfbackend"
+          terraform -chdir=terraform plan \
+            -var-file="../envs/${{ matrix.environment }}/terraform.tfvars" \
             -var="environment=${{ matrix.environment }}" \
             -detailed-exitcode -no-color 2>&1 | tee drift.txt || true
         env:

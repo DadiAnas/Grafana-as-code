@@ -106,11 +106,12 @@ module "teams" {
 module "folders" {
   source = "./modules/folders"
 
-  folder_permissions = local.folders_config
-  dashboards_path    = "${abspath(path.module)}/dashboards"
-  environment        = var.environment
-  org_ids            = module.organizations.organization_ids
-  team_details       = module.teams.team_details
+  folder_permissions   = local.folders_config
+  base_dashboards_path = "${abspath(local.base_path)}/dashboards"
+  env_dashboards_path  = "${abspath(local.env_path)}/dashboards"
+  environment          = var.environment
+  org_ids              = module.organizations.organization_ids
+  team_details         = module.teams.team_details
 
   depends_on = [module.organizations, module.teams]
 }
@@ -128,11 +129,12 @@ module "datasources" {
 module "dashboards" {
   source = "./modules/dashboards"
 
-  dashboards_path = "${path.module}/dashboards"
-  environment     = var.environment
-  folder_ids      = module.folders.folder_ids
-  folder_org_ids  = module.folders.folder_org_ids
-  exclude_folders = var.exclude_dashboard_folders
+  base_dashboards_path = "${abspath(local.base_path)}/dashboards"
+  env_dashboards_path  = "${abspath(local.env_path)}/dashboards"
+  environment          = var.environment
+  folder_ids           = module.folders.folder_ids
+  folder_org_ids       = module.folders.folder_org_ids
+  exclude_folders      = var.exclude_dashboard_folders
 
   depends_on = [module.folders, module.datasources]
 }

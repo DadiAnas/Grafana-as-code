@@ -41,10 +41,10 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-FROM_CONFIG="$PROJECT_ROOT/config/${FROM}"
-TO_CONFIG="$PROJECT_ROOT/config/${TO}"
-FROM_DASHBOARDS="$PROJECT_ROOT/dashboards/${FROM}"
-TO_DASHBOARDS="$PROJECT_ROOT/dashboards/${TO}"
+FROM_CONFIG="$PROJECT_ROOT/envs/${FROM}"
+TO_CONFIG="$PROJECT_ROOT/envs/${TO}"
+FROM_DASHBOARDS="$PROJECT_ROOT/envs/${FROM}/dashboards"
+TO_DASHBOARDS="$PROJECT_ROOT/envs/${TO}/dashboards"
 
 echo -e "${BOLD}${CYAN}"
 echo "╔═══════════════════════════════════════════════════════════════╗"
@@ -55,7 +55,7 @@ echo -e "${NC}"
 # Validate source exists
 if [ ! -d "$FROM_CONFIG" ]; then
     echo -e "${RED}Error: Source environment '${FROM}' not found${NC}"
-    echo "  Missing: config/${FROM}/"
+    echo "  Missing: envs/${FROM}/"
     exit 1
 fi
 
@@ -130,8 +130,8 @@ fi
 # Confirm promotion
 # =========================================================================
 echo ""
-echo -e "${YELLOW}⚠  This will overwrite config/${TO}/ with config/${FROM}/${NC}"
-echo -e "   dashboards/${TO}/ will also be synced from dashboards/${FROM}/"
+echo -e "${YELLOW}⚠  This will overwrite envs/${TO}/ with envs/${FROM}/${NC}"
+echo -e "   envs/${TO}/dashboards/ will also be synced from envs/${FROM}/dashboards/"
 echo ""
 read -p "  Continue? [y/N] " -n 1 -r
 echo ""
@@ -158,7 +158,7 @@ for file in $(find "$FROM_CONFIG" -type f -name "*.yaml" | sort); do
     TO_FILE="$TO_CONFIG/$REL_PATH"
     mkdir -p "$(dirname "$TO_FILE")"
     cp "$file" "$TO_FILE"
-    echo -e "  ${GREEN}✓${NC} config/${TO}/${REL_PATH}"
+    echo -e "  ${GREEN}✓${NC} envs/${TO}/${REL_PATH}"
     COPIED=$((COPIED + 1))
 done
 
@@ -184,7 +184,7 @@ echo "  Config files: ${COPIED}"
 echo "  Dashboards:   ${DASH_COPIED}"
 echo ""
 echo "  Next steps:"
-echo "    1. Review the promoted configs: git diff config/${TO}/"
+echo "    1. Review the promoted configs: git diff envs/${TO}/"
 echo "    2. Adjust env-specific values (URLs, credentials, etc.)"
 echo "    3. Plan & apply:"
 echo "       make plan  ENV=${TO}"

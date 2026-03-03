@@ -87,8 +87,8 @@ vault status
 
 ```bash
 terraform init
-terraform plan -var-file=environments/myenv.tfvars
-terraform apply -var-file=environments/myenv.tfvars
+terraform plan -var-file=envs/myenv.tfvars
+terraform apply -var-file=envs/myenv.tfvars
 ```
 
 ## Vault Secret Structure
@@ -211,7 +211,7 @@ variable "vault_mount" {
 ### Environment tfvars
 
 ```hcl
-# environments/npr.tfvars
+# envs/npr.tfvars
 grafana_url   = "http://localhost:3000"
 environment   = "npr"
 vault_address = "http://localhost:8200"
@@ -256,7 +256,7 @@ contactPoints:
 export VAULT_ADDR='http://127.0.0.1:8200'
 export VAULT_TOKEN='hvs.your-token'
 
-terraform apply -var-file=environments/npr.tfvars
+terraform apply -var-file=envs/npr.tfvars
 ```
 
 ### AppRole Authentication (CI/CD)
@@ -351,10 +351,10 @@ jobs:
           exportToken: true
       
       - name: Terraform Init
-        run: terraform init -backend-config=backends/prod.tfbackend
+        run: terraform -chdir=terraform init -backend-config=../envs/prod/backend.tfbackend
       
       - name: Terraform Plan
-        run: terraform plan -var-file=environments/prod.tfvars -out=tfplan
+        run: terraform plan -var-file=envs/prod.tfvars -out=tfplan
       
       - name: Terraform Apply
         if: github.ref == 'refs/heads/main'
@@ -382,8 +382,8 @@ plan:
   extends: .terraform_base
   stage: plan
   script:
-    - terraform init -backend-config=backends/prod.tfbackend
-    - terraform plan -var-file=environments/prod.tfvars -out=tfplan
+    - terraform -chdir=terraform init -backend-config=../envs/prod/backend.tfbackend
+    - terraform plan -var-file=envs/prod.tfvars -out=tfplan
   artifacts:
     paths:
       - tfplan
@@ -511,7 +511,7 @@ export VAULT_LOG_LEVEL=debug
 
 ```bash
 # Enable Terraform debug logging
-TF_LOG=DEBUG terraform plan -var-file=environments/npr.tfvars 2>&1 | tee terraform.log
+TF_LOG=DEBUG terraform plan -var-file=envs/npr.tfvars 2>&1 | tee terraform.log
 
 # Check provider configuration
 terraform providers

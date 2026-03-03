@@ -23,15 +23,15 @@ All resources follow a **shared + environment-specific** pattern where environme
 
 | Resource | Shared Location | Env Location | Merge Key |
 |----------|----------------|--------------|-----------|
-| Datasources | `config/shared/datasources.yaml` | `config/{env}/datasources.yaml` | `uid` |
-| Organizations | `config/shared/organizations.yaml` | `config/{env}/organizations.yaml` | `name` |
-| Folders | `config/shared/folders.yaml` | `config/{env}/folders.yaml` | `uid` |
-| Teams | `config/shared/teams.yaml` | `config/{env}/teams.yaml` | `name/org` |
-| Service Accounts | `config/shared/service_accounts.yaml` | `config/{env}/service_accounts.yaml` | `name` |
-| Alert Rules | `config/shared/alerting/alert_rules.yaml` | `config/{env}/alerting/alert_rules.yaml` | `org:folder-name` |
-| Contact Points | `config/shared/alerting/contact_points.yaml` | `config/{env}/alerting/contact_points.yaml` | `org:name` |
-| Notification Policies | `config/shared/alerting/notification_policies.yaml` | `config/{env}/alerting/notification_policies.yaml` | `org` |
-| Dashboards | `dashboards/shared/{folder}/` | `dashboards/{env}/{folder}/` | filename |
+| Datasources | `base/datasources.yaml` | `envs/{env}/datasources.yaml` | `uid` |
+| Organizations | `base/organizations.yaml` | `envs/{env}/organizations.yaml` | `name` |
+| Folders | `base/folders.yaml` | `envs/{env}/folders.yaml` | `uid` |
+| Teams | `base/teams.yaml` | `envs/{env}/teams.yaml` | `name/org` |
+| Service Accounts | `base/service_accounts.yaml` | `envs/{env}/service_accounts.yaml` | `name` |
+| Alert Rules | `base/alerting/alert_rules.yaml` | `envs/{env}/alerting/alert_rules.yaml` | `org:folder-name` |
+| Contact Points | `base/alerting/contact_points.yaml` | `envs/{env}/alerting/contact_points.yaml` | `org:name` |
+| Notification Policies | `base/alerting/notification_policies.yaml` | `envs/{env}/alerting/notification_policies.yaml` | `org` |
+| Dashboards | `base/dashboards/{folder}/` | `envs/{env}/dashboards/{folder}/` | filename |
 
 **Environment-specific configs override shared configs** with the same merge key.
 
@@ -39,8 +39,8 @@ All resources follow a **shared + environment-specific** pattern where environme
 
 ## Organizations
 
-**File**: `config/shared/organizations.yaml`
-**Env Override**: `config/{env}/organizations.yaml`
+**File**: `base/organizations.yaml`
+**Env Override**: `envs/{env}/organizations.yaml`
 
 Defines Grafana organizations for multi-tenancy.
 
@@ -81,8 +81,8 @@ organizations:
 
 ## Folders
 
-**File**: `config/shared/folders.yaml`
-**Env Override**: `config/{env}/folders.yaml`
+**File**: `base/folders.yaml`
+**Env Override**: `envs/{env}/folders.yaml`
 
 Defines the folder structure for organizing dashboards. Folders can be assigned to specific organizations.
 
@@ -147,8 +147,8 @@ folders:
 ## Datasources
 
 **Files**: 
-- Shared: `config/shared/datasources.yaml`
-- Environment: `config/{env}/datasources.yaml`
+- Shared: `base/datasources.yaml`
+- Environment: `envs/{env}/datasources.yaml`
 
 Defines data sources with full parameter support. Environment-specific datasources override shared ones with the same `uid`.
 
@@ -246,8 +246,8 @@ datasources:
 
 ## Teams
 
-**File**: `config/shared/teams.yaml`
-**Env Override**: `config/{env}/teams.yaml`
+**File**: `base/teams.yaml`
+**Env Override**: `envs/{env}/teams.yaml`
 
 Defines teams for access control. Teams use a **composite key** (`name/org`) internally, so the same team name can exist in different organizations.
 
@@ -319,8 +319,8 @@ teams:
 
 ## Service Accounts
 
-**File**: `config/shared/service_accounts.yaml`
-**Env Override**: `config/{env}/service_accounts.yaml`
+**File**: `base/service_accounts.yaml`
+**Env Override**: `envs/{env}/service_accounts.yaml`
 
 Defines service accounts for API access.
 
@@ -358,8 +358,8 @@ service_accounts:
 ## Alert Rules
 
 **Files**: 
-- Shared: `config/shared/alerting/alert_rules.yaml`
-- Environment: `config/{env}/alerting/alert_rules.yaml`
+- Shared: `base/alerting/alert_rules.yaml`
+- Environment: `envs/{env}/alerting/alert_rules.yaml`
 
 Uses **Grafana's native YAML export format** with `org` name instead of `orgId`. This makes it easy to:
 - Export alerts from Grafana UI and use directly
@@ -531,8 +531,8 @@ alert_rules:
 ## Contact Points
 
 **Files**: 
-- Shared: `config/shared/alerting/contact_points.yaml`
-- Environment: `config/{env}/alerting/contact_points.yaml`
+- Shared: `base/alerting/contact_points.yaml`
+- Environment: `envs/{env}/alerting/contact_points.yaml`
 
 Defines notification channels with support for 20+ contact point types.
 
@@ -704,8 +704,8 @@ contactPoints:
 ## Notification Policies
 
 **Files**:
-- Shared: `config/shared/alerting/notification_policies.yaml`
-- Environment: `config/{env}/alerting/notification_policies.yaml`
+- Shared: `base/alerting/notification_policies.yaml`
+- Environment: `envs/{env}/alerting/notification_policies.yaml`
 
 Defines routing for alerts to contact points. Uses Grafana's native format — one policy per organization.
 
@@ -764,8 +764,8 @@ policies:
 ## Mute Timings
 
 **Files**: 
-- Shared: `config/shared/alerting/mute_timings.yaml`
-- Environment: `config/{env}/alerting/mute_timings.yaml`
+- Shared: `base/alerting/mute_timings.yaml`
+- Environment: `envs/{env}/alerting/mute_timings.yaml`
 
 Defines time periods during which alerts should be muted (suppressed).
 
@@ -860,7 +860,7 @@ policies:
 
 ## Dashboard JSON
 
-**Location**: `dashboards/shared/<Org Name>/<folder-uid>/*.json` and `dashboards/{env}/<Org Name>/<folder-uid>/*.json`
+**Location**: `base/dashboards/<Org Name>/<folder-uid>/*.json` and `envs/{env}/dashboards/<Org Name>/<folder-uid>/*.json`
 
 Dashboards are standard Grafana JSON exports. The system supports:
 
@@ -935,7 +935,7 @@ Use datasource variables for portability across environments:
 ```bash
 # Export via API
 curl -s "http://localhost:3000/api/dashboards/uid/my-dashboard" \
-  -H "Authorization: Bearer $TOKEN" | jq '.dashboard' > dashboards/shared/folder/my-dashboard.json
+  -H "Authorization: Bearer $TOKEN" | jq '.dashboard' > base/dashboards/folder/my-dashboard.json
 
 # For environment-specific dashboard
 curl -s "http://localhost:3000/api/dashboards/uid/debug-dashboard" \
@@ -946,8 +946,8 @@ curl -s "http://localhost:3000/api/dashboards/uid/debug-dashboard" \
 
 | Use Case | Location |
 |----------|----------|
-| Standard monitoring dashboards | `dashboards/shared/` |
+| Standard monitoring dashboards | `base/dashboards/` |
 | Debug/development tools | `dashboards/npr/` |
 | Performance testing views | `dashboards/preprod/` |
 | Executive summaries | `dashboards/prod/` |
-| Environment-specific thresholds | Override in `dashboards/{env}/` |
+| Environment-specific thresholds | Override in `envs/{env}/dashboards/` |

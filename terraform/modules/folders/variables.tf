@@ -4,8 +4,13 @@ variable "folder_permissions" {
   default     = {}
 }
 
-variable "dashboards_path" {
-  description = "Path to the dashboards directory for auto-discovery"
+variable "base_dashboards_path" {
+  description = "Path to the base (shared) dashboards directory for auto-discovery"
+  type        = string
+}
+
+variable "env_dashboards_path" {
+  description = "Path to the environment-specific dashboards directory for auto-discovery"
   type        = string
 }
 

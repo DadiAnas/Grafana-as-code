@@ -156,14 +156,14 @@ if [ -n "$BACKEND" ] && ! echo "$BACKEND" | grep -qE '^(s3|azurerm|gcs|gitlab)$'
     exit 1
 fi
 
-if [ -d "$PROJECT_ROOT/config/$ENV_NAME" ]; then
+if [ -d "$PROJECT_ROOT/envs/$ENV_NAME" ]; then
     echo -e "${RED}Error: Environment '${ENV_NAME}' already exists!${NC}"
     echo ""
     echo "Existing files:"
-    [ -f "$PROJECT_ROOT/environments/$ENV_NAME.tfvars" ] && echo "  ✓ environments/$ENV_NAME.tfvars"
-    [ -f "$PROJECT_ROOT/backends/$ENV_NAME.tfbackend" ] && echo "  ✓ backends/$ENV_NAME.tfbackend"
-    [ -d "$PROJECT_ROOT/config/$ENV_NAME" ] && echo "  ✓ config/$ENV_NAME/"
-    [ -d "$PROJECT_ROOT/dashboards/$ENV_NAME" ] && echo "  ✓ dashboards/$ENV_NAME/"
+    [ -f "$PROJECT_ROOT/envs/$ENV_NAME/terraform.tfvars" ] && echo "  ✓ envs/$ENV_NAME/terraform.tfvars"
+    [ -f "$PROJECT_ROOT/envs/$ENV_NAME/backend.tfbackend" ] && echo "  ✓ envs/$ENV_NAME/backend.tfbackend"
+    [ -d "$PROJECT_ROOT/envs/$ENV_NAME" ] && echo "  ✓ envs/$ENV_NAME/"
+    [ -d "$PROJECT_ROOT/envs/$ENV_NAME/dashboards" ] && echo "  ✓ envs/$ENV_NAME/dashboards/"
     echo ""
     echo "To recreate, first run: make delete-env NAME=$ENV_NAME"
     exit 1
@@ -196,9 +196,9 @@ if [ "$DRY_RUN" = true ]; then
     echo -e "${YELLOW}=== DRY RUN — No files will be created ===${NC}"
     echo ""
     echo "  Would create:"
-    echo "    ✓ environments/${ENV_NAME}.tfvars"
-    echo "    ✓ backends/${ENV_NAME}.tfbackend"
-    echo "    ✓ config/${ENV_NAME}/"
+    echo "    ✓ envs/${ENV_NAME}/terraform.tfvars"
+    echo "    ✓ envs/${ENV_NAME}/backend.tfbackend"
+    echo "    ✓ envs/${ENV_NAME}/"
     echo "        ├── organizations.yaml"
     echo "        ├── folders.yaml"
     echo "        ├── teams.yaml"
@@ -210,7 +210,7 @@ if [ "$DRY_RUN" = true ]; then
     echo "            ├── alert_rules.yaml"
     echo "            ├── contact_points.yaml"
     echo "            └── notification_policies.yaml"
-    echo "    ✓ dashboards/${ENV_NAME}/"
+    echo "    ✓ envs/${ENV_NAME}/dashboards/"
 
     # Show orgs for dashboard subdirs
     if [ -n "$ORGS" ]; then
@@ -232,9 +232,9 @@ fi
 CREATED_FILES=()
 
 # =========================================================================
-# 1. environments/<name>.tfvars
+# 1. envs/<name>/terraform.tfvars
 # =========================================================================
-echo -e "${BLUE}[1/4]${NC} Creating ${YELLOW}environments/${ENV_NAME}.tfvars${NC}"
+echo -e "${BLUE}[1/4]${NC} Creating ${YELLOW}envs/${ENV_NAME}/terraform.tfvars${NC}"
 
 KEYCLOAK_LINE="# keycloak_url = \"https://keycloak.example.com\""
 if [ -n "$KEYCLOAK_URL" ]; then
@@ -246,7 +246,7 @@ if [ -n "$VAULT_NAMESPACE" ]; then
     VAULT_NS_LINE="vault_namespace = \"${VAULT_NAMESPACE}\""
 fi
 
-cat > "$PROJECT_ROOT/environments/${ENV_NAME}.tfvars" << EOF
+cat > "$PROJECT_ROOT/envs/${ENV_NAME}/terraform.tfvars" << EOF
 # =============================================================================
 # ${ENV_NAME^^} ENVIRONMENT — Terraform Variables
 # =============================================================================
@@ -257,16 +257,16 @@ cat > "$PROJECT_ROOT/environments/${ENV_NAME}.tfvars" << EOF
 #   make apply ENV=${ENV_NAME}
 #
 # Or directly:
-#   terraform plan  -var-file=environments/${ENV_NAME}.tfvars
-#   terraform apply -var-file=environments/${ENV_NAME}.tfvars
+#   terraform plan  -var-file=envs/${ENV_NAME}/terraform.tfvars
+#   terraform apply -var-file=envs/${ENV_NAME}/terraform.tfvars
 # =============================================================================
 
 # ─── Grafana Connection ─────────────────────────────────────────────────
 # The full URL of your Grafana instance (including protocol and port)
 grafana_url = "${GRAFANA_URL}"
 
-# Environment name — used to locate config/ and dashboards/ subdirectories
-# Must match: config/${ENV_NAME}/ and dashboards/${ENV_NAME}/
+# Environment name — used to locate envs/ subdirectory
+# Must match: envs/${ENV_NAME}/ and envs/${ENV_NAME}/dashboards/
 environment = "${ENV_NAME}"
 
 # ─── Vault Configuration ────────────────────────────────────────────────
@@ -285,7 +285,7 @@ ${VAULT_NS_LINE}
 #   make vault-setup ENV=${ENV_NAME}
 
 # ─── Keycloak (Optional) ────────────────────────────────────────────────
-# Only needed if you enable SSO via Keycloak (see config/${ENV_NAME}/sso.yaml)
+# Only needed if you enable SSO via Keycloak (see envs/${ENV_NAME}/sso.yaml)
 ${KEYCLOAK_LINE}
 
 # ─── Additional Variables ────────────────────────────────────────────────
@@ -303,12 +303,12 @@ ${KEYCLOAK_LINE}
 # # manage_alerting        = true
 # # manage_service_accounts = true
 EOF
-CREATED_FILES+=("environments/${ENV_NAME}.tfvars")
+CREATED_FILES+=("envs/${ENV_NAME}/terraform.tfvars")
 
 # =========================================================================
-# 2. backends/<name>.tfbackend
+# 2. envs/<name>/backend.tfbackend
 # =========================================================================
-echo -e "${BLUE}[2/4]${NC} Creating ${YELLOW}backends/${ENV_NAME}.tfbackend${NC}"
+echo -e "${BLUE}[2/4]${NC} Creating ${YELLOW}envs/${ENV_NAME}/backend.tfbackend${NC}"
 
 # Generate backend content based on BACKEND type
 generate_backend() {
@@ -321,7 +321,7 @@ generate_backend() {
     echo "# Usage:"
     echo "#   make init ENV=${ENV_NAME}"
     echo "# Or:"
-    echo "#   terraform init -backend-config=backends/${ENV_NAME}.tfbackend"
+    echo "#   terraform init -backend-config=envs/${ENV_NAME}/backend.tfbackend"
     echo "#"
     echo "# Uncomment ONE backend section below (or use BACKEND= when creating the env)."
     echo "# For local-only state, you can leave everything commented."
@@ -373,18 +373,18 @@ generate_backend() {
     echo "${gitlab_comment} retry_wait_min = 5"
 }
 
-generate_backend > "$PROJECT_ROOT/backends/${ENV_NAME}.tfbackend"
-CREATED_FILES+=("backends/${ENV_NAME}.tfbackend")
+generate_backend > "$PROJECT_ROOT/envs/${ENV_NAME}/backend.tfbackend"
+CREATED_FILES+=("envs/${ENV_NAME}/backend.tfbackend")
 
 # =========================================================================
-# 3. config/<name>/ with all YAML files
+# 3. YAML config files in envs/<name>/
 # =========================================================================
-echo -e "${BLUE}[3/4]${NC} Creating ${YELLOW}config/${ENV_NAME}/${NC} configuration files"
+echo -e "${BLUE}[3/4]${NC} Creating ${YELLOW}envs/${ENV_NAME}/${NC} configuration files"
 
-mkdir -p "$PROJECT_ROOT/config/${ENV_NAME}/alerting"
+mkdir -p "$PROJECT_ROOT/envs/${ENV_NAME}/alerting"
 
 # --- Organizations ---
-cat > "$PROJECT_ROOT/config/${ENV_NAME}/organizations.yaml" << EOF
+cat > "$PROJECT_ROOT/envs/${ENV_NAME}/organizations.yaml" << EOF
 # =============================================================================
 # ${ENV_NAME^^} — Organization Overrides
 # =============================================================================
@@ -631,16 +631,16 @@ DSEOF
     done
 }
 
-generate_datasources > "$PROJECT_ROOT/config/${ENV_NAME}/datasources.yaml"
+generate_datasources > "$PROJECT_ROOT/envs/${ENV_NAME}/datasources.yaml"
 
 # --- Folders ---
-cat > "$PROJECT_ROOT/config/${ENV_NAME}/folders.yaml" << EOF
+cat > "$PROJECT_ROOT/envs/${ENV_NAME}/folders.yaml" << EOF
 # =============================================================================
 # ${ENV_NAME^^} — Folder Permission Overrides
 # =============================================================================
 # Folders are auto-discovered from the dashboards/ directory structure:
-#   dashboards/${ENV_NAME}/<org_name>/<folder_uid>/
-#   dashboards/shared/<org_name>/<folder_uid>/
+#   envs/${ENV_NAME}/dashboards/<org_name>/<folder_uid>/
+#   base/dashboards/<org_name>/<folder_uid>/
 #
 # This file is ONLY for setting permissions on those folders.
 # If a folder is not listed here, it gets default (org-level) permissions.
@@ -672,7 +672,7 @@ folders: []
 EOF
 
 # --- Teams ---
-cat > "$PROJECT_ROOT/config/${ENV_NAME}/teams.yaml" << EOF
+cat > "$PROJECT_ROOT/envs/${ENV_NAME}/teams.yaml" << EOF
 # =============================================================================
 # ${ENV_NAME^^} — Team Overrides
 # =============================================================================
@@ -706,7 +706,7 @@ teams: []
 EOF
 
 # --- Service accounts ---
-cat > "$PROJECT_ROOT/config/${ENV_NAME}/service_accounts.yaml" << EOF
+cat > "$PROJECT_ROOT/envs/${ENV_NAME}/service_accounts.yaml" << EOF
 # =============================================================================
 # ${ENV_NAME^^} — Service Account Overrides
 # =============================================================================
@@ -745,7 +745,7 @@ generate_sso() {
 # ${ENV_NAME^^} — SSO Configuration Overrides
 # =============================================================================
 # Override shared SSO settings for THIS environment only.
-# Values here are merged with config/shared/sso.yaml.
+# Values here are merged with base/sso.yaml.
 #
 # Supported providers: Keycloak, Okta, Azure AD, Google, GitHub
 # Client secrets are fetched from Vault at: ${VAULT_MOUNT}/${ENV_NAME}/sso/keycloak
@@ -891,7 +891,7 @@ sso: {}
 SSOEOF
     fi
 }
-generate_sso > "$PROJECT_ROOT/config/${ENV_NAME}/sso.yaml"
+generate_sso > "$PROJECT_ROOT/envs/${ENV_NAME}/sso.yaml"
 
 # --- Keycloak ---
 generate_keycloak() {
@@ -945,10 +945,10 @@ keycloak: {}
 KCEOF
     fi
 }
-generate_keycloak > "$PROJECT_ROOT/config/${ENV_NAME}/keycloak.yaml"
+generate_keycloak > "$PROJECT_ROOT/envs/${ENV_NAME}/keycloak.yaml"
 
 # --- Alerting: Alert Rules ---
-cat > "$PROJECT_ROOT/config/${ENV_NAME}/alerting/alert_rules.yaml" << EOF
+cat > "$PROJECT_ROOT/envs/${ENV_NAME}/alerting/alert_rules.yaml" << EOF
 # =============================================================================
 # ${ENV_NAME^^} — Alert Rule Overrides
 # =============================================================================
@@ -956,7 +956,7 @@ cat > "$PROJECT_ROOT/config/${ENV_NAME}/alerting/alert_rules.yaml" << EOF
 # Matching is by folder + rule group name.
 #
 # Each group must specify:
-#   - folder: the folder UID (must match a directory in dashboards/)
+#   - folder: the folder UID (must match a directory in dashboards/ or an entry in folders.yaml)
 #   - name: rule group name
 #   - interval: evaluation interval (e.g., "1m", "5m")
 #   - org: which organization this alert belongs to
@@ -966,7 +966,7 @@ cat > "$PROJECT_ROOT/config/${ENV_NAME}/alerting/alert_rules.yaml" << EOF
 groups: []
 
   # --- Example: Environment-specific alert thresholds ---
-  # - folder: "alerts"                    # Must exist in dashboards/${ENV_NAME}/
+  # - folder: "alerts"                    # Must exist in envs/${ENV_NAME}/dashboards/
   #   name: "High CPU Usage"
   #   interval: "1m"
   #   org: "Main Organization"
@@ -998,7 +998,7 @@ groups: []
 EOF
 
 # --- Alerting: Contact Points ---
-cat > "$PROJECT_ROOT/config/${ENV_NAME}/alerting/contact_points.yaml" << EOF
+cat > "$PROJECT_ROOT/envs/${ENV_NAME}/alerting/contact_points.yaml" << EOF
 # =============================================================================
 # ${ENV_NAME^^} — Contact Point Overrides
 # =============================================================================
@@ -1057,7 +1057,7 @@ contactPoints: []
 EOF
 
 # --- Alerting: Notification Policies ---
-cat > "$PROJECT_ROOT/config/${ENV_NAME}/alerting/notification_policies.yaml" << EOF
+cat > "$PROJECT_ROOT/envs/${ENV_NAME}/alerting/notification_policies.yaml" << EOF
 # =============================================================================
 # ${ENV_NAME^^} — Notification Policy Overrides
 # =============================================================================
@@ -1104,12 +1104,12 @@ policies: []
   #     #     - "weekends"
 EOF
 
-CREATED_FILES+=("config/${ENV_NAME}/ (10 files)")
+CREATED_FILES+=("envs/${ENV_NAME}/ (10 files)")
 
 # =========================================================================
-# 4. dashboards/<name>/ with org directories
+# 4. envs/<name>/dashboards/ with org directories
 # =========================================================================
-echo -e "${BLUE}[4/4]${NC} Creating ${YELLOW}dashboards/${ENV_NAME}/${NC} directory structure"
+echo -e "${BLUE}[4/4]${NC} Creating ${YELLOW}envs/${ENV_NAME}/dashboards/${NC} directory structure"
 
 # Determine organization names
 ORG_NAMES=""
@@ -1118,7 +1118,7 @@ if [ -n "$ORGS" ]; then
     ORG_NAMES=$(echo "$ORGS" | tr ',' '\n')
 else
     # Parse from shared organizations.yaml
-    ORG_FILE="$PROJECT_ROOT/config/shared/organizations.yaml"
+    ORG_FILE="$PROJECT_ROOT/base/organizations.yaml"
     if [ -f "$ORG_FILE" ]; then
         ORG_NAMES=$(grep -E '^\s+- name:' "$ORG_FILE" | sed 's/.*name:\s*//;s/"//g;s/'"'"'//g;s/\s*$//' | grep -v '^#' || true)
     fi
@@ -1132,12 +1132,12 @@ fi
 while IFS= read -r org; do
     org=$(echo "$org" | xargs)  # trim whitespace
     [ -z "$org" ] && continue
-    mkdir -p "$PROJECT_ROOT/dashboards/${ENV_NAME}/${org}"
-    touch "$PROJECT_ROOT/dashboards/${ENV_NAME}/${org}/.gitkeep"
-    echo -e "       └── dashboards/${ENV_NAME}/${CYAN}${org}${NC}/"
+    mkdir -p "$PROJECT_ROOT/envs/${ENV_NAME}/dashboards/${org}"
+    touch "$PROJECT_ROOT/envs/${ENV_NAME}/dashboards/${org}/.gitkeep"
+    echo -e "       └── envs/${ENV_NAME}/dashboards/${CYAN}${org}${NC}/"
 done <<< "$ORG_NAMES"
 
-CREATED_FILES+=("dashboards/${ENV_NAME}/")
+CREATED_FILES+=("envs/${ENV_NAME}/dashboards/")
 
 # =========================================================================
 # Summary
@@ -1163,11 +1163,11 @@ echo -e "${BOLD}${YELLOW}Next steps:${NC}"
 
 STEP=1
 if [ -z "$KEYCLOAK_URL" ] && [ -z "$DATASOURCES" ]; then
-    echo -e "  ${CYAN}${STEP}.${NC} Edit ${YELLOW}environments/${ENV_NAME}.tfvars${NC} and ${YELLOW}config/${ENV_NAME}/*.yaml${NC} with your config"
+    echo -e "  ${CYAN}${STEP}.${NC} Edit ${YELLOW}envs/${ENV_NAME}/terraform.tfvars${NC} and ${YELLOW}envs/${ENV_NAME}/*.yaml${NC} with your config"
     STEP=$((STEP + 1))
 fi
 
-echo -e "  ${CYAN}${STEP}.${NC} Add dashboard JSON files to ${YELLOW}dashboards/${ENV_NAME}/${NC} or ${YELLOW}dashboards/shared/${NC}"
+echo -e "  ${CYAN}${STEP}.${NC} Add dashboard JSON files to ${YELLOW}envs/${ENV_NAME}/dashboards/${NC} or ${YELLOW}base/dashboards/${NC}"
 STEP=$((STEP + 1))
 
 echo -e "  ${CYAN}${STEP}.${NC} Set up Vault secrets:"

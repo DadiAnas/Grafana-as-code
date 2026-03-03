@@ -51,10 +51,10 @@ fi
 
 # Check if environment exists
 ENV_EXISTS=false
-[ -f "$PROJECT_ROOT/environments/${ENV_NAME}.tfvars" ] && ENV_EXISTS=true
-[ -f "$PROJECT_ROOT/backends/${ENV_NAME}.tfbackend" ] && ENV_EXISTS=true
-[ -d "$PROJECT_ROOT/config/${ENV_NAME}" ] && ENV_EXISTS=true
-[ -d "$PROJECT_ROOT/dashboards/${ENV_NAME}" ] && ENV_EXISTS=true
+[ -f "$PROJECT_ROOT/envs/${ENV_NAME}/terraform.tfvars" ] && ENV_EXISTS=true
+[ -f "$PROJECT_ROOT/envs/${ENV_NAME}/backend.tfbackend" ] && ENV_EXISTS=true
+[ -d "$PROJECT_ROOT/envs/${ENV_NAME}" ] && ENV_EXISTS=true
+[ -d "$PROJECT_ROOT/envs/${ENV_NAME}/dashboards" ] && ENV_EXISTS=true
 
 if [ "$ENV_EXISTS" = false ]; then
     echo -e "${RED}Error: Environment '${ENV_NAME}' does not exist${NC}"
@@ -73,23 +73,23 @@ echo -e "${BOLD}The following files will be ${RED}permanently deleted${NC}${BOLD
 echo ""
 
 TOTAL_FILES=0
-if [ -f "$PROJECT_ROOT/environments/${ENV_NAME}.tfvars" ]; then
-    echo -e "  ${RED}✗${NC} environments/${ENV_NAME}.tfvars"
+if [ -f "$PROJECT_ROOT/envs/${ENV_NAME}/terraform.tfvars" ]; then
+    echo -e "  ${RED}✗${NC} envs/${ENV_NAME}/terraform.tfvars"
     TOTAL_FILES=$((TOTAL_FILES + 1))
 fi
-if [ -f "$PROJECT_ROOT/backends/${ENV_NAME}.tfbackend" ]; then
-    echo -e "  ${RED}✗${NC} backends/${ENV_NAME}.tfbackend"
+if [ -f "$PROJECT_ROOT/envs/${ENV_NAME}/backend.tfbackend" ]; then
+    echo -e "  ${RED}✗${NC} envs/${ENV_NAME}/backend.tfbackend"
     TOTAL_FILES=$((TOTAL_FILES + 1))
 fi
-if [ -d "$PROJECT_ROOT/config/${ENV_NAME}" ]; then
-    CONFIG_COUNT=$(find "$PROJECT_ROOT/config/${ENV_NAME}" -type f | wc -l)
-    echo -e "  ${RED}✗${NC} config/${ENV_NAME}/ ${DIM}(${CONFIG_COUNT} files)${NC}"
+if [ -d "$PROJECT_ROOT/envs/${ENV_NAME}" ]; then
+    CONFIG_COUNT=$(find "$PROJECT_ROOT/envs/${ENV_NAME}" -type f | wc -l)
+    echo -e "  ${RED}✗${NC} envs/${ENV_NAME}/ ${DIM}(${CONFIG_COUNT} files)${NC}"
     TOTAL_FILES=$((TOTAL_FILES + CONFIG_COUNT))
 fi
-if [ -d "$PROJECT_ROOT/dashboards/${ENV_NAME}" ]; then
-    DASH_COUNT=$(find "$PROJECT_ROOT/dashboards/${ENV_NAME}" -type f | wc -l)
-    JSON_COUNT=$(find "$PROJECT_ROOT/dashboards/${ENV_NAME}" -name '*.json' 2>/dev/null | wc -l)
-    echo -e "  ${RED}✗${NC} dashboards/${ENV_NAME}/ ${DIM}(${DASH_COUNT} files, ${JSON_COUNT} dashboards)${NC}"
+if [ -d "$PROJECT_ROOT/envs/${ENV_NAME}/dashboards" ]; then
+    DASH_COUNT=$(find "$PROJECT_ROOT/envs/${ENV_NAME}/dashboards" -type f | wc -l)
+    JSON_COUNT=$(find "$PROJECT_ROOT/envs/${ENV_NAME}/dashboards" -name '*.json' 2>/dev/null | wc -l)
+    echo -e "  ${RED}✗${NC} envs/${ENV_NAME}/dashboards/ ${DIM}(${DASH_COUNT} files, ${JSON_COUNT} dashboards)${NC}"
     TOTAL_FILES=$((TOTAL_FILES + DASH_COUNT))
 fi
 if [ -f "$PROJECT_ROOT/tfplan-${ENV_NAME}" ]; then
@@ -132,10 +132,10 @@ echo ""
 # -------------------------------------------------------------------------
 # Delete files
 # -------------------------------------------------------------------------
-[ -f "$PROJECT_ROOT/environments/${ENV_NAME}.tfvars" ] && rm -f "$PROJECT_ROOT/environments/${ENV_NAME}.tfvars" && echo -e "  ${GREEN}✓${NC} Removed environments/${ENV_NAME}.tfvars"
-[ -f "$PROJECT_ROOT/backends/${ENV_NAME}.tfbackend" ] && rm -f "$PROJECT_ROOT/backends/${ENV_NAME}.tfbackend" && echo -e "  ${GREEN}✓${NC} Removed backends/${ENV_NAME}.tfbackend"
-[ -d "$PROJECT_ROOT/config/${ENV_NAME}" ] && rm -rf "$PROJECT_ROOT/config/${ENV_NAME}" && echo -e "  ${GREEN}✓${NC} Removed config/${ENV_NAME}/"
-[ -d "$PROJECT_ROOT/dashboards/${ENV_NAME}" ] && rm -rf "$PROJECT_ROOT/dashboards/${ENV_NAME}" && echo -e "  ${GREEN}✓${NC} Removed dashboards/${ENV_NAME}/"
+[ -f "$PROJECT_ROOT/envs/${ENV_NAME}/terraform.tfvars" ] && rm -f "$PROJECT_ROOT/envs/${ENV_NAME}/terraform.tfvars" && echo -e "  ${GREEN}✓${NC} Removed envs/${ENV_NAME}/terraform.tfvars"
+[ -f "$PROJECT_ROOT/envs/${ENV_NAME}/backend.tfbackend" ] && rm -f "$PROJECT_ROOT/envs/${ENV_NAME}/backend.tfbackend" && echo -e "  ${GREEN}✓${NC} Removed envs/${ENV_NAME}/backend.tfbackend"
+[ -d "$PROJECT_ROOT/envs/${ENV_NAME}" ] && rm -rf "$PROJECT_ROOT/envs/${ENV_NAME}" && echo -e "  ${GREEN}✓${NC} Removed envs/${ENV_NAME}/"
+[ -d "$PROJECT_ROOT/envs/${ENV_NAME}/dashboards" ] && rm -rf "$PROJECT_ROOT/envs/${ENV_NAME}/dashboards" && echo -e "  ${GREEN}✓${NC} Removed envs/${ENV_NAME}/dashboards/"
 [ -f "$PROJECT_ROOT/tfplan-${ENV_NAME}" ] && rm -f "$PROJECT_ROOT/tfplan-${ENV_NAME}" && echo -e "  ${GREEN}✓${NC} Removed tfplan-${ENV_NAME}"
 
 echo ""

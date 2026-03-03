@@ -45,22 +45,22 @@ info() { echo -e "  ${BLUE}ℹ️  INFO${NC}  $1"; }
 # -------------------------------------------------------------------------
 echo -e "${BOLD}── Required Files ──${NC}"
 
-if [ -f "$PROJECT_ROOT/environments/${ENV_NAME}.tfvars" ]; then
-    pass "environments/${ENV_NAME}.tfvars"
+if [ -f "$PROJECT_ROOT/envs/${ENV_NAME}/terraform.tfvars" ]; then
+    pass "envs/${ENV_NAME}/terraform.tfvars"
 else
-    fail "environments/${ENV_NAME}.tfvars is missing"
+    fail "envs/${ENV_NAME}/terraform.tfvars is missing"
 fi
 
-if [ -d "$PROJECT_ROOT/config/${ENV_NAME}" ]; then
-    pass "config/${ENV_NAME}/ directory"
+if [ -d "$PROJECT_ROOT/envs/${ENV_NAME}" ]; then
+    pass "envs/${ENV_NAME}/ directory"
 else
-    fail "config/${ENV_NAME}/ directory is missing"
+    fail "envs/${ENV_NAME}/ directory is missing"
 fi
 
-if [ -d "$PROJECT_ROOT/dashboards/${ENV_NAME}" ]; then
-    pass "dashboards/${ENV_NAME}/ directory"
+if [ -d "$PROJECT_ROOT/envs/${ENV_NAME}/dashboards" ]; then
+    pass "envs/${ENV_NAME}/dashboards/ directory"
 else
-    fail "dashboards/${ENV_NAME}/ directory is missing"
+    fail "envs/${ENV_NAME}/dashboards/ directory is missing"
 fi
 
 echo ""
@@ -70,10 +70,10 @@ echo ""
 # -------------------------------------------------------------------------
 echo -e "${BOLD}── Optional Files ──${NC}"
 
-if [ -f "$PROJECT_ROOT/backends/${ENV_NAME}.tfbackend" ]; then
-    pass "backends/${ENV_NAME}.tfbackend"
+if [ -f "$PROJECT_ROOT/envs/${ENV_NAME}/backend.tfbackend" ]; then
+    pass "envs/${ENV_NAME}/backend.tfbackend"
 else
-    info "backends/${ENV_NAME}.tfbackend not found (using local state)"
+    info "envs/${ENV_NAME}/backend.tfbackend not found (using local state)"
 fi
 
 echo ""
@@ -97,10 +97,10 @@ EXPECTED_CONFIG_FILES=(
 )
 
 for cfg in "${EXPECTED_CONFIG_FILES[@]}"; do
-    if [ -f "$PROJECT_ROOT/config/${ENV_NAME}/${cfg}" ]; then
-        pass "config/${ENV_NAME}/${cfg}"
+    if [ -f "$PROJECT_ROOT/envs/${ENV_NAME}/${cfg}" ]; then
+        pass "envs/${ENV_NAME}/${cfg}"
     else
-        warn "config/${ENV_NAME}/${cfg} is missing (shared config will apply)"
+        warn "envs/${ENV_NAME}/${cfg} is missing (shared config will apply)"
     fi
 done
 
@@ -112,10 +112,10 @@ echo ""
 echo -e "${BOLD}── Shared Configuration ──${NC}"
 
 for cfg in "${EXPECTED_CONFIG_FILES[@]}"; do
-    if [ -f "$PROJECT_ROOT/config/shared/${cfg}" ]; then
-        pass "config/shared/${cfg}"
+    if [ -f "$PROJECT_ROOT/base/${cfg}" ]; then
+        pass "base/${cfg}"
     else
-        fail "config/shared/${cfg} is missing!"
+        fail "base/${cfg} is missing!"
     fi
 done
 
@@ -126,8 +126,8 @@ echo ""
 # -------------------------------------------------------------------------
 echo -e "${BOLD}── Variables Check ──${NC}"
 
-if [ -f "$PROJECT_ROOT/environments/${ENV_NAME}.tfvars" ]; then
-    TFVARS_FILE="$PROJECT_ROOT/environments/${ENV_NAME}.tfvars"
+if [ -f "$PROJECT_ROOT/envs/${ENV_NAME}/terraform.tfvars" ]; then
+    TFVARS_FILE="$PROJECT_ROOT/envs/${ENV_NAME}/terraform.tfvars"
 
     # Check grafana_url is set
     if grep -qE '^\s*grafana_url\s*=' "$TFVARS_FILE"; then
@@ -164,21 +164,21 @@ echo ""
 # -------------------------------------------------------------------------
 echo -e "${BOLD}── Dashboard Structure ──${NC}"
 
-if [ -d "$PROJECT_ROOT/dashboards/${ENV_NAME}" ]; then
-    ORG_DIRS=$(find "$PROJECT_ROOT/dashboards/${ENV_NAME}" -maxdepth 1 -mindepth 1 -type d -printf '%f\n' | sort)
+if [ -d "$PROJECT_ROOT/envs/${ENV_NAME}/dashboards" ]; then
+    ORG_DIRS=$(find "$PROJECT_ROOT/envs/${ENV_NAME}/dashboards" -maxdepth 1 -mindepth 1 -type d -printf '%f\n' | sort)
     if [ -n "$ORG_DIRS" ]; then
         while IFS= read -r org; do
-            JSON_COUNT=$(find "$PROJECT_ROOT/dashboards/${ENV_NAME}/${org}" -name '*.json' 2>/dev/null | wc -l)
-            info "dashboards/${ENV_NAME}/${org}/ (${JSON_COUNT} dashboard files)"
+            JSON_COUNT=$(find "$PROJECT_ROOT/envs/${ENV_NAME}/dashboards/${org}" -name '*.json' 2>/dev/null | wc -l)
+            info "envs/${ENV_NAME}/dashboards/${org}/ (${JSON_COUNT} dashboard files)"
         done <<< "$ORG_DIRS"
     else
-        warn "No organization subdirectories in dashboards/${ENV_NAME}/"
+        warn "No organization subdirectories in envs/${ENV_NAME}/dashboards/"
     fi
 fi
 
-if [ -d "$PROJECT_ROOT/dashboards/shared" ]; then
-    SHARED_JSON=$(find "$PROJECT_ROOT/dashboards/shared" -name '*.json' | wc -l)
-    info "dashboards/shared/ (${SHARED_JSON} shared dashboard files)"
+if [ -d "$PROJECT_ROOT/base/dashboards" ]; then
+    SHARED_JSON=$(find "$PROJECT_ROOT/base/dashboards" -name '*.json' | wc -l)
+    info "base/dashboards/ (${SHARED_JSON} shared dashboard files)"
 fi
 
 echo ""

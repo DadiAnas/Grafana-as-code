@@ -1,5 +1,5 @@
 output "datasource_ids" {
-  description = "Map of datasource UIDs to their IDs"
+  description = "Map of org:uid composite keys to datasource IDs"
   value       = { for k, v in grafana_data_source.datasources : k => v.id }
 }
 

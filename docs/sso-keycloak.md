@@ -120,13 +120,13 @@ Create the following groups in Keycloak:
 
 SSO is configured via two YAML files:
 
-1. **Shared settings**: `config/shared/sso.yaml`
-2. **Environment-specific overrides**: `config/{env}/sso.yaml`
+1. **Shared settings**: `base/sso.yaml`
+2. **Environment-specific overrides**: `envs/{env}/sso.yaml`
 
 ### sso.yaml (Per Environment)
 
 ```yaml
-# config/shared/sso.yaml — or override in config/{env}/sso.yaml
+# base/sso.yaml — or override in envs/{env}/sso.yaml
 
 sso:
   enabled: true
@@ -193,7 +193,7 @@ vault kv put grafana/npr/sso/keycloak \
 Organization mapping is defined in `sso.yaml` using the `groups` array, where each group has `org_mappings`:
 
 ```yaml
-# config/shared/sso.yaml
+# base/sso.yaml
 sso:
   enabled: true
   # ... (OAuth settings above)

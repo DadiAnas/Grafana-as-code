@@ -4,7 +4,7 @@
 # terraform {
 #   backend "s3" {
 #     # Configuration provided via -backend-config flag
-#     # See backends/*.tfbackend files
+#     # See envs/<env>/backend.tfbackend files
 #   }
 # }
 

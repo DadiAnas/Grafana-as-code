@@ -120,7 +120,7 @@ fi
 echo ""
 
 IMPORTED_COUNT=0
-CONFIG_DIR="${OUTPUT}/config/${ENV_NAME}"
+CONFIG_DIR="${OUTPUT}/envs/${ENV_NAME}"
 mkdir -p "${CONFIG_DIR}/alerting"
 
 # =========================================================================
@@ -173,7 +173,7 @@ for org in orgs:
     print()
 " 2>/dev/null
     } > "${CONFIG_DIR}/organizations.yaml"
-    echo -e "  ${GREEN}✓${NC} ${ORG_COUNT} organization(s) → config/${ENV_NAME}/organizations.yaml"
+    echo -e "  ${GREEN}✓${NC} ${ORG_COUNT} organization(s) → envs/${ENV_NAME}/organizations.yaml"
     IMPORTED_COUNT=$((IMPORTED_COUNT + 1))
 else
     echo -e "  ${DIM}  No organizations found${NC}"
@@ -326,7 +326,7 @@ for ds in datasources:
 export CURRENT_ORG_ID=""
 
 if [ "$TOTAL_DS" -gt 0 ]; then
-    echo -e "  ${GREEN}✓${NC} ${TOTAL_DS} datasource(s) across ${#ORG_IDS[@]} org(s) → config/${ENV_NAME}/datasources.yaml"
+    echo -e "  ${GREEN}✓${NC} ${TOTAL_DS} datasource(s) across ${#ORG_IDS[@]} org(s) → envs/${ENV_NAME}/datasources.yaml"
     IMPORTED_COUNT=$((IMPORTED_COUNT + 1))
 else
     echo -e "  ${DIM}  No datasources found${NC}"
@@ -337,9 +337,73 @@ fi
 # =========================================================================
 echo -e "${BLUE}[3/8]${NC} Importing folders..."
 
+# -------------------------------------------------------------------------
+# Phase 1: Build global UID mapping (old random UID → slugified title UID)
+# This mapping is reused by dashboards and alert rules sections.
+# -------------------------------------------------------------------------
+declare -A FOLDER_UID_MAP  # Maps old_uid → new_slug_uid (across all orgs)
+
+FOLDER_MAPPING_JSON=""
+for ORG_ID in "${ORG_IDS[@]}"; do
+    export CURRENT_ORG_ID="$ORG_ID"
+    ORG_NAME="${ORG_NAME_MAP[$ORG_ID]:-Org $ORG_ID}"
+
+    FOLDERS_JSON=$(grafana_api "/api/folders?limit=1000" || echo "[]")
+
+    # Generate slug UIDs and mapping using Python
+    MAPPING=$(echo "$FOLDERS_JSON" | python3 -c "
+import json, sys, re
+
+folders = json.load(sys.stdin)
+
+def slugify(title):
+    \"\"\"Convert a folder title to a clean, filesystem-safe slug.\"\"\"
+    s = title.lower().strip()
+    s = re.sub(r'[^a-z0-9\s-]', '', s)   # Remove special chars
+    s = re.sub(r'[\s_]+', '-', s)         # Spaces/underscores → hyphens
+    s = re.sub(r'-+', '-', s)             # Collapse multiple hyphens
+    s = s.strip('-')
+    return s or 'folder'
+
+# First pass: generate slugs with dedup
+used_slugs = set()
+mapping = {}  # old_uid → new_slug
+
+# Sort by parentUid (top-level first) to get stable slug assignment
+top_level = [f for f in folders if not f.get('parentUid')]
+children  = [f for f in folders if f.get('parentUid')]
+
+for f in top_level + children:
+    old_uid = f['uid']
+    base_slug = slugify(f['title'])
+    slug = base_slug
+    counter = 1
+    while slug in used_slugs:
+        counter += 1
+        slug = f'{base_slug}-{counter}'
+    used_slugs.add(slug)
+    mapping[old_uid] = slug
+
+# Output: old_uid|new_slug per line
+for old_uid, new_slug in mapping.items():
+    print(f'{old_uid}|{new_slug}')
+" 2>/dev/null)
+
+    # Store the mapping
+    while IFS='|' read -r old_uid new_slug; do
+        [ -n "$old_uid" ] && FOLDER_UID_MAP[$old_uid]="$new_slug"
+    done <<< "$MAPPING"
+done
+export CURRENT_ORG_ID=""
+
+# -------------------------------------------------------------------------
+# Phase 2: Generate folders.yaml with slugified UIDs
+# -------------------------------------------------------------------------
 TOTAL_FOLDERS=0
 {
     echo "# Imported from ${GRAFANA_URL} on $(date -Iseconds)"
+    echo "# NOTE: Folder UIDs have been slugified from the original random Grafana UIDs"
+    echo "#       for better readability in both YAML config and directory structure."
     echo ""
     echo "folders:"
 
@@ -351,7 +415,15 @@ TOTAL_FOLDERS=0
         FOLDER_COUNT=$(echo "$FOLDERS_JSON" | (grep -c '"uid"' || true))
 
         if [ "$FOLDER_COUNT" -gt 0 ]; then
-            echo "$FOLDERS_JSON" | python3 -c "
+            # Pass the UID mapping as an environment variable
+            MAPPING_JSON=$(python3 -c "
+import json
+mapping = {}
+$(for old_uid in "${!FOLDER_UID_MAP[@]}"; do echo "mapping['${old_uid}'] = '${FOLDER_UID_MAP[$old_uid]}'"; done)
+print(json.dumps(mapping))
+" 2>/dev/null)
+
+            echo "$FOLDERS_JSON" | UID_MAP="$MAPPING_JSON" python3 -c "
 import json, sys, subprocess, os
 
 org_name = '$ORG_NAME'
@@ -359,6 +431,7 @@ org_id = $ORG_ID
 grafana_url = os.environ.get('GRAFANA_URL', '${GRAFANA_URL}')
 auth = os.environ.get('AUTH', '${AUTH}')
 folders = json.load(sys.stdin)
+uid_map = json.loads(os.environ.get('UID_MAP', '{}'))
 
 # Build team id->name map for this org
 try:
@@ -383,19 +456,24 @@ except Exception:
     user_map = {}
 
 for f in folders:
+    old_uid = f['uid']
+    new_uid = uid_map.get(old_uid, old_uid)
+    parent_old = f.get('parentUid', '')
+    parent_new = uid_map.get(parent_old, parent_old) if parent_old else ''
+
     print(f'  - title: \"{f[\"title\"]}\"')
-    print(f'    uid: \"{f[\"uid\"]}\"')
+    print(f'    uid: \"{new_uid}\"')
+    print(f'    # original_uid: \"{old_uid}\"')
     print(f'    org: \"{org_name}\"')
     print(f'    orgId: {org_id}')
-    parent = f.get('parentUid', '')
-    if parent:
-        print(f'    parent_uid: \"{parent}\"')
+    if parent_new:
+        print(f'    parent_uid: \"{parent_new}\"')
 
-    # Fetch folder permissions
+    # Fetch folder permissions (using original Grafana UID for API call)
     try:
         result = subprocess.run(
             ['curl', '-sf', '-u', auth, '-H', f'X-Grafana-Org-Id: {org_id}',
-             f'{grafana_url}/api/folders/{f[\"uid\"]}/permissions'],
+             f'{grafana_url}/api/folders/{old_uid}/permissions'],
             capture_output=True, text=True, timeout=10)
         perms = json.loads(result.stdout) if result.returncode == 0 else []
     except Exception:
@@ -430,8 +508,10 @@ for f in folders:
 } > "${CONFIG_DIR}/folders.yaml"
 export CURRENT_ORG_ID=""
 
-# Create dashboard directories for every folder (so Terraform fileset discovers them)
-DASH_BASE="${OUTPUT}/dashboards/${ENV_NAME}"
+# -------------------------------------------------------------------------
+# Phase 3: Create dashboard directories using slugified UIDs
+# -------------------------------------------------------------------------
+DASH_BASE="${OUTPUT}/envs/${ENV_NAME}/dashboards"
 for ORG_ID in "${ORG_IDS[@]}"; do
     export CURRENT_ORG_ID="$ORG_ID"
     ORG_NAME="${ORG_NAME_MAP[$ORG_ID]:-Org $ORG_ID}"
@@ -443,15 +523,17 @@ for f in json.load(sys.stdin):
     print(f.get('uid', ''))
 " 2>/dev/null | while read -r fuid; do
         [ -z "$fuid" ] && continue
-        mkdir -p "${DASH_BASE}/${ORG_NAME}/${fuid}"
-        [ ! -f "${DASH_BASE}/${ORG_NAME}/${fuid}/.gitkeep" ] && touch "${DASH_BASE}/${ORG_NAME}/${fuid}/.gitkeep" || true
+        # Use slugified UID for directory name
+        SLUG_UID="${FOLDER_UID_MAP[$fuid]:-$fuid}"
+        mkdir -p "${DASH_BASE}/${ORG_NAME}/${SLUG_UID}"
+        [ ! -f "${DASH_BASE}/${ORG_NAME}/${SLUG_UID}/.gitkeep" ] && touch "${DASH_BASE}/${ORG_NAME}/${SLUG_UID}/.gitkeep" || true
     done
 done
 export CURRENT_ORG_ID=""
 
 if [ "$TOTAL_FOLDERS" -gt 0 ]; then
-    echo -e "  ${GREEN}✓${NC} ${TOTAL_FOLDERS} folder(s) across ${#ORG_IDS[@]} org(s) → config/${ENV_NAME}/folders.yaml"
-    echo -e "  ${GREEN}✓${NC} Created ${TOTAL_FOLDERS} folder directories under dashboards/${ENV_NAME}/"
+    echo -e "  ${GREEN}✓${NC} ${TOTAL_FOLDERS} folder(s) across ${#ORG_IDS[@]} org(s) → envs/${ENV_NAME}/folders.yaml"
+    echo -e "  ${GREEN}✓${NC} Created ${TOTAL_FOLDERS} folder directories under envs/${ENV_NAME}/dashboards/"
     IMPORTED_COUNT=$((IMPORTED_COUNT + 1))
 else
     echo -e "  ${DIM}  No folders found${NC}"
@@ -554,7 +636,7 @@ if isinstance(teams, list):
 export CURRENT_ORG_ID=""
 
 if [ "$TOTAL_TEAMS" -gt 0 ]; then
-    echo -e "  ${GREEN}✓${NC} ${TOTAL_TEAMS} team(s) across ${#ORG_IDS[@]} org(s) → config/${ENV_NAME}/teams.yaml"
+    echo -e "  ${GREEN}✓${NC} ${TOTAL_TEAMS} team(s) across ${#ORG_IDS[@]} org(s) → envs/${ENV_NAME}/teams.yaml"
     IMPORTED_COUNT=$((IMPORTED_COUNT + 1))
 else
     echo -e "  ${DIM}  No teams found${NC}"
@@ -604,7 +686,7 @@ for sa in data.get('serviceAccounts', []):
 export CURRENT_ORG_ID=""
 
 if [ "$TOTAL_SA" -gt 0 ]; then
-    echo -e "  ${GREEN}✓${NC} ${TOTAL_SA} service account(s) across ${#ORG_IDS[@]} org(s) → config/${ENV_NAME}/service_accounts.yaml"
+    echo -e "  ${GREEN}✓${NC} ${TOTAL_SA} service account(s) across ${#ORG_IDS[@]} org(s) → envs/${ENV_NAME}/service_accounts.yaml"
     IMPORTED_COUNT=$((IMPORTED_COUNT + 1))
 else
     echo -e "  ${DIM}  No service accounts found${NC}"
@@ -707,14 +789,23 @@ TOTAL_AR=0
         AR_COUNT=$(echo "$AR_JSON" | (grep -c '"uid"' || true))
 
         if [ "$AR_COUNT" -gt 0 ]; then
-            echo "$AR_JSON" | python3 -c "
-import json, sys, yaml
+            # Build UID map JSON for this python block
+            AR_UID_MAP_JSON=$(python3 -c "
+import json
+mapping = {}
+$(for old_uid in "${!FOLDER_UID_MAP[@]}"; do echo "mapping['${old_uid}'] = '${FOLDER_UID_MAP[$old_uid]}'"; done)
+print(json.dumps(mapping))
+" 2>/dev/null)
+
+            echo "$AR_JSON" | FOLDER_MAP="$AR_UID_MAP_JSON" python3 -c "
+import json, sys, yaml, os
 
 class NoAliasDumper(yaml.SafeDumper):
     def ignore_aliases(self, data):
         return True
 
 org_name = '$ORG_NAME'
+folder_map = json.loads(os.environ.get('FOLDER_MAP', '{}'))
 try:
     rules = json.load(sys.stdin)
 except:
@@ -722,7 +813,8 @@ except:
 
 groups = {}
 for rule in rules:
-    folder = rule.get('folderUID', 'general')
+    folder_raw = rule.get('folderUID', 'general')
+    folder = folder_map.get(folder_raw, folder_raw)
     group_name = rule.get('ruleGroup', 'default')
     key = f'{folder}/{group_name}'
     
@@ -920,7 +1012,7 @@ fi
 if [ "$IMPORT_DASHBOARDS" = true ]; then
     echo -e "${BLUE}[7/8]${NC} Importing dashboards..."
 
-    DASH_DIR="${OUTPUT}/dashboards/${ENV_NAME}"
+    DASH_DIR="${OUTPUT}/envs/${ENV_NAME}/dashboards"
 
     for ORG_ID in "${ORG_IDS[@]}"; do
         export CURRENT_ORG_ID="$ORG_ID"
@@ -940,9 +1032,11 @@ for d in dashboards:
     print(f'{uid}|{folder_uid}|{title}')
 " 2>/dev/null | while IFS='|' read -r uid folder_uid title; do
                 [ -z "$folder_uid" ] && folder_uid="general"
+                # Remap to slugified UID
+                slug_folder_uid="${FOLDER_UID_MAP[$folder_uid]:-$folder_uid}"
                 safe_title=$(echo "$title" | sed 's/[\/\\]/-/g')
 
-                mkdir -p "${DASH_DIR}/${ORG_NAME}/${folder_uid}"
+                mkdir -p "${DASH_DIR}/${ORG_NAME}/${slug_folder_uid}"
 
                 DASH_JSON=$(grafana_api "/api/dashboards/uid/${uid}" || echo "")
                 if [ -n "$DASH_JSON" ]; then
@@ -953,15 +1047,15 @@ dash = data.get('dashboard', {})
 dash.pop('id', None)
 dash.pop('version', None)
 print(json.dumps(dash, indent=2))
-" 2>/dev/null > "${DASH_DIR}/${ORG_NAME}/${folder_uid}/${safe_title}.json"
-                    echo -e "  ${GREEN}✓${NC} ${ORG_NAME}/${folder_uid}/${safe_title}.json"
+" 2>/dev/null > "${DASH_DIR}/${ORG_NAME}/${slug_folder_uid}/${safe_title}.json"
+                    echo -e "  ${GREEN}✓${NC} ${ORG_NAME}/${slug_folder_uid}/${safe_title}.json"
                 fi
             done
         fi
     done
     export CURRENT_ORG_ID=""
 
-    echo -e "  ${GREEN}✓${NC} Exported dashboards to dashboards/${ENV_NAME}/"
+    echo -e "  ${GREEN}✓${NC} Exported dashboards to envs/${ENV_NAME}/dashboards/"
     IMPORTED_COUNT=$((IMPORTED_COUNT + 1))
 else
     echo -e "${BLUE}[7/8]${NC} ${DIM}Skipping dashboards (--no-dashboards)${NC}"
@@ -1053,9 +1147,11 @@ else:
     if org_mapping_str:
         print('  # Group-to-org role mappings')
         print('  # Generated from Grafana org_mapping config')
-        print('  # Use org: \"*\" to apply a role to all organizations')
+        print('  # Use org: "*" to apply a role to all organizations')
+        print('  # Use name: "*" (wildcard_group: true) to apply to all groups')
         print('  groups:')
         # org_mapping format: group_name:org_id_or_*:role (newline separated)
+        # Both group_name and org_id can be "*" (wildcard / all)
         mappings = [m.strip() for m in org_mapping_str.strip().replace('\\n', '\n').split('\n') if m.strip()]
 
         # Collect all known org IDs from the org_map
@@ -1072,17 +1168,20 @@ else:
                 if group_name not in groups:
                     groups[group_name] = []
                     group_order.append(group_name)
-                if org_id == '*':
-                    # Wildcard already in source — preserve it
-                    groups[group_name].append({'org': '*', 'role': role})
-                else:
-                    org_name = org_map.get(org_id, org_id)
-                    groups[group_name].append({'org': org_name, 'role': role, '_org_id': org_id})
 
-        # Collapse: if a group maps to ALL orgs with the same role, use org: \"*\"
+                entry = {'role': role}
+                if org_id == '*':
+                    # Wildcard org: applies to all organizations
+                    entry['org'] = '*'
+                else:
+                    entry['org'] = org_map.get(org_id, org_id)
+                    entry['_org_id'] = org_id
+                groups[group_name].append(entry)
+
+        # Collapse: if a group maps to ALL orgs with the same role, use org: "*"
         for group_name in group_order:
             mappings_list = groups[group_name]
-            # Skip if already contains a wildcard
+            # Skip if already contains a wildcard org
             if any(m['org'] == '*' for m in mappings_list):
                 continue
             # Check by role: count how many orgs share the same role
@@ -1091,7 +1190,7 @@ else:
                 role_counts.setdefault(m['role'], []).append(m)
             # If one role covers ALL known orgs, collapse to *
             for role, role_mappings in role_counts.items():
-                covered_ids = {m['_org_id'] for m in role_mappings}
+                covered_ids = {m['_org_id'] for m in role_mappings if '_org_id' in m}
                 if len(all_org_ids) > 1 and covered_ids >= all_org_ids:
                     # This role covers all orgs — collapse to *
                     remaining = [m for m in mappings_list if m['role'] != role]
@@ -1101,6 +1200,9 @@ else:
 
         for group_name in group_order:
             print(f'    - name: \"{group_name}\"')
+            # Mark wildcard group names so the SSO module handles them specially
+            if group_name == '*':
+                print(f'      wildcard_group: true')
             print(f'      org_mappings:')
             for om in groups[group_name]:
                 print(f'        - org: \"{om[\"org\"]}\"')
@@ -1131,9 +1233,9 @@ print(len(enabled))
 " 2>/dev/null || echo 0)
 
 if [ "$SSO_ENABLED" -gt 0 ]; then
-    echo -e "  ${GREEN}✓${NC} SSO config (enabled) → config/${ENV_NAME}/sso.yaml"
+    echo -e "  ${GREEN}✓${NC} SSO config (enabled) → envs/${ENV_NAME}/sso.yaml"
 else
-    echo -e "  ${DIM}  SSO disabled → config/${ENV_NAME}/sso.yaml${NC}"
+    echo -e "  ${DIM}  SSO disabled → envs/${ENV_NAME}/sso.yaml${NC}"
 fi
 IMPORTED_COUNT=$((IMPORTED_COUNT + 1))
 
@@ -1149,11 +1251,11 @@ EOFKC
 
 # Clean up any orphaned Keycloak resources from Terraform state
 # (keycloak.yaml defaults to enabled: false, so state entries would cause errors)
-KC_STATE=$(terraform state list 2>/dev/null | grep '^module\.keycloak\.' || true)
+KC_STATE=$(terraform -chdir=terraform state list 2>/dev/null | grep '^module\.keycloak\.' || true)
 if [ -n "$KC_STATE" ]; then
     echo -e "  ${YELLOW}Removing orphaned Keycloak resources from Terraform state...${NC}"
     echo "$KC_STATE" | while IFS= read -r resource; do
-        terraform state rm "$resource" >/dev/null 2>&1 || true
+        terraform -chdir=terraform state rm "$resource" >/dev/null 2>&1 || true
     done
     echo -e "  ${GREEN}✓${NC} Cleaned $(echo "$KC_STATE" | wc -l) Keycloak state entries"
 fi
@@ -1161,9 +1263,9 @@ fi
 # =========================================================================
 # Generate tfvars file
 # =========================================================================
-TFVARS_FILE="${OUTPUT}/environments/${ENV_NAME}.tfvars"
+TFVARS_FILE="${OUTPUT}/envs/${ENV_NAME}/terraform.tfvars"
 if [ ! -f "$TFVARS_FILE" ]; then
-    mkdir -p "${OUTPUT}/environments"
+    mkdir -p "$(dirname "$TFVARS_FILE")"
     cat > "$TFVARS_FILE" << EOFVARS
 # =============================================================================
 # ${ENV_NAME^^} ENVIRONMENT - Terraform Variables
@@ -1178,7 +1280,7 @@ if [ ! -f "$TFVARS_FILE" ]; then
 # The URL of your Grafana instance
 grafana_url = "${GRAFANA_URL}"
 
-# Environment name — must match a directory under config/ and dashboards/
+# Environment name — must match a directory under envs/
 environment = "${ENV_NAME}"
 
 # Vault Configuration (HashiCorp Vault for secrets management)
@@ -1190,9 +1292,9 @@ vault_mount   = "grafana"
 # Keycloak Configuration (optional — only if you enable SSO via Keycloak)
 # keycloak_url = "https://keycloak.example.com"
 EOFVARS
-    echo -e "  ${GREEN}✓${NC} Generated environments/${ENV_NAME}.tfvars"
+    echo -e "  ${GREEN}✓${NC} Generated envs/${ENV_NAME}/terraform.tfvars"
 else
-    echo -e "  ${DIM}  environments/${ENV_NAME}.tfvars already exists (skipped)${NC}"
+    echo -e "  ${DIM}  envs/${ENV_NAME}/terraform.tfvars already exists (skipped)${NC}"
 fi
 
 # =========================================================================
@@ -1209,15 +1311,15 @@ echo "  Orgs:        ${#ORG_IDS[@]} (${ORG_IDS[*]})"
 echo "  Imported:    ${IMPORTED_COUNT} resource type(s)"
 echo ""
 echo "  Generated files:"
-echo "    config/${ENV_NAME}/"
+echo "    envs/${ENV_NAME}/"
 ls -1 "${CONFIG_DIR}/" 2>/dev/null | sed 's/^/      /'
-echo "    config/${ENV_NAME}/alerting/"
+echo "    envs/${ENV_NAME}/alerting/"
 ls -1 "${CONFIG_DIR}/alerting/" 2>/dev/null | sed 's/^/      /'
 if [ "$IMPORT_DASHBOARDS" = true ]; then
-    DASH_DIR="${OUTPUT}/dashboards/${ENV_NAME}"
+    DASH_DIR="${OUTPUT}/envs/${ENV_NAME}/dashboards"
     if [ -d "$DASH_DIR" ]; then
         DASH_FILE_COUNT=$(find "$DASH_DIR" -name "*.json" 2>/dev/null | wc -l)
-        echo "    dashboards/${ENV_NAME}/ (${DASH_FILE_COUNT} dashboards)"
+        echo "    envs/${ENV_NAME}/dashboards/ (${DASH_FILE_COUNT} dashboards)"
         # Show breakdown per org
         for ORG_ID in "${ORG_IDS[@]}"; do
             ORG_NAME="${ORG_NAME_MAP[$ORG_ID]:-Org $ORG_ID}"
@@ -1233,8 +1335,8 @@ echo -e "  ${YELLOW}⚠  Review and adjust the generated YAML files before apply
 echo "  Some values (SSO, secrets, Keycloak) need manual configuration."
 echo ""
 echo "  Next steps:"
-echo "    1. Review config/${ENV_NAME}/*.yaml"
-echo "    2. Review environments/${ENV_NAME}.tfvars"
+echo "    1. Review envs/${ENV_NAME}/*.yaml"
+echo "    2. Review envs/${ENV_NAME}/terraform.tfvars"
 echo "    3. Set up Vault secrets: make vault-setup ENV=${ENV_NAME}"
 echo "    4. Run: make init ENV=${ENV_NAME} && make plan ENV=${ENV_NAME}"
 echo ""

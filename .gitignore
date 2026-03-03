@@ -10,10 +10,10 @@ crash.*.log
 # Terraform variable files (may contain secrets)
 *.tfvars
 !*.tfvars.example
-!environments/*.tfvars
+!envs/*/terraform.tfvars
 
-# Backend configs with secrets
-!backends/*.tfbackend
+# Backend configs
+!envs/*/backend.tfbackend
 
 # Override files
 override.tf
@@ -68,9 +68,6 @@ token.txt
 # Terraform plan output
 *.tfplan
 plan.out
-
-# Dashboard exports (if auto-generated)
-dashboards/*.json.bak
 
 # Backups (from make backup)
 backups/

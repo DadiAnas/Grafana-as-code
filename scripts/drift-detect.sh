@@ -33,9 +33,9 @@ echo "╚═══════════════════════�
 echo -e "${NC}"
 
 # Validate environment exists
-if [ ! -f "$PROJECT_ROOT/environments/${ENV}.tfvars" ]; then
+if [ ! -f "$PROJECT_ROOT/envs/${ENV}/terraform.tfvars" ]; then
     echo -e "${RED}Error: Environment '${ENV}' not found${NC}"
-    echo "  Missing: environments/${ENV}.tfvars"
+    echo "  Missing: envs/${ENV}/terraform.tfvars"
     exit 1
 fi
 
@@ -44,8 +44,8 @@ fi
 echo -e "${BLUE}Running terraform plan...${NC}"
 echo ""
 
-PLAN_OUTPUT=$(cd "$PROJECT_ROOT" && terraform plan \
-    -var-file="environments/${ENV}.tfvars" \
+PLAN_OUTPUT=$(cd "$PROJECT_ROOT" && terraform -chdir=terraform plan \
+    -var-file="../envs/${ENV}/terraform.tfvars" \
     -var="environment=${ENV}" \
     -detailed-exitcode \
     -no-color \

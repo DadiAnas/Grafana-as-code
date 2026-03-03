@@ -19,8 +19,10 @@
 # Default environment — override with: make plan ENV=staging
 ENV ?= myenv
 
-TF_VAR_FILE = environments/$(ENV).tfvars
-TF_BACKEND  = backends/$(ENV).tfbackend
+# Paths (new structure)
+TF_DIR      = terraform
+TF_VAR_FILE = ../envs/$(ENV)/terraform.tfvars
+TF_BACKEND  = ../envs/$(ENV)/backend.tfbackend
 
 # ============================
 # Help
@@ -167,28 +169,28 @@ check-env:
 
 init:
 	@echo "Initializing Terraform for $(ENV)..."
-	terraform init -backend-config=$(TF_BACKEND) -reconfigure
+	terraform -chdir=$(TF_DIR) init -backend-config=$(TF_BACKEND) -reconfigure
 
 plan:
 	@echo "Planning changes for $(ENV)..."
-	terraform plan -var-file=$(TF_VAR_FILE) -out=tfplan-$(ENV)
+	terraform -chdir=$(TF_DIR) plan -var-file=$(TF_VAR_FILE) -out=tfplan-$(ENV)
 
 apply:
 	@echo "Applying changes for $(ENV)..."
-	@if [ -f tfplan-$(ENV) ]; then \
-		terraform apply tfplan-$(ENV); \
+	@if [ -f $(TF_DIR)/tfplan-$(ENV) ]; then \
+		terraform -chdir=$(TF_DIR) apply tfplan-$(ENV); \
 	else \
-		terraform apply -var-file=$(TF_VAR_FILE); \
+		terraform -chdir=$(TF_DIR) apply -var-file=$(TF_VAR_FILE); \
 	fi
 
 apply-auto:
 	@echo "Auto-applying changes for $(ENV)..."
-	terraform apply -var-file=$(TF_VAR_FILE) -auto-approve
+	terraform -chdir=$(TF_DIR) apply -var-file=$(TF_VAR_FILE) -auto-approve
 
 destroy:
 	@echo "WARNING: This will DESTROY all resources in $(ENV)!"
 	@read -p "Type the environment name to confirm: " confirm && [ "$$confirm" = "$(ENV)" ]
-	terraform destroy -var-file=$(TF_VAR_FILE)
+	terraform -chdir=$(TF_DIR) destroy -var-file=$(TF_VAR_FILE)
 
 # =============================================================================
 # UTILITIES
@@ -196,32 +198,32 @@ destroy:
 
 fmt:
 	@echo "Formatting Terraform files..."
-	terraform fmt -recursive
+	terraform fmt -recursive $(TF_DIR)
 
 validate:
 	@echo "Validating Terraform configuration..."
-	terraform validate
+	terraform -chdir=$(TF_DIR) validate
 
 clean:
 	@echo "Cleaning Terraform cache..."
-	rm -rf .terraform
-	rm -f tfplan-*
-	rm -f *.tfplan
+	rm -rf $(TF_DIR)/.terraform
+	rm -f $(TF_DIR)/tfplan-*
+	rm -f $(TF_DIR)/*.tfplan
 
 lint:
 	@echo "Running TFLint..."
-	@tflint --init 2>/dev/null || true
-	tflint --recursive
+	@cd $(TF_DIR) && tflint --init 2>/dev/null || true
+	cd $(TF_DIR) && tflint --recursive
 	@echo ""
 	@echo "Running YAML lint..."
-	@yamllint -d '{extends: default, rules: {line-length: {max: 200}, truthy: disable, document-start: disable}}' config/ 2>/dev/null || echo "(install yamllint: pip install yamllint)"
+	@yamllint -d '{extends: default, rules: {line-length: {max: 200}, truthy: disable, document-start: disable}}' base/ envs/ 2>/dev/null || echo "(install yamllint: pip install yamllint)"
 
 output:
 	@echo "Terraform outputs for $(ENV):"
-	terraform output
+	terraform -chdir=$(TF_DIR) output
 
 state-list:
-	terraform state list
+	terraform -chdir=$(TF_DIR) state list
 
 # =============================================================================
 # OPERATIONS
@@ -256,7 +258,7 @@ team-sync:
 		KEYCLOAK_URL="$(KEYCLOAK_URL)" KEYCLOAK_REALM="$(KEYCLOAK_REALM)" \
 		KEYCLOAK_USER="$(KEYCLOAK_USER)" KEYCLOAK_PASS="$(KEYCLOAK_PASS)" \
 		DRY_RUN="$(DRY_RUN)" \
-		bash scripts/team-sync.sh "config/$(ENV)/teams.yaml"
+		bash scripts/team-sync.sh "envs/$(ENV)/teams.yaml"
 
 # Import from existing Grafana instance
 # Usage: make import ENV=prod GRAFANA_URL=https://grafana.example.com AUTH=admin:admin
@@ -335,24 +337,24 @@ test: dev-up dev-bootstrap
 
 vault-setup:
 	@echo "Setting up Vault secrets for $(ENV)..."
-	bash vault/scripts/setup-secrets.sh $(ENV)
+	bash scripts/vault/setup-secrets.sh $(ENV)
 
 vault-verify:
 	@echo "Verifying Vault secrets for $(ENV)..."
-	bash vault/scripts/verify-secrets.sh $(ENV)
+	bash scripts/vault/verify-secrets.sh $(ENV)
 
 # =============================================================================
 # CI/CD TARGETS (non-interactive)
 # =============================================================================
 
 ci-init:
-	terraform init -backend-config=$(TF_BACKEND) -input=false
+	terraform -chdir=$(TF_DIR) init -backend-config=$(TF_BACKEND) -input=false
 
 ci-plan:
-	terraform plan -var-file=$(TF_VAR_FILE) -input=false -out=tfplan
+	terraform -chdir=$(TF_DIR) plan -var-file=$(TF_VAR_FILE) -input=false -out=tfplan
 
 ci-apply:
-	terraform apply -input=false -auto-approve tfplan
+	terraform -chdir=$(TF_DIR) apply -input=false -auto-approve tfplan
 
 ci-destroy:
-	terraform destroy -var-file=$(TF_VAR_FILE) -input=false -auto-approve
+	terraform -chdir=$(TF_DIR) destroy -var-file=$(TF_VAR_FILE) -input=false -auto-approve

@@ -115,7 +115,7 @@ echo -e "${BLUE}[3/3]${NC} Generating dev environment..."
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-if [ ! -d "$PROJECT_ROOT/config/${ENV}" ]; then
+if [ ! -d "$PROJECT_ROOT/envs/${ENV}" ]; then
     bash "$SCRIPT_DIR/new-env.sh" "${ENV}" \
         --grafana-url="${GRAFANA_URL}" \
         --vault-addr="${VAULT_ADDR}" \

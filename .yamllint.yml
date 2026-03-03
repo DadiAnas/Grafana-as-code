@@ -1,0 +1,22 @@
+# =============================================================================
+# YAMLLINT CONFIGURATION
+# =============================================================================
+# Used by: make lint, CI/CD pipelines
+# =============================================================================
+
+extends: default
+
+rules:
+  line-length:
+    max: 200
+  truthy: disable
+  document-start: disable
+  comments:
+    min-spaces-from-content: 1
+  comments-indentation: disable
+
+# Only lint YAML config files, not CI or other auto-generated files
+ignore: |
+  .terraform/
+  .git/
+  node_modules/

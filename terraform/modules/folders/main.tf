@@ -1,36 +1,50 @@
 # =============================================================================
 # GRAFANA FOLDERS MODULE - Supports nested subfolders
 # =============================================================================
-# Hierarchy: dashboards/${env}/${org_name}/${folder_uid}/*.json
+# Folders are discovered from THREE sources (union of all):
+#   1. base/dashboards/<org>/<folder>/              (shared dashboards)
+#   2. envs/<env>/dashboards/<org>/<folder>/         (env-specific dashboards)
+#   3. folders.yaml entries with org + uid           (YAML-declared, e.g. alert-only)
 #
 # Rules:
-# 1. Organization is inferred from the parent directory name
-# 2. Folder UID is the directory name
+# 1. Organization is inferred from the parent directory name (or 'org' field in YAML)
+# 2. Folder UID is the directory name (or 'uid' field in YAML)
 # 3. Permissions are managed via folders.yaml
 # 4. Folders are split into top-level and subfolders to avoid Terraform cycles
 # =============================================================================
 
 locals {
   # ---------------------------------------------------------------------------
-  # DISCOVER SHARED FOLDERS
+  # DISCOVER BASE (SHARED) FOLDERS from dashboard directories
   # ---------------------------------------------------------------------------
   shared_folder_paths = toset([
-    for file in fileset(var.dashboards_path, "shared/**/*") :
-    dirname(replace(file, "shared/", ""))
-    if length(split("/", replace(file, "shared/", ""))) >= 2
+    for file in fileset(var.base_dashboards_path, "**/*") :
+    dirname(file)
+    if length(split("/", file)) >= 2
   ])
 
   # ---------------------------------------------------------------------------
-  # DISCOVER ENV-SPECIFIC FOLDERS
+  # DISCOVER ENV-SPECIFIC FOLDERS from dashboard directories
   # ---------------------------------------------------------------------------
   env_folder_paths = toset([
-    for file in fileset(var.dashboards_path, "${var.environment}/**/*") :
-    dirname(replace(file, "${var.environment}/", ""))
-    if length(split("/", replace(file, "${var.environment}/", ""))) >= 2
+    for file in fileset(var.env_dashboards_path, "**/*") :
+    dirname(file)
+    if length(split("/", file)) >= 2
   ])
 
-  # Combine unique paths
-  raw_paths = setunion(local.shared_folder_paths, local.env_folder_paths)
+  # ---------------------------------------------------------------------------
+  # DISCOVER YAML-DECLARED FOLDERS (from folders.yaml)
+  # Ensures folders that have no dashboards (e.g., alert-only folders,
+  # empty org folders) are still created by Terraform.
+  # ---------------------------------------------------------------------------
+  yaml_folder_paths = toset([
+    for f in try(var.folder_permissions.folders, []) :
+    "${try(f.org, "Main Org.")}/${f.uid}"
+    if try(f.uid, "") != ""
+  ])
+
+  # Combine ALL sources
+  raw_paths = setunion(local.shared_folder_paths, local.env_folder_paths, local.yaml_folder_paths)
 
   # Expand paths to ensure all intermediate folders exist
   # e.g., "Org/A/B" -> ["Org/A", "Org/A/B"]

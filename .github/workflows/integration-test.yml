@@ -124,13 +124,13 @@ jobs:
       # Step 1: Lint & Validate
       # ─────────────────────────────────────────────────────────────────
       - name: "Step 1: Terraform Format Check"
-        run: terraform fmt -check -recursive -diff
+        run: terraform fmt -check -recursive -diff terraform/
 
       - name: "Step 1: Terraform Init (validation only)"
-        run: terraform init -backend=false
+        run: terraform -chdir=terraform init -backend=false
 
       - name: "Step 1: Terraform Validate"
-        run: terraform validate
+        run: terraform -chdir=terraform validate
 
       # ─────────────────────────────────────────────────────────────────
       # Step 2: Bootstrap Vault + Create Test Environment
@@ -167,10 +167,10 @@ jobs:
           echo "Environment scaffolded"
           echo ""
           echo "Config files:"
-          ls -la config/${ENV_NAME}/
+          ls -la envs/${ENV_NAME}/
           echo ""
           echo "Dashboard dirs:"
-          ls -la dashboards/${ENV_NAME}/
+          ls -la envs/${ENV_NAME}/dashboards/
 
       - name: "Step 2: Verify environment"
         run: make check-env ENV=${ENV_NAME}
@@ -179,21 +179,21 @@ jobs:
       # Step 3: Terraform Init → Plan → Apply
       # ─────────────────────────────────────────────────────────────────
       - name: "Step 3: Terraform Init"
-        run: terraform init -backend=false
+        run: terraform -chdir=terraform init -backend=false
 
       - name: "Step 3: Terraform Plan"
         run: |
-          terraform plan \
-            -var-file=environments/${ENV_NAME}.tfvars \
-            -out=tfplan-${ENV_NAME} \
+          terraform -chdir=terraform plan \
+            -var-file=../envs/${ENV_NAME}/terraform.tfvars \
+            -out=../tfplan-${ENV_NAME} \
             -no-color
 
       - name: "Step 3: Terraform Apply"
         run: |
-          terraform apply \
+          terraform -chdir=terraform apply \
             -auto-approve \
             -no-color \
-            tfplan-${ENV_NAME}
+            ../tfplan-${ENV_NAME}
 
       # ─────────────────────────────────────────────────────────────────
       # Step 4: Verify Outputs & Resources
@@ -201,22 +201,22 @@ jobs:
       - name: "Step 4: Verify Terraform outputs"
         run: |
           echo "=== Organization IDs ==="
-          terraform output -json organization_ids | jq .
-          ORG_COUNT=$(terraform output -json organization_ids | jq 'length')
+          terraform -chdir=terraform output -json organization_ids | jq .
+          ORG_COUNT=$(terraform -chdir=terraform output -json organization_ids | jq 'length')
           echo "Organizations created: ${ORG_COUNT}"
           [ "$ORG_COUNT" -ge 1 ] || { echo "No organizations found"; exit 1; }
 
           echo ""
           echo "=== Folder IDs ==="
-          terraform output -json folder_ids | jq .
+          terraform -chdir=terraform output -json folder_ids | jq .
 
           echo ""
           echo "=== Team IDs ==="
-          terraform output -json team_ids | jq .
+          terraform -chdir=terraform output -json team_ids | jq .
 
           echo ""
           echo "=== SSO Enabled ==="
-          terraform output sso_enabled
+          terraform -chdir=terraform output sso_enabled
 
           echo ""
           echo "All outputs verified"
@@ -247,13 +247,13 @@ jobs:
 
       - name: "Step 4: Verify state count"
         run: |
-          RESOURCE_COUNT=$(terraform state list | wc -l)
+          RESOURCE_COUNT=$(terraform -chdir=terraform state list | wc -l)
           echo "Total managed resources: ${RESOURCE_COUNT}"
           [ "$RESOURCE_COUNT" -ge 1 ] || { echo "No resources in state"; exit 1; }
 
           echo ""
           echo "Resources by module:"
-          terraform state list | sed 's/\[.*//' | sort | uniq -c | sort -rn
+          terraform -chdir=terraform state list | sed 's/\[.*//' | sort | uniq -c | sort -rn
 
           echo ""
           echo "State verified"
@@ -263,8 +263,8 @@ jobs:
       # ─────────────────────────────────────────────────────────────────
       - name: "Step 5: Idempotency check (re-plan)"
         run: |
-          terraform plan \
-            -var-file=environments/${ENV_NAME}.tfvars \
+          terraform -chdir=terraform plan \
+            -var-file=../envs/${ENV_NAME}/terraform.tfvars \
             -detailed-exitcode \
             -no-color 2>&1 | tee replan.txt || EXITCODE=$?
 
@@ -294,23 +294,23 @@ jobs:
           echo ""
           echo "=== Imported Config ==="
           echo "Organizations:"
-          cat config/ci-import/organizations.yaml | head -20
+          cat envs/ci-import/organizations.yaml | head -20
 
           echo ""
           echo "Folders:"
-          cat config/ci-import/folders.yaml | head -30
+          cat envs/ci-import/folders.yaml | head -30
 
           echo ""
           echo "Teams:"
-          cat config/ci-import/teams.yaml | head -20
+          cat envs/ci-import/teams.yaml | head -20
 
           echo ""
           echo "Datasources:"
-          cat config/ci-import/datasources.yaml | head -20
+          cat envs/ci-import/datasources.yaml | head -20
 
           echo ""
           echo "Dashboard files:"
-          find dashboards/ci-import -name '*.json' 2>/dev/null | head -20 || echo "(none)"
+          find envs/ci-import/dashboards -name '*.json' 2>/dev/null | head -20 || echo "(none)"
 
           echo ""
           echo "Import completed"
@@ -319,11 +319,11 @@ jobs:
         run: |
           # Ensure required YAML files were created
           for file in organizations folders teams datasources sso keycloak service_accounts; do
-            [ -f "config/ci-import/${file}.yaml" ] || { echo "Missing config/ci-import/${file}.yaml"; exit 1; }
+            [ -f "envs/ci-import/${file}.yaml" ] || { echo "Missing envs/ci-import/${file}.yaml"; exit 1; }
           done
 
           # Ensure tfvars was created
-          [ -f "environments/ci-import.tfvars" ] || { echo "Missing environments/ci-import.tfvars"; exit 1; }
+          [ -f "envs/ci-import/terraform.tfvars" ] || { echo "Missing envs/ci-import/terraform.tfvars"; exit 1; }
 
           echo "All imported config files present"
 
@@ -338,8 +338,8 @@ jobs:
           vault kv put grafana/ci-import/sso/keycloak \
             client_secret="ci-test-client-secret"
 
-          terraform plan \
-            -var-file=environments/ci-import.tfvars \
+          terraform -chdir=terraform plan \
+            -var-file=../envs/ci-import/terraform.tfvars \
             -no-color 2>&1 | tee import-plan.txt
 
           echo ""
@@ -364,8 +364,8 @@ jobs:
 
       - name: "Step 8: Detect drift"
         run: |
-          terraform plan \
-            -var-file=environments/${ENV_NAME}.tfvars \
+          terraform -chdir=terraform plan \
+            -var-file=../envs/${ENV_NAME}/terraform.tfvars \
             -detailed-exitcode \
             -no-color 2>&1 | tee drift.txt || DRIFT_CODE=$?
 
@@ -406,8 +406,8 @@ jobs:
       - name: "Step 10: Test dashboard folder exclusion"
         run: |
           # Add a test dashboard
-          mkdir -p "dashboards/${ENV_NAME}/Main Organization/test-exclude"
-          cat > "dashboards/${ENV_NAME}/Main Organization/test-exclude/test.json" << 'EOF'
+          mkdir -p "envs/${ENV_NAME}/dashboards/Main Organization/test-exclude"
+          cat > "envs/${ENV_NAME}/dashboards/Main Organization/test-exclude/test.json" << 'EOF'
           {
             "uid": "test-exclude-dash",
             "title": "Excluded Dashboard",
@@ -418,8 +418,8 @@ jobs:
           EOF
 
           # Plan without exclusion — should want to create the dashboard
-          terraform plan \
-            -var-file=environments/${ENV_NAME}.tfvars \
+          terraform -chdir=terraform plan \
+            -var-file=../envs/${ENV_NAME}/terraform.tfvars \
             -no-color 2>&1 | tee plan-no-exclude.txt
 
           if grep -q "test-exclude" plan-no-exclude.txt; then
@@ -429,8 +429,8 @@ jobs:
           fi
 
           # Plan with exclusion — should NOT show the dashboard
-          terraform plan \
-            -var-file=environments/${ENV_NAME}.tfvars \
+          terraform -chdir=terraform plan \
+            -var-file=../envs/${ENV_NAME}/terraform.tfvars \
             -var='exclude_dashboard_folders=["Main Organization/test-exclude"]' \
             -no-color 2>&1 | tee plan-with-exclude.txt
 
@@ -452,17 +452,17 @@ jobs:
             DATASOURCES=prometheus,loki,postgres
 
           # Verify files
-          [ -f "environments/scaffold-test.tfvars" ] || { echo "Missing tfvars"; exit 1; }
-          [ -d "config/scaffold-test" ] || { echo "Missing config dir"; exit 1; }
-          [ -d "dashboards/scaffold-test" ] || { echo "Missing dashboards dir"; exit 1; }
+          [ -f "envs/scaffold-test/terraform.tfvars" ] || { echo "Missing tfvars"; exit 1; }
+          [ -d "envs/scaffold-test" ] || { echo "Missing config dir"; exit 1; }
+          [ -d "envs/scaffold-test/dashboards" ] || { echo "Missing dashboards dir"; exit 1; }
 
           echo ""
           echo "=== Scaffold tfvars ==="
-          cat environments/scaffold-test.tfvars
+          cat envs/scaffold-test/terraform.tfvars
 
           echo ""
           echo "=== Scaffold datasources ==="
-          cat config/scaffold-test/datasources.yaml | head -30
+          cat envs/scaffold-test/datasources.yaml | head -30
 
           echo ""
           echo "Scaffolding verified"
@@ -471,9 +471,9 @@ jobs:
         run: |
           bash scripts/delete-env.sh scaffold-test --force
 
-          [ ! -f "environments/scaffold-test.tfvars" ] || { echo "tfvars not deleted"; exit 1; }
-          [ ! -d "config/scaffold-test" ] || { echo "config dir not deleted"; exit 1; }
-          [ ! -d "dashboards/scaffold-test" ] || { echo "dashboards dir not deleted"; exit 1; }
+          [ ! -f "envs/scaffold-test/terraform.tfvars" ] || { echo "tfvars not deleted"; exit 1; }
+          [ ! -d "envs/scaffold-test" ] || { echo "config dir not deleted"; exit 1; }
+          [ ! -d "envs/scaffold-test/dashboards" ] || { echo "dashboards dir not deleted"; exit 1; }
 
           echo "Environment deletion verified"
 
@@ -492,7 +492,7 @@ jobs:
             echo "Verifying promote-target exists..."
           }
 
-          [ -d "config/promote-target" ] || { echo "promote-target config missing"; exit 1; }
+          [ -d "envs/promote-target" ] || { echo "promote-target config missing"; exit 1; }
           echo "Promote test completed"
 
       # ─────────────────────────────────────────────────────────────────
@@ -501,12 +501,12 @@ jobs:
       - name: "Step 13: Terraform Destroy"
         if: always()
         run: |
-          terraform destroy \
-            -var-file=environments/${ENV_NAME}.tfvars \
+          terraform -chdir=terraform destroy \
+            -var-file=../envs/${ENV_NAME}/terraform.tfvars \
             -auto-approve \
             -no-color || true
 
-          REMAINING=$(terraform state list 2>/dev/null | wc -l)
+          REMAINING=$(terraform -chdir=terraform state list 2>/dev/null | wc -l)
           echo "Resources remaining after destroy: ${REMAINING}"
 
           echo "Destroy completed"

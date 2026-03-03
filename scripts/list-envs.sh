@@ -25,8 +25,8 @@ echo "║                  Configured Environments                     ║"
 echo "╚═══════════════════════════════════════════════════════════════╝"
 echo -e "${NC}"
 
-# Discover environments from config/ directories (excluding shared)
-ENVS=$(find "$PROJECT_ROOT/config" -maxdepth 1 -mindepth 1 -type d ! -name 'shared' -printf '%f\n' | sort)
+# Discover environments from envs/ directories
+ENVS=$(find "$PROJECT_ROOT/envs" -maxdepth 1 -mindepth 1 -type d -printf '%f\n' | sort)
 
 if [ -z "$ENVS" ]; then
     echo -e "  ${YELLOW}No environments found.${NC}"
@@ -47,27 +47,27 @@ while IFS= read -r env; do
     HAS_DASHBOARDS="❌"
     GRAFANA_URL="${DIM}not set${NC}"
 
-    [ -f "$PROJECT_ROOT/environments/${env}.tfvars" ] && HAS_TFVARS="${GREEN}✓${NC}"
-    [ -f "$PROJECT_ROOT/backends/${env}.tfbackend" ] && HAS_BACKEND="${GREEN}✓${NC}"
-    [ -d "$PROJECT_ROOT/config/${env}" ] && HAS_CONFIG="${GREEN}✓${NC}"
-    [ -d "$PROJECT_ROOT/dashboards/${env}" ] && HAS_DASHBOARDS="${GREEN}✓${NC}"
+    [ -f "$PROJECT_ROOT/envs/${env}/terraform.tfvars" ] && HAS_TFVARS="${GREEN}✓${NC}"
+    [ -f "$PROJECT_ROOT/envs/${env}/backend.tfbackend" ] && HAS_BACKEND="${GREEN}✓${NC}"
+    [ -d "$PROJECT_ROOT/envs/${env}" ] && HAS_CONFIG="${GREEN}✓${NC}"
+    [ -d "$PROJECT_ROOT/envs/${env}/dashboards" ] && HAS_DASHBOARDS="${GREEN}✓${NC}"
 
     # Extract Grafana URL from tfvars
-    if [ -f "$PROJECT_ROOT/environments/${env}.tfvars" ]; then
-        URL=$(grep -E '^\s*grafana_url\s*=' "$PROJECT_ROOT/environments/${env}.tfvars" | sed 's/.*=\s*//;s/"//g;s/\s*$//' | head -1)
+    if [ -f "$PROJECT_ROOT/envs/${env}/terraform.tfvars" ]; then
+        URL=$(grep -E '^\s*grafana_url\s*=' "$PROJECT_ROOT/envs/${env}/terraform.tfvars" | sed 's/.*=\s*//;s/"//g;s/\s*$//' | head -1)
         [ -n "$URL" ] && GRAFANA_URL="$URL"
     fi
 
     # Count dashboards
     DASHBOARD_COUNT=0
-    if [ -d "$PROJECT_ROOT/dashboards/${env}" ]; then
-        DASHBOARD_COUNT=$(find "$PROJECT_ROOT/dashboards/${env}" -name '*.json' | wc -l)
+    if [ -d "$PROJECT_ROOT/envs/${env}/dashboards" ]; then
+        DASHBOARD_COUNT=$(find "$PROJECT_ROOT/envs/${env}/dashboards" -name '*.json' | wc -l)
     fi
 
     # Count config files
     CONFIG_COUNT=0
-    if [ -d "$PROJECT_ROOT/config/${env}" ]; then
-        CONFIG_COUNT=$(find "$PROJECT_ROOT/config/${env}" -name '*.yaml' | wc -l)
+    if [ -d "$PROJECT_ROOT/envs/${env}" ]; then
+        CONFIG_COUNT=$(find "$PROJECT_ROOT/envs/${env}" -name '*.yaml' | wc -l)
     fi
 
     # Template marker

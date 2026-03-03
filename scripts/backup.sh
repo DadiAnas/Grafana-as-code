@@ -27,9 +27,9 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 ENV="${1:?Usage: $0 <env-name>}"
 
 # Read Grafana URL from tfvars
-TFVARS_FILE="$PROJECT_ROOT/environments/${ENV}.tfvars"
+TFVARS_FILE="$PROJECT_ROOT/envs/${ENV}/terraform.tfvars"
 if [ ! -f "$TFVARS_FILE" ]; then
-    echo -e "${RED}Error: environments/${ENV}.tfvars not found${NC}"
+    echo -e "${RED}Error: envs/${ENV}/terraform.tfvars not found${NC}"
     exit 1
 fi
 

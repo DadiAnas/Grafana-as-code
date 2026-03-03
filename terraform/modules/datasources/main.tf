@@ -113,8 +113,9 @@
 
 locals {
   # Merge Vault credentials with datasource configuration
+  # Use composite key "org:uid" to handle same UID across different orgs
   datasources_with_credentials = {
-    for ds in var.datasources.datasources : ds.uid => merge(ds, {
+    for ds in var.datasources.datasources : "${try(ds.org, "_")}:${ds.uid}" => merge(ds, {
       # If use_vault is true, merge Vault secrets into secure_json_data
       secure_json_data = try(ds.use_vault, false) ? merge(
         try(ds.secure_json_data, {}),

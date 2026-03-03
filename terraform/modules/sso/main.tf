@@ -5,10 +5,17 @@ locals {
   # Get groups from SSO config (works regardless of Keycloak Terraform management)
   sso_groups = try(var.sso_config.groups, [])
 
-  # Identify groups that should receive GrafanaAdmin role
+  # Separate wildcard groups (name: "*") from named groups
+  # Wildcard groups apply to ALL IdP groups — they should NOT be in role_attribute_path
+  # Named groups (specific IdP group names) can be used for GrafanaAdmin via role_attribute_path
+  named_groups    = [for group in local.sso_groups : group if try(group.wildcard_group, false) == false && group.name != "*"]
+  wildcard_groups = [for group in local.sso_groups : group if try(group.wildcard_group, false) == true || group.name == "*"]
+
+  # Identify named groups that should receive GrafanaAdmin role
   # GrafanaAdmin must be assigned via role_attribute_path, NOT org_mapping
+  # Only named groups can be used here — wildcard groups cannot be expressed in JMESPath
   grafana_admin_groups = distinct(flatten([
-    for group in local.sso_groups : [
+    for group in local.named_groups : [
       for mapping in group.org_mappings :
       group.name if mapping.role == "GrafanaAdmin"
     ]
@@ -26,15 +33,31 @@ locals {
 
   # Generate org_mapping from SSO groups config with granular per-org roles
   # Format: group_name:org_id:role (using org IDs to avoid space issues)
-  # IMPORTANT: Filter out GrafanaAdmin mappings - they must use role_attribute_path instead
+  # IMPORTANT: Filter out GrafanaAdmin mappings for named groups — they must use role_attribute_path
   # Supports org: "*" wildcard — meaning "all organizations"
-  dynamic_org_mappings = flatten([
-    for group in local.sso_groups : [
+  # Supports group name: "*" wildcard — meaning "all groups" (passed through directly)
+
+  # Named group mappings (specific group names → specific or wildcard orgs)
+  named_group_mappings = flatten([
+    for group in local.named_groups : [
       for mapping in group.org_mappings :
       mapping.org == "*" ? "${group.name}:*:${mapping.role}" : "${group.name}:${var.org_ids[mapping.org]}:${mapping.role}"
       if mapping.role != "GrafanaAdmin"
     ]
   ])
+
+  # Wildcard group mappings (* → specific or wildcard orgs)
+  # These mean "all IdP groups get this role in this org"
+  wildcard_group_mappings = flatten([
+    for group in local.wildcard_groups : [
+      for mapping in group.org_mappings :
+      mapping.org == "*" ? "*:*:${mapping.role}" : "*:${var.org_ids[mapping.org]}:${mapping.role}"
+      if mapping.role != "GrafanaAdmin"
+    ]
+  ])
+
+  # Combine all mappings
+  dynamic_org_mappings = concat(local.named_group_mappings, local.wildcard_group_mappings)
 
   # Combine dynamic mappings into a single string
   generated_org_mapping = length(local.dynamic_org_mappings) > 0 ? join("\n", local.dynamic_org_mappings) : null

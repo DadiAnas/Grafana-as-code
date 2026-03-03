@@ -5,8 +5,8 @@
 #
 # Pipeline stages:
 #   1. validate  — fmt, validate, lint, security scan
-#   2. plan      — terraform plan (per environment, on MR + main)
-#   3. apply     — terraform apply (auto on main, manual gate optional)
+#   2. plan      — terraform -chdir=terraform plan (per environment, on MR + main)
+#   3. apply     — terraform -chdir=terraform apply (auto on main, manual gate optional)
 #   4. drift     — scheduled drift detection
 #   5. cleanup   — manual destroy
 #
@@ -43,8 +43,8 @@ default:
   cache:
     key: terraform-${CI_COMMIT_REF_SLUG}
     paths:
-      - ${TF_ROOT}/.terraform/
-      - ${TF_ROOT}/.terraform.lock.hcl
+      - ${TF_ROOT}/terraform/.terraform/
+      - ${TF_ROOT}/terraform/.terraform.lock.hcl
 
 # =============================================================================
 # REUSABLE TEMPLATES
@@ -58,13 +58,13 @@ default:
       echo "═══════════════════════════════════════════════"
       echo "  Planning: ${ENV_NAME}"
       echo "═══════════════════════════════════════════════"
-    - terraform init -backend-config="backends/${ENV_NAME}.tfbackend" -reconfigure
+    - terraform -chdir=terraform init -backend-config="../envs/${ENV_NAME}/backend.tfbackend" -reconfigure
     - |
-      terraform plan \
-        -var-file="environments/${ENV_NAME}.tfvars" \
+      terraform -chdir=terraform plan \
+        -var-file="../envs/${ENV_NAME}/terraform.tfvars" \
         -var="environment=${ENV_NAME}" \
         -no-color \
-        -out="${ENV_NAME}.tfplan" | tee "${ENV_NAME}-plan.txt"
+        -out="../${ENV_NAME}.tfplan" | tee "${ENV_NAME}-plan.txt"
     - |
       # Summarize changes
       ADDS=$(grep -c '# .* will be created' "${ENV_NAME}-plan.txt" 2>/dev/null || echo 0)
@@ -80,21 +80,14 @@ default:
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes:
-        - "config/${ENV_NAME}/**"
-        - "config/shared/**"
-        - "dashboards/${ENV_NAME}/**"
-        - "dashboards/shared/**"
-        - "environments/${ENV_NAME}.tfvars"
-        - "backends/${ENV_NAME}.tfbackend"
-        - "**/*.tf"
+        - "envs/${ENV_NAME}/**"
+        - "base/**"
+        - "terraform/**"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes:
-        - "config/${ENV_NAME}/**"
-        - "config/shared/**"
-        - "dashboards/${ENV_NAME}/**"
-        - "dashboards/shared/**"
-        - "environments/${ENV_NAME}.tfvars"
-        - "**/*.tf"
+        - "envs/${ENV_NAME}/**"
+        - "base/**"
+        - "terraform/**"
 
 # Apply template — extend for each environment
 .apply-template:
@@ -104,14 +97,14 @@ default:
       echo "═══════════════════════════════════════════════"
       echo "  Applying: ${ENV_NAME}"
       echo "═══════════════════════════════════════════════"
-    - terraform init -backend-config="backends/${ENV_NAME}.tfbackend" -reconfigure
+    - terraform -chdir=terraform init -backend-config="../envs/${ENV_NAME}/backend.tfbackend" -reconfigure
     - |
-      terraform apply \
-        -var-file="environments/${ENV_NAME}.tfvars" \
+      terraform -chdir=terraform apply \
+        -var-file="../envs/${ENV_NAME}/terraform.tfvars" \
         -var="environment=${ENV_NAME}" \
         -auto-approve \
         -no-color
-    - terraform output -json > "${ENV_NAME}-outputs.json" || true
+    - terraform -chdir=terraform output -json > "${ENV_NAME}-outputs.json" || true
   artifacts:
     paths:
       - "${ENV_NAME}-outputs.json"
@@ -124,11 +117,11 @@ default:
 .destroy-template:
   stage: cleanup
   script:
-    - terraform init -backend-config="backends/${ENV_NAME}.tfbackend" -reconfigure
+    - terraform -chdir=terraform init -backend-config="../envs/${ENV_NAME}/backend.tfbackend" -reconfigure
     - |
       echo "⚠️  DESTROYING environment: ${ENV_NAME}"
-      terraform destroy \
-        -var-file="environments/${ENV_NAME}.tfvars" \
+      terraform -chdir=terraform destroy \
+        -var-file="../envs/${ENV_NAME}/terraform.tfvars" \
         -var="environment=${ENV_NAME}" \
         -auto-approve
   rules:
@@ -140,11 +133,11 @@ default:
 .drift-template:
   stage: drift
   script:
-    - terraform init -backend-config="backends/${ENV_NAME}.tfbackend" -reconfigure
+    - terraform -chdir=terraform init -backend-config="../envs/${ENV_NAME}/backend.tfbackend" -reconfigure
     - |
       set +e
-      terraform plan \
-        -var-file="environments/${ENV_NAME}.tfvars" \
+      terraform -chdir=terraform plan \
+        -var-file="../envs/${ENV_NAME}/terraform.tfvars" \
         -var="environment=${ENV_NAME}" \
         -detailed-exitcode \
         -no-color 2>&1 | tee drift_${ENV_NAME}.txt
@@ -181,7 +174,7 @@ default:
 format-check:
   stage: validate
   script:
-    - terraform fmt -check -recursive -diff
+    - terraform fmt -check -recursive -diff terraform/
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
@@ -189,8 +182,8 @@ format-check:
 validate:
   stage: validate
   script:
-    - terraform init -backend=false
-    - terraform validate
+    - terraform -chdir=terraform init -backend=false
+    - terraform -chdir=terraform validate
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
@@ -209,7 +202,7 @@ yaml-lint:
           truthy: disable,
           document-start: disable
         }
-      }' config/
+      }' base/ envs/
   allow_failure: true
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"

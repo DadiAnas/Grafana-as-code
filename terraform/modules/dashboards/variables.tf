@@ -1,10 +1,15 @@
-variable "dashboards_path" {
-  description = "Path to the dashboards directory"
+variable "base_dashboards_path" {
+  description = "Path to the base (shared) dashboards directory"
+  type        = string
+}
+
+variable "env_dashboards_path" {
+  description = "Path to the environment-specific dashboards directory"
   type        = string
 }
 
 variable "environment" {
-  description = "Environment name (npr, preprod, prod)"
+  description = "Environment name"
   type        = string
 }
 

@@ -39,10 +39,10 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-DASH_DIR="$PROJECT_ROOT/dashboards/${ENV}"
+DASH_DIR="$PROJECT_ROOT/envs/${ENV}/dashboards"
 
 if [ ! -d "$DASH_DIR" ]; then
-    echo -e "${RED}Error: dashboards/${ENV}/ not found${NC}"
+    echo -e "${RED}Error: envs/${ENV}/dashboards/ not found${NC}"
     exit 1
 fi
 
@@ -64,9 +64,9 @@ HAS_CHANGES=false
 # Compare against another environment
 # =========================================================================
 if [ -n "$AGAINST" ]; then
-    AGAINST_DIR="$PROJECT_ROOT/dashboards/${AGAINST}"
+    AGAINST_DIR="$PROJECT_ROOT/envs/${AGAINST}/dashboards"
     if [ ! -d "$AGAINST_DIR" ]; then
-        echo -e "${RED}Error: dashboards/${AGAINST}/ not found${NC}"
+        echo -e "${RED}Error: envs/${AGAINST}/dashboards/ not found${NC}"
         exit 1
     fi
 
@@ -75,8 +75,8 @@ if [ -n "$AGAINST" ]; then
 
     # Find all JSON files in both dirs
     ALL_FILES=$(cd "$PROJECT_ROOT" && {
-        find "dashboards/${ENV}" -name "*.json" 2>/dev/null | sed "s|dashboards/${ENV}/||"
-        find "dashboards/${AGAINST}" -name "*.json" 2>/dev/null | sed "s|dashboards/${AGAINST}/||"
+        find "envs/${ENV}/dashboards" -name "*.json" 2>/dev/null | sed "s|envs/${ENV}/dashboards/||"
+        find "envs/${AGAINST}/dashboards" -name "*.json" 2>/dev/null | sed "s|envs/${AGAINST}/dashboards/||"
     } | sort -u)
 
     while read -r rel_path; do
@@ -168,9 +168,9 @@ else
     cd "$PROJECT_ROOT"
 
     # Get list of changed dashboard files from git
-    CHANGED_FILES=$(git diff --name-status HEAD -- "dashboards/${ENV}/" 2>/dev/null || true)
-    STAGED_FILES=$(git diff --cached --name-status HEAD -- "dashboards/${ENV}/" 2>/dev/null || true)
-    UNTRACKED=$(git ls-files --others --exclude-standard -- "dashboards/${ENV}/" 2>/dev/null || true)
+    CHANGED_FILES=$(git diff --name-status HEAD -- "envs/${ENV}/dashboards/" 2>/dev/null || true)
+    STAGED_FILES=$(git diff --cached --name-status HEAD -- "envs/${ENV}/dashboards/" 2>/dev/null || true)
+    UNTRACKED=$(git ls-files --others --exclude-standard -- "envs/${ENV}/dashboards/" 2>/dev/null || true)
 
     # Process changes
     if [ -n "$CHANGED_FILES" ]; then
