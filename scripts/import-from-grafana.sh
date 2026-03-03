@@ -1190,18 +1190,30 @@ else:
                 group_name = parts[0]
                 org_id = parts[1]
                 role = parts[2]
-                if group_name not in groups:
-                    groups[group_name] = []
-                    group_order.append(group_name)
+            elif len(parts) == 2 and parts[1].startswith('*'):
+                # Handle malformed entry like "group:*Role" (missing colon after *)
+                group_name = parts[0]
+                org_id = '*'
+                role = parts[1][1:]  # Remove the leading *
+                import sys
+                print(f'# WARNING: Fixed malformed org_mapping entry "{m}" -> "{group_name}:*:{role}"', file=sys.stderr)
+            else:
+                import sys
+                print(f'# WARNING: Skipping malformed org_mapping entry "{m}" (expected format: group:org:role)', file=sys.stderr)
+                continue
 
-                entry = {'role': role}
-                if org_id == '*':
-                    # Wildcard org: applies to all organizations
-                    entry['org'] = '*'
-                else:
-                    entry['org'] = org_map.get(org_id, org_id)
-                    entry['_org_id'] = org_id
-                groups[group_name].append(entry)
+            if group_name not in groups:
+                groups[group_name] = []
+                group_order.append(group_name)
+
+            entry = {'role': role}
+            if org_id == '*':
+                # Wildcard org: applies to all organizations
+                entry['org'] = '*'
+            else:
+                entry['org'] = org_map.get(org_id, org_id)
+                entry['_org_id'] = org_id
+            groups[group_name].append(entry)
 
         # Collapse: if a group maps to ALL orgs with the same role, use org: "*"
         for group_name in group_order:
