@@ -231,6 +231,9 @@ fi
 
 CREATED_FILES=()
 
+# Create the environment directory structure
+mkdir -p "$PROJECT_ROOT/envs/${ENV_NAME}"
+
 # =========================================================================
 # 1. envs/<name>/terraform.tfvars
 # =========================================================================
