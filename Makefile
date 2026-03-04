@@ -139,7 +139,7 @@ new-env:
 	 BACKEND_ARG="$(BACKEND)" \
 	 ORGS_ARG="$(ORGS)" \
 	 DATASOURCES_ARG="$(DATASOURCES)" \
-	 bash scripts/new-env.sh "$(NAME)"
+	 python3 scripts/new_env.py "$(NAME)"
 
 # Delete an environment (removes scaffolded files, NOT infrastructure)
 # Usage: make delete-env NAME=staging
@@ -152,16 +152,16 @@ delete-env:
 		echo ""; \
 		exit 1; \
 	fi
-	@bash scripts/delete-env.sh "$(NAME)"
+	@python3 scripts/delete_env.py "$(NAME)"
 
 # List all configured environments
 list-envs:
-	@bash scripts/list-envs.sh
+	@python3 scripts/list_envs.py
 
 # Validate an environment is ready for deployment
 # Usage: make check-env ENV=staging
 check-env:
-	@bash scripts/check-env.sh "$(ENV)"
+	@python3 scripts/check_env.py "$(ENV)"
 
 # =============================================================================
 # TERRAFORM WORKFLOW
@@ -230,10 +230,10 @@ state-list:
 # =============================================================================
 
 drift:
-	@bash scripts/drift-detect.sh "$(ENV)"
+	@python3 scripts/drift_detect.py "$(ENV)"
 
 backup:
-	@bash scripts/backup.sh "$(ENV)"
+	@python3 scripts/backup.py "$(ENV)"
 
 # Sync Keycloak groups → Grafana teams (OSS — no Enterprise needed)
 # Usage: make team-sync ENV=prod GRAFANA_URL=http://localhost:3000 AUTH=admin:admin \
@@ -258,7 +258,7 @@ team-sync:
 		KEYCLOAK_URL="$(KEYCLOAK_URL)" KEYCLOAK_REALM="$(KEYCLOAK_REALM)" \
 		KEYCLOAK_USER="$(KEYCLOAK_USER)" KEYCLOAK_PASS="$(KEYCLOAK_PASS)" \
 		DRY_RUN="$(DRY_RUN)" \
-		bash scripts/team-sync.sh "envs/$(ENV)/teams.yaml"
+		python3 scripts/team_sync.py "envs/$(ENV)/teams.yaml"
 
 # Import from existing Grafana instance
 # Usage: make import ENV=prod GRAFANA_URL=https://grafana.example.com AUTH=admin:admin
@@ -288,10 +288,10 @@ promote:
 		echo ""; \
 		exit 1; \
 	fi
-	@bash scripts/promote.sh "$(FROM)" "$(TO)"
+	@python3 scripts/promote.py "$(FROM)" "$(TO)"
 
 dashboard-diff:
-	@bash scripts/dashboard-diff.sh "$(ENV)"
+	@python3 scripts/dashboard_diff.py "$(ENV)"
 
 # Dry-run for new-env
 dry-run:
@@ -299,7 +299,7 @@ dry-run:
 		echo "Usage: make dry-run NAME=staging"; \
 		exit 1; \
 	fi
-	@bash scripts/new-env.sh "$(NAME)" --dry-run
+	@python3 scripts/new_env.py "$(NAME)" --dry-run
 
 # =============================================================================
 # LOCAL DEVELOPMENT
@@ -320,7 +320,7 @@ dev-down:
 	docker compose down
 
 dev-bootstrap:
-	@bash scripts/dev-bootstrap.sh dev
+	@python3 scripts/dev_bootstrap.py dev
 
 test: dev-up dev-bootstrap
 	@echo ""
@@ -337,11 +337,11 @@ test: dev-up dev-bootstrap
 
 vault-setup:
 	@echo "Setting up Vault secrets for $(ENV)..."
-	bash scripts/vault/setup-secrets.sh $(ENV)
+	python3 scripts/vault/setup_secrets.py $(ENV)
 
 vault-verify:
 	@echo "Verifying Vault secrets for $(ENV)..."
-	bash scripts/vault/verify-secrets.sh $(ENV)
+	python3 scripts/vault/verify_secrets.py $(ENV)
 
 # =============================================================================
 # CI/CD TARGETS (non-interactive)

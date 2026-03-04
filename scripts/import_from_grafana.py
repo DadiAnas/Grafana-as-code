@@ -262,16 +262,15 @@ def import_datasources(ctx: ImportContext) -> None:
 
     ctx.client.current_org_id = None
 
-    if not all_datasources:
-        print(f"  {Colors.DIM}  No datasources found{Colors.NC}")
-        return
-
     output_file = ctx.config_dir / "datasources.yaml"
     with open(output_file, "w") as f:
         f.write(f"# Imported from {ctx.grafana_url} on {datetime.now().isoformat()}\n\n")
         f.write(yaml_dump({"datasources": all_datasources}))
 
-    print(f"  {Colors.GREEN}✓{Colors.NC} {len(all_datasources)} datasource(s) across {len(ctx.org_ids)} org(s) → envs/{ctx.env_name}/datasources.yaml")
+    if not all_datasources:
+        print(f"  {Colors.DIM}  No datasources found → envs/{ctx.env_name}/datasources.yaml{Colors.NC}")
+    else:
+        print(f"  {Colors.GREEN}✓{Colors.NC} {len(all_datasources)} datasource(s) across {len(ctx.org_ids)} org(s) → envs/{ctx.env_name}/datasources.yaml")
     ctx.imported_count += 1
 
 
@@ -438,7 +437,13 @@ def import_folders(ctx: ImportContext) -> None:
     ctx.client.current_org_id = None
 
     if not all_folders:
-        print(f"  {Colors.DIM}  No folders found{Colors.NC}")
+        output_file = ctx.config_dir / "folders.yaml"
+        with open(output_file, "w") as f:
+            f.write(f"# Imported from {ctx.grafana_url} on {datetime.now().isoformat()}\n")
+            f.write("# NOTE: Folder UIDs have been slugified from the original random Grafana UIDs\n")
+            f.write("#       for better readability in both YAML config and directory structure.\n\n")
+            f.write(yaml_dump({"folders": []}))
+        print(f"  {Colors.DIM}  No folders found → envs/{ctx.env_name}/folders.yaml{Colors.NC}")
         return
 
     output_file = ctx.config_dir / "folders.yaml"
@@ -487,16 +492,15 @@ def import_teams(ctx: ImportContext) -> None:
 
     ctx.client.current_org_id = None
 
-    if not all_teams:
-        print(f"  {Colors.DIM}  No teams found{Colors.NC}")
-        return
-
     output_file = ctx.config_dir / "teams.yaml"
     with open(output_file, "w") as f:
         f.write(f"# Imported from {ctx.grafana_url} on {datetime.now().isoformat()}\n\n")
         f.write(yaml_dump({"teams": all_teams}))
 
-    print(f"  {Colors.GREEN}✓{Colors.NC} {len(all_teams)} team(s) across {len(ctx.org_ids)} org(s) → envs/{ctx.env_name}/teams.yaml")
+    if not all_teams:
+        print(f"  {Colors.DIM}  No teams found → envs/{ctx.env_name}/teams.yaml{Colors.NC}")
+    else:
+        print(f"  {Colors.GREEN}✓{Colors.NC} {len(all_teams)} team(s) across {len(ctx.org_ids)} org(s) → envs/{ctx.env_name}/teams.yaml")
     ctx.imported_count += 1
 
 
@@ -524,16 +528,15 @@ def import_service_accounts(ctx: ImportContext) -> None:
 
     ctx.client.current_org_id = None
 
-    if not all_service_accounts:
-        print(f"  {Colors.DIM}  No service accounts found{Colors.NC}")
-        return
-
     output_file = ctx.config_dir / "service_accounts.yaml"
     with open(output_file, "w") as f:
         f.write(f"# Imported from {ctx.grafana_url} on {datetime.now().isoformat()}\n\n")
         f.write(yaml_dump({"service_accounts": all_service_accounts}))
 
-    print(f"  {Colors.GREEN}✓{Colors.NC} {len(all_service_accounts)} service account(s) across {len(ctx.org_ids)} org(s) → envs/{ctx.env_name}/service_accounts.yaml")
+    if not all_service_accounts:
+        print(f"  {Colors.DIM}  No service accounts found → envs/{ctx.env_name}/service_accounts.yaml{Colors.NC}")
+    else:
+        print(f"  {Colors.GREEN}✓{Colors.NC} {len(all_service_accounts)} service account(s) across {len(ctx.org_ids)} org(s) → envs/{ctx.env_name}/service_accounts.yaml")
     ctx.imported_count += 1
 
 
