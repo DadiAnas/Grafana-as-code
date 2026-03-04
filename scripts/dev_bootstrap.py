@@ -159,10 +159,10 @@ def main() -> None:
 
     env_dir = project_root / "envs" / env
     if not env_dir.is_dir():
-        new_env_script = Path(__file__).parent / "new-env.sh"
+        new_env_script = Path(__file__).parent / "new_env.py"
         subprocess.run(
             [
-                "bash",
+                "python3",
                 str(new_env_script),
                 env,
                 f"--grafana-url={grafana_url}",
