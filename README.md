@@ -101,7 +101,7 @@ grafana-as-code/
 │       └── keycloak/
 │
 ├── scripts/                          ← Automation
-│   ├── import-from-grafana.sh        ← Import from existing Grafana
+│   ├── import_from_grafana.py         ← Import from existing Grafana
 │   ├── new-env.sh                    ← Create new environment
 │   ├── delete-env.sh / list-envs.sh / check-env.sh
 │   ├── drift-detect.sh
@@ -212,7 +212,7 @@ make init ENV=dev && make plan ENV=dev && make apply ENV=dev
 
 ## 📥 Import from Grafana
 
-The import script (`scripts/import-from-grafana.sh`) connects to a running Grafana instance and auto-generates all the YAML configuration files and dashboard JSON needed to manage it with Terraform.
+The import script (`scripts/import_from_grafana.py`) connects to a running Grafana instance and auto-generates all the YAML configuration files and dashboard JSON needed to manage it with Terraform.
 
 ### What Gets Imported
 
@@ -244,7 +244,7 @@ make import ENV=prod \
   AUTH=glsa_xxxxxxxxxxxxx
 
 # Skip dashboards (faster, config-only import)
-bash scripts/import-from-grafana.sh prod \
+python3 scripts/import_from_grafana.py prod \
   --grafana-url=https://grafana.example.com \
   --auth=admin:password \
   --no-dashboards

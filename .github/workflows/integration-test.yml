@@ -287,7 +287,7 @@ jobs:
       - name: "Step 6: Import from Grafana"
         run: |
           # Import into a separate environment to avoid clobbering ci-test
-          bash scripts/import-from-grafana.sh ci-import \
+          python3 scripts/import_from_grafana.py ci-import \
             --grafana-url=${GRAFANA_URL} \
             --auth=${GRAFANA_AUTH}
 
