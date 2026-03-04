@@ -255,7 +255,15 @@ def import_datasources(ctx: ImportContext) -> None:
         ctx.client.current_org_id = org_id
         org_name = ctx.org_map[org_id]
 
-        datasources = ctx.client.get("/api/datasources") or []
+        datasources_resp = ctx.client.get("/api/datasources")
+        if datasources_resp is None:
+            print(
+                f"  {Colors.YELLOW}⚠{Colors.NC} API request failed for org {org_name} (id={org_id}) — "
+                "skipping datasources for this org (check auth/connectivity)",
+                file=sys.stderr,
+            )
+            datasources_resp = []
+        datasources = datasources_resp
         for ds in datasources:
             ds_entry = _process_datasource(ds, org_name, org_id)
             all_datasources.append(ds_entry)
@@ -341,7 +349,15 @@ def import_folders(ctx: ImportContext) -> None:
     # Phase 1: Build global UID mapping
     for org_id in ctx.org_ids:
         ctx.client.current_org_id = org_id
-        folders = ctx.client.get("/api/folders?limit=1000") or []
+        folders_resp = ctx.client.get("/api/folders?limit=1000")
+        if folders_resp is None:
+            print(
+                f"  {Colors.YELLOW}⚠{Colors.NC} API request failed for org id={org_id} — "
+                "skipping folder UID mapping for this org (check auth/connectivity)",
+                file=sys.stderr,
+            )
+            folders_resp = []
+        folders = folders_resp
 
         used_slugs: set[str] = set()
         top_level = [f for f in folders if not f.get("parentUid")]
@@ -368,7 +384,15 @@ def import_folders(ctx: ImportContext) -> None:
         ctx.client.current_org_id = org_id
         org_name = ctx.org_map[org_id]
 
-        folders = ctx.client.get("/api/folders?limit=1000") or []
+        folders_resp = ctx.client.get("/api/folders?limit=1000")
+        if folders_resp is None:
+            print(
+                f"  {Colors.YELLOW}⚠{Colors.NC} API request failed for org {org_name} (id={org_id}) — "
+                "skipping folders for this org (check auth/connectivity)",
+                file=sys.stderr,
+            )
+            folders_resp = []
+        folders = folders_resp
         if not folders:
             continue
 
@@ -425,8 +449,15 @@ def import_folders(ctx: ImportContext) -> None:
         ctx.client.current_org_id = org_id
         org_name = ctx.org_map[org_id]
 
-        folders = ctx.client.get("/api/folders?limit=1000") or []
-        for folder in folders:
+        folders_resp = ctx.client.get("/api/folders?limit=1000")
+        if folders_resp is None:
+            print(
+                f"  {Colors.YELLOW}⚠{Colors.NC} API request failed for org {org_name} (id={org_id}) — "
+                "skipping dashboard directory creation for this org (check auth/connectivity)",
+                file=sys.stderr,
+            )
+            folders_resp = []
+        for folder in folders_resp:
             slug_uid = ctx.folder_uid_map.get(folder["uid"], folder["uid"])
             folder_path = dash_base / org_name / slug_uid
             folder_path.mkdir(parents=True, exist_ok=True)
@@ -468,8 +499,15 @@ def import_teams(ctx: ImportContext) -> None:
         ctx.client.current_org_id = org_id
         org_name = ctx.org_map[org_id]
 
-        teams_data = ctx.client.get("/api/teams/search?perpage=1000") or {}
-        teams = teams_data.get("teams", [])
+        teams_resp = ctx.client.get("/api/teams/search?perpage=1000")
+        if teams_resp is None:
+            print(
+                f"  {Colors.YELLOW}⚠{Colors.NC} API request failed for org {org_name} (id={org_id}) — "
+                "skipping teams for this org (check auth/connectivity)",
+                file=sys.stderr,
+            )
+            teams_resp = {}
+        teams = teams_resp.get("teams", [])
 
         for team in teams:
             team_entry: dict[str, Any] = {
@@ -514,8 +552,15 @@ def import_service_accounts(ctx: ImportContext) -> None:
         ctx.client.current_org_id = org_id
         org_name = ctx.org_map[org_id]
 
-        sa_data = ctx.client.get("/api/serviceaccounts/search?perpage=1000") or {}
-        service_accounts = sa_data.get("serviceAccounts", [])
+        sa_resp = ctx.client.get("/api/serviceaccounts/search?perpage=1000")
+        if sa_resp is None:
+            print(
+                f"  {Colors.YELLOW}⚠{Colors.NC} API request failed for org {org_name} (id={org_id}) — "
+                "skipping service accounts for this org (check auth/connectivity)",
+                file=sys.stderr,
+            )
+            sa_resp = {}
+        service_accounts = sa_resp.get("serviceAccounts", [])
 
         for sa in service_accounts:
             sa_entry: dict[str, Any] = {
