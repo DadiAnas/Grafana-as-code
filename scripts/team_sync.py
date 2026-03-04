@@ -250,7 +250,7 @@ def main() -> None:
         org_id: int | None = team.get("orgId") or org_name_to_id.get(org_name)
 
         if not org_id:
-            print(f"  \033[0;31m✗\033[0m {team_name}: cannot resolve org '{org_name}'")
+            print(f"  {Colors.RED}✗{Colors.NC} {team_name}: cannot resolve org '{org_name}'")
             errors += 1
             continue
 
@@ -264,7 +264,7 @@ def main() -> None:
         matching = [t for t in grafana_teams if t["name"] == team_name]
 
         if not matching:
-            print(f"  \033[0;31m✗\033[0m {team_name}: not found in Grafana org {org_id}")
+            print(f"  {Colors.RED}✗{Colors.NC} {team_name}: not found in Grafana org {org_id}")
             errors += 1
             continue
 
@@ -311,7 +311,7 @@ def main() -> None:
             kc_group_id = kc_group_map.get(group_name)
             if not kc_group_id:
                 print(
-                    f"  \033[1;33m⚠\033[0m {team_name}:"
+                    f"  {Colors.YELLOW}⚠{Colors.NC} {team_name}:"
                     f" Keycloak group '{group_name}' not found — skipped"
                 )
                 continue
@@ -329,14 +329,14 @@ def main() -> None:
                     if global_user:
                         gf_login = global_user["login"]
                         print(
-                            f"    \033[1;33m⚠\033[0m {gf_login} exists in Grafana but not in"
+                            f"    {Colors.YELLOW}⚠{Colors.NC} {gf_login} exists in Grafana but not in"
                             f" org {org_id} — must log in via SSO to get org mapping"
                         )
                     else:
                         if username or email:
                             print(
-                                f"    \033[2m⊘ KC:{username or email}"
-                                " not in Grafana — must log in via SSO first\033[0m"
+                                f"    {Colors.DIM}⊘ KC:{username or email}"
+                                f" not in Grafana — must log in via SSO first{Colors.NC}"
                             )
                     continue
 
@@ -349,14 +349,14 @@ def main() -> None:
 
         if not to_add and not to_remove:
             print(
-                f"  \033[0;32m✓\033[0m {team_name} (org {org_id}):"
+                f"  {Colors.GREEN}✓{Colors.NC} {team_name} (org {org_id}):"
                 f" in sync ({len(current_user_ids)} members)"
             )
             skipped += 1
             continue
 
         print(
-            f"  \033[0;34m↻\033[0m {team_name} (org {org_id}):"
+            f"  {Colors.BLUE}↻{Colors.NC} {team_name} (org {org_id}):"
             f" +{len(to_add)} -{len(to_remove)} members"
         )
 
@@ -372,10 +372,10 @@ def main() -> None:
                     org_id=org_id,
                 )
                 if 200 <= status < 300:
-                    print(f"    \033[0;32m+\033[0m {uname}")
+                    print(f"    {Colors.GREEN}+{Colors.NC} {uname}")
                     added += 1
                 else:
-                    print(f"    \033[0;31m✗\033[0m {uname}: HTTP {status} {resp}")
+                    print(f"    {Colors.RED}✗{Colors.NC} {uname}: HTTP {status} {resp}")
                     errors += 1
 
         for uid in to_remove:
@@ -392,10 +392,10 @@ def main() -> None:
                     org_id=org_id,
                 )
                 if 200 <= status < 300:
-                    print(f"    \033[0;31m-\033[0m {uname}")
+                    print(f"    {Colors.RED}-{Colors.NC} {uname}")
                     removed += 1
                 else:
-                    print(f"    \033[0;31m✗\033[0m {uname}: HTTP {status} {resp}")
+                    print(f"    {Colors.RED}✗{Colors.NC} {uname}: HTTP {status} {resp}")
                     errors += 1
 
     # Summary
