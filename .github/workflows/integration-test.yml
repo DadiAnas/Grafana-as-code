@@ -99,6 +99,7 @@ jobs:
           echo "deb [signed-by=/usr/share/keyrings/hashicorp.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | \
             sudo tee /etc/apt/sources.list.d/hashicorp.list
           sudo apt-get update && sudo apt-get install -y vault jq
+          pip install -r requirements.txt
 
       - name: Wait for services
         run: |
@@ -384,7 +385,7 @@ jobs:
       # ─────────────────────────────────────────────────────────────────
       - name: "Step 9: Backup Grafana state"
         run: |
-          bash scripts/backup.sh ${ENV_NAME} || {
+          python3 scripts/backup.py ${ENV_NAME} || {
             echo "⚠️  Backup script had issues (may need GRAFANA_URL in tfvars)"
             echo "Trying direct API backup..."
             mkdir -p backups/${ENV_NAME}
@@ -469,7 +470,7 @@ jobs:
 
       - name: "Step 11: Test delete-env"
         run: |
-          bash scripts/delete-env.sh scaffold-test --force
+          python3 scripts/delete_env.py scaffold-test --force
 
           [ ! -f "envs/scaffold-test/terraform.tfvars" ] || { echo "tfvars not deleted"; exit 1; }
           [ ! -d "envs/scaffold-test" ] || { echo "config dir not deleted"; exit 1; }
@@ -487,7 +488,7 @@ jobs:
             GRAFANA_URL=https://grafana.promote.example.com
 
           # Promote from ci-test to promote-target
-          bash scripts/promote.sh ${ENV_NAME} promote-target || {
+          python3 scripts/promote.py ${ENV_NAME} promote-target || {
             echo "⚠️  Promote script may require interactive confirm"
             echo "Verifying promote-target exists..."
           }
