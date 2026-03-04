@@ -100,18 +100,18 @@ grafana-as-code/
 │       ├── sso/
 │       └── keycloak/
 │
-├── scripts/                          ← Automation
+├── scripts/                          ← Automation (all Python)
 │   ├── import_from_grafana.py         ← Import from existing Grafana
-│   ├── new-env.sh                    ← Create new environment
-│   ├── delete-env.sh / list-envs.sh / check-env.sh
-│   ├── drift-detect.sh
-│   ├── backup.sh
-│   ├── promote.sh
-│   ├── dashboard-diff.sh
-│   ├── team-sync.sh
+│   ├── new_env.py                    ← Create new environment
+│   ├── delete_env.py / list_envs.py / check_env.py
+│   ├── drift_detect.py
+│   ├── backup.py
+│   ├── promote.py
+│   ├── dashboard_diff.py
+│   ├── team_sync.py
 │   └── vault/                        ← Vault setup scripts
-│       ├── setup-secrets.sh
-│       ├── verify-secrets.sh
+│       ├── setup_secrets.py
+│       ├── verify_secrets.py
 │       └── ...
 │
 ├── Makefile                          ← Entry point — run everything from here
@@ -134,8 +134,7 @@ Everything else (`terraform/`, `scripts/`, `modules/`) is internal plumbing.
 ## 📋 Prerequisites
 
 - **Terraform** >= 1.6.0
-- **Python 3** (used by the import script)
-- **curl** (used by API scripts)
+- **Python 3** with `pip install -r requirements.txt` (all automation scripts use Python)
 - **Grafana** instance with admin access (basic auth or service account token)
 - **HashiCorp Vault** for secrets management
 - **Docker** *(optional)* for local development
