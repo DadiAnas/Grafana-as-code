@@ -338,14 +338,55 @@ def _process_datasource(ds: dict[str, Any], org_name: str, org_id: int) -> dict[
     if http_headers:
         entry["http_headers"] = http_headers
 
-    # When Grafana reports secure fields the values are redacted (not returned
-    # by the API).  Mark the datasource for Vault-managed credentials and add
-    # a human-readable hint so the user knows exactly what to store.
-    if secure_fields:
+    # ── Detect secrets requiring Vault ───────────────────────────────────────
+    # Grafana's API redacts secrets in two ways:
+    #   1. secureJsonFields: {"password": true}  → explicit (most reliable)
+    #   2. Returns "" or omits fields entirely    → detected by patterns below
+    # We build the full list from multiple sources so the hint is complete even
+    # when Grafana returns secureJsonFields: {} (empty).
+
+    # Start with what Grafana explicitly flagged as secure
+    secret_field_names: list[str] = sorted(secure_fields.keys())
+
+    # basic_auth_enabled always implies a basicAuthPassword
+    if ds.get("basicAuth") and "basicAuthPassword" not in secret_field_names:
+        secret_field_names.append("basicAuthPassword")
+
+    # Database datasources with a user almost certainly have a password
+    _DB_TYPES = {
+        "postgres", "mysql", "mssql", "influxdb",
+        "grafana-postgresql-datasource",
+        "grafana-mysql-datasource",
+        "grafana-mssql-datasource",
+    }
+    if ds.get("type") in _DB_TYPES and (ds.get("user") or ds.get("database")):
+        if "password" not in secret_field_names:
+            secret_field_names.append("password")
+
+    # Known secret keys that can appear inside jsonData as empty strings
+    _KNOWN_SECRET_JSON_KEYS = {
+        "token", "apiKey", "accessKey", "secretKey", "clientSecret",
+        "privateKey", "tlsClientKey", "tlsClientCert", "tlsCACert",
+        "sigV4SecretKey", "oauthClientSecret",
+    }
+    for k, v in (json_data or {}).items():
+        if k in _KNOWN_SECRET_JSON_KEYS and (v == "" or v is None):
+            if k not in secret_field_names:
+                secret_field_names.append(k)
+
+    # HTTP header values that are empty strings (name present, value redacted)
+    for header_name, header_val in http_headers.items():
+        placeholder = f"httpHeader:{header_name}"
+        if header_val == "" and placeholder not in secret_field_names:
+            secret_field_names.append(placeholder)
+
+    if secret_field_names:
         entry["use_vault"] = True
-        field_names = ", ".join(sorted(secure_fields.keys()))
         entry["vault_secret_fields"] = (
-            f"Store in Vault at grafana/<env>/datasources/{entry['name']}: {field_names}"
+            "Store in Vault at grafana/<env>/datasources/"
+            + entry["name"]
+            + ": "
+            + ", ".join(sorted(secret_field_names))
         )
 
     return entry
