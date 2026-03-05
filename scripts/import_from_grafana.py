@@ -1188,15 +1188,33 @@ grafana_url = "{ctx.grafana_url}"
 # Environment name — must match a directory under envs/
 environment = "{ctx.env_name}"
 
-# Vault Configuration (HashiCorp Vault for secrets management)
+# ─── Vault Configuration ───────────────────────────────────────────────────
+# HashiCorp Vault for secrets management (datasource passwords, SSO secrets)
 vault_address = "http://localhost:8200"
 vault_mount   = "grafana"
+
+# Vault Enterprise namespace (leave commented for OSS Vault or root namespace)
+# vault_namespace = "admin/team-grafana"
+
 # vault_token — set via VAULT_TOKEN env variable for security:
 #   export VAULT_TOKEN="your-vault-token"
+
+# ─── Vault Secret Paths ────────────────────────────────────────────────────
+# Path prefixes within vault_mount for each resource type.
+# Defaults match the layout this script writes secrets to.
+# Uncomment and change ONLY if your Vault topology differs.
+#
+# vault_path_grafana_auth      = "grafana/auth"
+# vault_path_datasources       = "grafana/datasources"
+# vault_path_contact_points    = "grafana/alerting/contact-points"
+# vault_path_sso               = "grafana/sso/keycloak"
+# vault_path_keycloak          = "grafana/keycloak/client"
+# vault_path_service_accounts  = "grafana/service-accounts"
 
 # Keycloak Configuration (optional — only if you enable SSO via Keycloak)
 # keycloak_url = "https://keycloak.example.com"
 """
+
 
     with open(tfvars_file, "w") as f:
         f.write(content)

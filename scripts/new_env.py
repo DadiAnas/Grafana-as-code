@@ -126,6 +126,18 @@ def _generate_tfvars(
         f"# See: https://developer.hashicorp.com/vault/docs/enterprise/namespaces\n"
         f"{vault_ns_line}\n"
         f"\n"
+        f"# \u2500\u2500\u2500 Vault Secret Paths \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n"
+        f"# Path prefixes within the vault_mount for each resource type.\n"
+        f"# Defaults match the layout written by import_from_grafana.py.\n"
+        f"# Uncomment and change ONLY if your Vault topology differs.\n"
+        f"#\n"
+        f'# vault_path_grafana_auth      = "grafana/auth"\n'
+        f'# vault_path_datasources        = "grafana/datasources"\n'
+        f'# vault_path_contact_points     = "grafana/alerting/contact-points"\n'
+        f'# vault_path_sso                = "grafana/sso/keycloak"\n'
+        f'# vault_path_keycloak           = "grafana/keycloak/client"\n'
+        f'# vault_path_service_accounts   = "grafana/service-accounts"\n'
+        f"\n"
         f"# The vault token should be set via environment variable for security:\n"
         f'#   export VAULT_TOKEN="your-vault-token"\n'
         f"#\n"

@@ -25,7 +25,18 @@ variable "environment" {
 # =============================================================================
 # HashiCorp Vault is used to store sensitive credentials (Grafana auth,
 # datasource passwords, SSO secrets, etc.) instead of in plaintext.
-# See vault/ directory for setup scripts.
+#
+# Secret layout (all paths are relative to vault_mount):
+#
+#   <vault_path_grafana_auth>              → Grafana admin credentials
+#   <vault_path_datasources>/<ds-name>    → per-datasource credentials
+#   <vault_path_contact_points>/<cp-name> → per-contact-point secrets
+#   <vault_path_sso>                      → SSO / Keycloak OIDC creds
+#   <vault_path_keycloak>                 → Keycloak provider auth
+#   <vault_path_service_accounts>/<name>  → per-service-account tokens
+#
+# All path variables default to the conventional layout used by import_from_grafana.py.
+# Override any of them in your environment's terraform.tfvars if your Vault differs.
 # =============================================================================
 
 variable "vault_address" {
@@ -41,15 +52,57 @@ variable "vault_token" {
 }
 
 variable "vault_mount" {
-  description = "The KV v2 secrets engine mount path in Vault"
+  description = "KV v2 secrets engine mount path in Vault (the engine name, not the full path)"
   type        = string
   default     = "grafana"
 }
 
 variable "vault_namespace" {
-  description = "Vault Enterprise namespace (e.g., 'admin/grafana'). Leave empty for OSS Vault or root namespace."
+  description = "Vault Enterprise namespace (e.g., 'admin/team-grafana'). Leave empty for OSS Vault or root namespace."
   type        = string
   default     = ""
+}
+
+# ---------------------------------------------------------------------------
+# Vault secret path prefixes
+# Each variable is the path suffix appended after vault_mount.
+# The import script writes secrets to these same paths by default.
+# ---------------------------------------------------------------------------
+
+variable "vault_path_grafana_auth" {
+  description = "Vault path (within the mount) for the Grafana admin auth secret."
+  type        = string
+  default     = "grafana/auth"
+}
+
+variable "vault_path_datasources" {
+  description = "Vault path prefix for per-datasource credential secrets. The datasource name is appended: <prefix>/<datasource-name>."
+  type        = string
+  default     = "grafana/datasources"
+}
+
+variable "vault_path_contact_points" {
+  description = "Vault path prefix for alerting contact-point credential secrets. The contact point name is appended: <prefix>/<cp-name>."
+  type        = string
+  default     = "grafana/alerting/contact-points"
+}
+
+variable "vault_path_sso" {
+  description = "Vault path (within the mount) for SSO / Keycloak OIDC credentials."
+  type        = string
+  default     = "grafana/sso/keycloak"
+}
+
+variable "vault_path_keycloak" {
+  description = "Vault path (within the mount) for Keycloak provider-auth credentials (used when Terraform manages the Keycloak client)."
+  type        = string
+  default     = "grafana/keycloak/client"
+}
+
+variable "vault_path_service_accounts" {
+  description = "Vault path prefix for per-service-account credential secrets. The service account name is appended: <prefix>/<name>."
+  type        = string
+  default     = "grafana/service-accounts"
 }
 
 # =============================================================================

@@ -26,18 +26,22 @@ provider "vault" {
 }
 
 # Fetch Grafana credentials from Vault
+# Path: var.vault_mount / var.vault_path_grafana_auth
 data "vault_kv_secret_v2" "grafana_auth" {
-  mount = var.vault_mount
-  name  = "${var.environment}/grafana/auth"
+  mount     = var.vault_mount
+  name      = var.vault_path_grafana_auth
+  namespace = var.vault_namespace != "" ? var.vault_namespace : null
 }
 
 # Fetch Keycloak provider credentials from Vault (optional)
 # Only fetched when keycloak management is enabled
+# Path: var.vault_mount / var.vault_path_keycloak
 data "vault_kv_secret_v2" "keycloak_provider_auth" {
   count = local.keycloak_config.enabled ? 1 : 0
 
-  mount = var.vault_mount
-  name  = "${var.environment}/keycloak/provider-auth"
+  mount     = var.vault_mount
+  name      = var.vault_path_keycloak
+  namespace = var.vault_namespace != "" ? var.vault_namespace : null
 }
 
 # Local values for Keycloak provider auth
@@ -83,8 +87,17 @@ module "organizations" {
 module "vault_secrets" {
   source = "./modules/vault"
 
-  environment           = var.environment
-  vault_mount           = var.vault_mount
+  environment     = var.environment
+  vault_mount     = var.vault_mount
+  vault_namespace = var.vault_namespace
+
+  # Configurable path prefixes (override in terraform.tfvars when Vault layout differs)
+  vault_path_datasources      = var.vault_path_datasources
+  vault_path_contact_points   = var.vault_path_contact_points
+  vault_path_sso              = var.vault_path_sso
+  vault_path_keycloak         = var.vault_path_keycloak
+  vault_path_service_accounts = var.vault_path_service_accounts
+
   datasource_names      = local.datasource_names
   contact_point_names   = local.contact_point_names
   load_sso_secrets      = true
