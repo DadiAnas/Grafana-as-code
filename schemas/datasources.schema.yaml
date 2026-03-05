@@ -17,6 +17,7 @@ datasource:
   database_name: str(required=False)
   username: str(required=False)
   use_vault: bool(required=False)
+  vault_secret_fields: str(required=False)
   http_headers: map(str(), str(), required=False)
   json_data: any(required=False)
   secure_json_data: any(required=False)

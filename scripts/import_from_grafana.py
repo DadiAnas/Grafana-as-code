@@ -338,9 +338,15 @@ def _process_datasource(ds: dict[str, Any], org_name: str, org_id: int) -> dict[
     if http_headers:
         entry["http_headers"] = http_headers
 
-    # Add comment about secure fields
+    # When Grafana reports secure fields the values are redacted (not returned
+    # by the API).  Mark the datasource for Vault-managed credentials and add
+    # a human-readable hint so the user knows exactly what to store.
     if secure_fields:
-        entry["_comment_secure_fields"] = f"Secure fields detected: {list(secure_fields.keys())}. Configure via Vault."
+        entry["use_vault"] = True
+        field_names = ", ".join(sorted(secure_fields.keys()))
+        entry["vault_secret_fields"] = (
+            f"Store in Vault at grafana/<env>/datasources/{entry['name']}: {field_names}"
+        )
 
     return entry
 
@@ -615,6 +621,76 @@ def import_service_accounts(ctx: ImportContext) -> None:
     ctx.imported_count += 1
 
 
+# ---------------------------------------------------------------------------
+# Contact-point secret detection
+# ---------------------------------------------------------------------------
+# Grafana's API returns secret fields as EMPTY STRINGS (redacted).
+# We detect them by field name, replace with a clear placeholder, and
+# return the list of affected fields so the caller can write a Vault hint.
+
+# Maps receiver type → list of field names that hold secrets
+_CP_SECRET_FIELDS: dict[str, list[str]] = {
+    "webhook":      ["url", "password", "tlsClientCert", "tlsClientKey", "authorizationCredentials"],
+    "slack":        ["token", "url", "recipient"],          # url = Incoming Webhook URL
+    "pagerduty":    ["integrationKey", "serviceKey"],
+    "opsgenie":     ["apiKey", "apiUrl"],
+    "email":        [],                                     # no secrets in Grafana email config
+    "telegram":     ["botToken"],
+    "discord":      ["url"],                                # webhook URL
+    "teams":        ["url"],                                # webhook URL
+    "googlechat":   ["url"],
+    "victorops":    ["apiKey", "url"],
+    "pushover":     ["apiToken", "userKey"],
+    "sns":          ["accessKey", "secretKey"],
+    "threema":      ["apiSecret"],
+    "webex":        ["botToken", "roomId"],
+    "line":         ["token"],
+    "kafka":        ["password"],
+    "oncall":       ["url", "httpPassword", "authorizationCredentials"],
+    "alertmanager": ["basicAuthPassword"],
+    "sensugo":      ["apiKey"],
+}
+
+_VAULT_PLACEHOLDER = "VAULT_SECRET_REQUIRED"
+
+
+def _redact_contact_point_secrets(
+    recv_type: str,
+    settings: dict,
+    env_name: str,
+    cp_name: str,
+) -> tuple[dict, list[str]]:
+    """
+    Scrub known-sensitive fields from contact point settings.
+
+    Grafana redacts secrets by returning them as empty strings.  We detect
+    empty-or-absent values for known secret fields and replace them with
+    a clear placeholder string.
+
+    Returns:
+        (cleaned_settings, list_of_secret_field_names_found)
+    """
+    secret_fields = _CP_SECRET_FIELDS.get(recv_type, [])
+    cleaned = dict(settings)
+    found: list[str] = []
+
+    for field in secret_fields:
+        val = cleaned.get(field)
+        # Grafana returns "" for redacted secrets; also handle None / missing
+        if val == "" or val is None:
+            cleaned[field] = _VAULT_PLACEHOLDER
+            found.append(field)
+
+    # Generic catch-all: any OTHER field that is an empty string in a receiver
+    # that has known secret fields is also likely redacted
+    for k, v in list(cleaned.items()):
+        if k not in secret_fields and v == "" and not k.startswith("#"):
+            cleaned[k] = _VAULT_PLACEHOLDER
+            found.append(k)
+
+    return cleaned, found
+
+
 def import_alerting(ctx: ImportContext) -> None:
     """Import alerting configuration (contact points, rules, policies)."""
     print(f"{Colors.BLUE}[6/8]{Colors.NC} Importing alerting configuration...")
@@ -643,8 +719,18 @@ def import_alerting(ctx: ImportContext) -> None:
 
             recv: dict[str, Any] = {"type": cp["type"]}
             settings = cp.get("settings", {})
+            secrets_found: list[str] = []
             if settings:
-                recv["settings"] = settings
+                cleaned, secrets_found = _redact_contact_point_secrets(
+                    cp["type"], settings, env_name=ctx.env_name, cp_name=name
+                )
+                recv["settings"] = cleaned
+            if secrets_found:
+                recv["vault_secrets"] = (
+                    f"⚠ Fill in Vault at "
+                    f"grafana/{ctx.env_name}/contact_points/{name}: "
+                    + ", ".join(secrets_found)
+                )
             dis_resolve = cp.get("disableResolveMessage")
             if dis_resolve is not None:
                 recv["disableResolveMessage"] = dis_resolve

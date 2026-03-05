@@ -1,0 +1,18 @@
+folders:
+- title: App Api
+  uid: app-api
+  org: Application Team
+  orgId: 3
+  permissions:
+  - role: Viewer
+    permission: View
+- title: App Backend
+  uid: app-backend
+  org: Application Team
+  orgId: 3
+  permissions: []
+- title: App Frontend
+  uid: app-frontend
+  org: Application Team
+  orgId: 3
+  permissions: []

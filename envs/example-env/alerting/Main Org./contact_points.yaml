@@ -1,0 +1,53 @@
+# contact_points per org
+
+contactPoints:
+- name: email-npr
+  org: Main Org.
+  receivers:
+  - type: email
+    settings:
+      addresses: oncall-npr@example.com;platform-npr@example.com
+      message: 'Environment: NPR
+
+        {{ range .Alerts }}
+
+        Alert: {{ .Labels.alertname }}
+
+        Status: {{ .Status }}
+
+        Severity: {{ .Labels.severity }}
+
+        Summary: {{ .Annotations.summary }}
+
+        Description: {{ .Annotations.description }}
+
+        {{ if .Annotations.runbook_url }}Runbook: {{ .Annotations.runbook_url }}{{
+        end }}
+
+        {{ end }}
+
+        '
+      singleEmail: true
+      subject: '[NPR] [{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}'
+    disableResolveMessage: false
+- name: grafana-default-email
+  org: Main Org.
+  receivers:
+  - type: email
+    settings:
+      addresses: <example@email.com>
+      singleEmail: false
+    disableResolveMessage: false
+- name: webhook-npr
+  org: Main Org.
+  receivers:
+  - type: webhook
+    settings:
+      authorization_credentials: '[REDACTED]'
+      authorization_scheme: Bearer
+      headers:
+        Content-Type: application/json
+      httpMethod: POST
+      maxAlerts: 0
+      url: https://api.npr.example.com/alerts
+    disableResolveMessage: false

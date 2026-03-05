@@ -1,0 +1,33 @@
+datasources:
+- name: Debug-Prometheus
+  uid: debug-prometheus
+  type: prometheus
+  url: http://prometheus-debug-npr.example.com:9090
+  org: Platform Team
+  orgId: 5
+  access: proxy
+  is_default: false
+  json_data:
+    httpMethod: POST
+    timeInterval: 5s
+- name: Platform-Loki
+  uid: platform-loki
+  type: loki
+  url: http://loki.platform.local:3100
+  org: Platform Team
+  orgId: 5
+  access: proxy
+  is_default: false
+  json_data:
+    maxLines: 1000
+- name: Platform-Prometheus
+  uid: platform-prometheus
+  type: prometheus
+  url: http://prometheus.platform.local:9090
+  org: Platform Team
+  orgId: 5
+  access: proxy
+  is_default: true
+  json_data:
+    httpMethod: POST
+    timeInterval: 15s

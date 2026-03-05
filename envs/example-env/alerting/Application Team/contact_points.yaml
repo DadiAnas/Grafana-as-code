@@ -1,0 +1,29 @@
+# contact_points per org
+
+contactPoints:
+- name: app-email
+  org: Application Team
+  receivers:
+  - type: email
+    settings:
+      addresses: app-team@example.com
+      singleEmail: true
+      subject: '[{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}'
+    disableResolveMessage: false
+- name: app-webhook-npr
+  org: Application Team
+  receivers:
+  - type: webhook
+    settings:
+      httpMethod: POST
+      maxAlerts: 0
+      url: https://hooks.app.example.com/npr/alerts
+    disableResolveMessage: false
+- name: grafana-default-email
+  org: Application Team
+  receivers:
+  - type: email
+    settings:
+      addresses: <example@email.com>
+      singleEmail: false
+    disableResolveMessage: false

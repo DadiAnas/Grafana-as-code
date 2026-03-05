@@ -12,4 +12,5 @@ contact_point:
 receiver:
   type: str()
   settings: any(required=False)
+  vault_secrets: str(required=False)   # populated by import script for redacted secrets
   disableResolveMessage: bool(required=False)
