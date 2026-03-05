@@ -1,0 +1,6 @@
+teams:
+- name: Dev Team
+  email: dev-team@example.com
+  org: Development
+  orgId: 4
+  members: []

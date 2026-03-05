@@ -249,7 +249,7 @@ def import_datasources(ctx: ImportContext) -> None:
     """Import datasources from all organizations."""
     print(f"{Colors.BLUE}[2/8]{Colors.NC} Importing datasources...")
 
-    all_datasources: list[dict[str, Any]] = []
+    total_count = 0
 
     for org_id in ctx.org_ids:
         ctx.client.current_org_id = org_id
@@ -263,22 +263,25 @@ def import_datasources(ctx: ImportContext) -> None:
                 file=sys.stderr,
             )
             datasources_resp = []
-        datasources = datasources_resp
-        for ds in datasources:
-            ds_entry = _process_datasource(ds, org_name, org_id)
-            all_datasources.append(ds_entry)
+
+        org_datasources = [_process_datasource(ds, org_name, org_id) for ds in datasources_resp]
+
+        # Always create the dir and file, even if empty
+        org_dir = ctx.config_dir / "datasources" / org_name
+        org_dir.mkdir(parents=True, exist_ok=True)
+        output_file = org_dir / "datasources.yaml"
+        with open(output_file, "w") as f:
+            f.write(f"# Imported from {ctx.grafana_url} on {datetime.now().isoformat()}\n\n")
+            f.write(yaml_dump({"datasources": org_datasources}))
+
+        if org_datasources:
+            print(f"  {Colors.GREEN}✓{Colors.NC} {len(org_datasources)} datasource(s) → envs/{ctx.env_name}/datasources/{org_name}/datasources.yaml")
+        else:
+            print(f"  {Colors.DIM}  0 datasources → envs/{ctx.env_name}/datasources/{org_name}/datasources.yaml (empty){Colors.NC}")
+        total_count += len(org_datasources)
 
     ctx.client.current_org_id = None
 
-    output_file = ctx.config_dir / "datasources.yaml"
-    with open(output_file, "w") as f:
-        f.write(f"# Imported from {ctx.grafana_url} on {datetime.now().isoformat()}\n\n")
-        f.write(yaml_dump({"datasources": all_datasources}))
-
-    if not all_datasources:
-        print(f"  {Colors.DIM}  No datasources found → envs/{ctx.env_name}/datasources.yaml{Colors.NC}")
-    else:
-        print(f"  {Colors.GREEN}✓{Colors.NC} {len(all_datasources)} datasource(s) across {len(ctx.org_ids)} org(s) → envs/{ctx.env_name}/datasources.yaml")
     ctx.imported_count += 1
 
 
@@ -314,7 +317,7 @@ def _process_datasource(ds: dict[str, Any], org_name: str, org_id: int) -> dict[
         "uid": ds.get("uid", ds["name"].lower().replace(" ", "-")),
         "type": ds["type"],
         "url": ds.get("url", ""),
-        "org": org_name,
+        "orgId": org_id,
         "access": ds.get("access", "proxy"),
         "is_default": ds.get("isDefault", False),
     }
@@ -413,7 +416,7 @@ def import_folders(ctx: ImportContext) -> None:
                 "title": folder["title"],
                 "uid": new_uid,
                 "_comment_original_uid": old_uid,
-                "org": org_name,
+                "orgId": org_id,
             }
 
             if parent_new:
@@ -467,24 +470,29 @@ def import_folders(ctx: ImportContext) -> None:
 
     ctx.client.current_org_id = None
 
-    if not all_folders:
-        output_file = ctx.config_dir / "folders.yaml"
+    # Write per-org folder files — always create dir+file for every org
+    folders_by_org: dict[str, list[dict[str, Any]]] = {}
+    for folder_entry in all_folders:
+        org = ctx.org_map.get(folder_entry.get("orgId"), "__no_org__")
+        folders_by_org.setdefault(org, []).append(folder_entry)
+
+    # Ensure every org gets a directory, even with no folders
+    for org_id in ctx.org_ids:
+        org_name = ctx.org_map[org_id]
+        org_folders = folders_by_org.get(org_name, [])
+        org_dir = ctx.config_dir / "folders" / org_name
+        org_dir.mkdir(parents=True, exist_ok=True)
+        output_file = org_dir / "folders.yaml"
         with open(output_file, "w") as f:
             f.write(f"# Imported from {ctx.grafana_url} on {datetime.now().isoformat()}\n")
             f.write("# NOTE: Folder UIDs have been slugified from the original random Grafana UIDs\n")
             f.write("#       for better readability in both YAML config and directory structure.\n\n")
-            f.write(yaml_dump({"folders": []}))
-        print(f"  {Colors.DIM}  No folders found → envs/{ctx.env_name}/folders.yaml{Colors.NC}")
-        return
+            f.write(yaml_dump({"folders": org_folders}))
+        if org_folders:
+            print(f"  {Colors.GREEN}✓{Colors.NC} {len(org_folders)} folder(s) → envs/{ctx.env_name}/folders/{org_name}/folders.yaml")
+        else:
+            print(f"  {Colors.DIM}  0 folders → envs/{ctx.env_name}/folders/{org_name}/folders.yaml (empty){Colors.NC}")
 
-    output_file = ctx.config_dir / "folders.yaml"
-    with open(output_file, "w") as f:
-        f.write(f"# Imported from {ctx.grafana_url} on {datetime.now().isoformat()}\n")
-        f.write("# NOTE: Folder UIDs have been slugified from the original random Grafana UIDs\n")
-        f.write("#       for better readability in both YAML config and directory structure.\n\n")
-        f.write(yaml_dump({"folders": all_folders}))
-
-    print(f"  {Colors.GREEN}✓{Colors.NC} {total_folders} folder(s) across {len(ctx.org_ids)} org(s) → envs/{ctx.env_name}/folders.yaml")
     print(f"  {Colors.GREEN}✓{Colors.NC} Created {total_folders} folder directories under envs/{ctx.env_name}/dashboards/")
     ctx.imported_count += 1
 
@@ -512,7 +520,7 @@ def import_teams(ctx: ImportContext) -> None:
         for team in teams:
             team_entry: dict[str, Any] = {
                 "name": team["name"],
-                "org": org_name,
+                "orgId": org_id,
                 "members": [],
             }
 
@@ -530,15 +538,26 @@ def import_teams(ctx: ImportContext) -> None:
 
     ctx.client.current_org_id = None
 
-    output_file = ctx.config_dir / "teams.yaml"
-    with open(output_file, "w") as f:
-        f.write(f"# Imported from {ctx.grafana_url} on {datetime.now().isoformat()}\n\n")
-        f.write(yaml_dump({"teams": all_teams}))
+    # Write per-org team files — always create dir+file for every org
+    teams_by_org: dict[str, list[dict[str, Any]]] = {}
+    for team_entry in all_teams:
+        org = ctx.org_map.get(team_entry.get("orgId"), "__no_org__")
+        teams_by_org.setdefault(org, []).append(team_entry)
 
-    if not all_teams:
-        print(f"  {Colors.DIM}  No teams found → envs/{ctx.env_name}/teams.yaml{Colors.NC}")
-    else:
-        print(f"  {Colors.GREEN}✓{Colors.NC} {len(all_teams)} team(s) across {len(ctx.org_ids)} org(s) → envs/{ctx.env_name}/teams.yaml")
+    for org_id in ctx.org_ids:
+        org_name = ctx.org_map[org_id]
+        org_teams = teams_by_org.get(org_name, [])
+        org_dir = ctx.config_dir / "teams" / org_name
+        org_dir.mkdir(parents=True, exist_ok=True)
+        output_file = org_dir / "teams.yaml"
+        with open(output_file, "w") as f:
+            f.write(f"# Imported from {ctx.grafana_url} on {datetime.now().isoformat()}\n\n")
+            f.write(yaml_dump({"teams": org_teams}))
+        if org_teams:
+            print(f"  {Colors.GREEN}✓{Colors.NC} {len(org_teams)} team(s) → envs/{ctx.env_name}/teams/{org_name}/teams.yaml")
+        else:
+            print(f"  {Colors.DIM}  0 teams → envs/{ctx.env_name}/teams/{org_name}/teams.yaml (empty){Colors.NC}")
+
     ctx.imported_count += 1
 
 
@@ -567,21 +586,32 @@ def import_service_accounts(ctx: ImportContext) -> None:
                 "name": sa["name"],
                 "role": sa.get("role", "Viewer"),
                 "is_disabled": sa.get("isDisabled", False),
-                "org": org_name,
+                "orgId": org_id,
             }
             all_service_accounts.append(sa_entry)
 
     ctx.client.current_org_id = None
 
-    output_file = ctx.config_dir / "service_accounts.yaml"
-    with open(output_file, "w") as f:
-        f.write(f"# Imported from {ctx.grafana_url} on {datetime.now().isoformat()}\n\n")
-        f.write(yaml_dump({"service_accounts": all_service_accounts}))
+    # Write per-org service account files — always create dir+file for every org
+    sa_by_org: dict[str, list[dict[str, Any]]] = {}
+    for sa_entry in all_service_accounts:
+        org = ctx.org_map.get(sa_entry.get("orgId"), "__no_org__")
+        sa_by_org.setdefault(org, []).append(sa_entry)
 
-    if not all_service_accounts:
-        print(f"  {Colors.DIM}  No service accounts found → envs/{ctx.env_name}/service_accounts.yaml{Colors.NC}")
-    else:
-        print(f"  {Colors.GREEN}✓{Colors.NC} {len(all_service_accounts)} service account(s) across {len(ctx.org_ids)} org(s) → envs/{ctx.env_name}/service_accounts.yaml")
+    for org_id in ctx.org_ids:
+        org_name = ctx.org_map[org_id]
+        org_sas = sa_by_org.get(org_name, [])
+        org_dir = ctx.config_dir / "service_accounts" / org_name
+        org_dir.mkdir(parents=True, exist_ok=True)
+        output_file = org_dir / "service_accounts.yaml"
+        with open(output_file, "w") as f:
+            f.write(f"# Imported from {ctx.grafana_url} on {datetime.now().isoformat()}\n\n")
+            f.write(yaml_dump({"service_accounts": org_sas}))
+        if org_sas:
+            print(f"  {Colors.GREEN}✓{Colors.NC} {len(org_sas)} service account(s) → envs/{ctx.env_name}/service_accounts/{org_name}/service_accounts.yaml")
+        else:
+            print(f"  {Colors.DIM}  0 service accounts → envs/{ctx.env_name}/service_accounts/{org_name}/service_accounts.yaml (empty){Colors.NC}")
+
     ctx.imported_count += 1
 
 
@@ -609,7 +639,7 @@ def import_alerting(ctx: ImportContext) -> None:
         for cp in contact_points:
             name = cp["name"]
             if name not in grouped:
-                grouped[name] = {"name": name, "org": org_name, "receivers": []}
+                grouped[name] = {"name": name, "orgId": org_id, "receivers": []}
 
             recv: dict[str, Any] = {"type": cp["type"]}
             settings = cp.get("settings", {})
@@ -621,17 +651,27 @@ def import_alerting(ctx: ImportContext) -> None:
             grouped[name]["receivers"].append(recv)
             total_cp += 1
 
-        all_contact_points.extend(grouped.values())
+        # Always create the org dir and write contact points (even if empty)
+        org_dir = alerting_dir / org_name
+        org_dir.mkdir(parents=True, exist_ok=True)
+        if grouped:
+            output_file = org_dir / "contact_points.yaml"
+            with open(output_file, "w") as f:
+                f.write(f"# Imported from {ctx.grafana_url} on {datetime.now().isoformat()}\n\n")
+                f.write(yaml_dump({"contactPoints": list(grouped.values())}))
+        else:
+            output_file = org_dir / "contact_points.yaml"
+            with open(output_file, "w") as f:
+                f.write(f"# Imported from {ctx.grafana_url} on {datetime.now().isoformat()}\n\n")
+                f.write(yaml_dump({"contactPoints": []}))
 
     ctx.client.current_org_id = None
 
     if total_cp > 0:
-        output_file = alerting_dir / "contact_points.yaml"
-        with open(output_file, "w") as f:
-            f.write(f"# Imported from {ctx.grafana_url} on {datetime.now().isoformat()}\n\n")
-            f.write(yaml_dump({"contactPoints": all_contact_points}))
-        print(f"  {Colors.GREEN}✓{Colors.NC} {total_cp} contact point(s) across {len(ctx.org_ids)} org(s)")
-        ctx.imported_count += 1
+        print(f"  {Colors.GREEN}✓{Colors.NC} {total_cp} contact point(s) → envs/{ctx.env_name}/alerting/<org>/contact_points.yaml")
+    else:
+        print(f"  {Colors.DIM}  0 contact points (empty files created per org){Colors.NC}")
+    ctx.imported_count += 1
 
     # Alert Rules
     all_groups: list[dict[str, Any]] = []
@@ -656,7 +696,7 @@ def import_alerting(ctx: ImportContext) -> None:
                 groups[key] = {
                     "name": group_name,
                     "folder": folder,
-                    "org": org_name,
+                    "orgId": org_id,
                     "interval": "1m",
                     "rules": [],
                 }
@@ -674,17 +714,22 @@ def import_alerting(ctx: ImportContext) -> None:
             groups[key]["rules"].append(r_data)
             total_ar += 1
 
-        all_groups.extend(groups.values())
+        # Always create org dir and write alert_rules (even if empty)
+        org_dir = alerting_dir / org_name
+        org_dir.mkdir(parents=True, exist_ok=True)
+        output_file = org_dir / "alert_rules.yaml"
+        with open(output_file, "w") as f:
+            f.write(f"# Imported from {ctx.grafana_url} on {datetime.now().isoformat()}\n\n")
+            f.write("apiVersion: 1\n")
+            f.write(yaml_dump({"groups": list(groups.values()) if groups else []}))
 
     ctx.client.current_org_id = None
 
     if total_ar > 0:
-        output_file = alerting_dir / "alert_rules.yaml"
-        with open(output_file, "w") as f:
-            f.write(f"# Imported from {ctx.grafana_url} on {datetime.now().isoformat()}\n\n")
-            f.write(yaml_dump({"groups": all_groups}))
-        print(f"  {Colors.GREEN}✓{Colors.NC} {total_ar} alert rule(s) across {len(ctx.org_ids)} org(s)")
-        ctx.imported_count += 1
+        print(f"  {Colors.GREEN}✓{Colors.NC} {total_ar} alert rule(s) → envs/{ctx.env_name}/alerting/<org>/alert_rules.yaml")
+    else:
+        print(f"  {Colors.DIM}  0 alert rules (empty files created per org){Colors.NC}")
+    ctx.imported_count += 1
 
     # Notification Policies
     all_policies: list[dict[str, Any]] = []
@@ -695,33 +740,38 @@ def import_alerting(ctx: ImportContext) -> None:
         org_name = ctx.org_map[org_id]
 
         policy = ctx.client.get("/api/v1/provisioning/policies")
-        if not policy or not policy.get("receiver"):
-            continue
+        policy_entry = None
+        if policy and policy.get("receiver"):
+            policy_entry = _process_notification_policy(policy, org_id)
 
-        policy_entry = _process_notification_policy(policy, org_name)
-        all_policies.append(policy_entry)
-        total_np += 1
-
-    ctx.client.current_org_id = None
-
-    if total_np > 0:
-        output_file = alerting_dir / "notification_policies.yaml"
+        # Always write the file (with or without content)
+        org_dir = alerting_dir / org_name
+        org_dir.mkdir(parents=True, exist_ok=True)
+        output_file = org_dir / "notification_policies.yaml"
         with open(output_file, "w") as f:
             f.write(f"# Imported from {ctx.grafana_url} on {datetime.now().isoformat()}\n")
             f.write("#\n")
             f.write("# Notification Policies define how alerts are routed to contact points.\n")
             f.write("# Format follows Grafana's provisioning API structure.\n\n")
-            f.write(yaml_dump({"policies": all_policies}))
-        print(f"  {Colors.GREEN}✓{Colors.NC} {total_np} notification policy tree(s) across {len(ctx.org_ids)} org(s)")
-        ctx.imported_count += 1
+            if policy_entry:
+                f.write(yaml_dump({"policies": [policy_entry]}))
+                total_np += 1
+            else:
+                f.write(yaml_dump({"policies": []}))
+
+    ctx.client.current_org_id = None
+
+    if total_np > 0:
+        print(f"  {Colors.GREEN}✓{Colors.NC} {total_np} notification policy(ies) → envs/{ctx.env_name}/alerting/<org>/notification_policies.yaml")
     else:
-        print(f"  {Colors.DIM}  No notification policies found{Colors.NC}")
+        print(f"  {Colors.DIM}  0 notification policies (empty files created per org){Colors.NC}")
+    ctx.imported_count += 1
 
 
-def _process_notification_policy(policy: dict[str, Any], org_name: str) -> dict[str, Any]:
+def _process_notification_policy(policy: dict[str, Any], org_id: int) -> dict[str, Any]:
     """Process a notification policy into YAML format."""
     entry: dict[str, Any] = {
-        "org": org_name,
+        "orgId": org_id,
         "receiver": policy.get("receiver", "grafana-default-email"),
     }
 
@@ -948,9 +998,9 @@ def _process_org_mapping(org_mapping_str: str, org_map: dict[int, str]) -> list[
 
         entry: dict[str, Any] = {"role": role}
         if org_id == "*":
-            entry["org"] = "*"
+            entry["orgId"] = "*"
         else:
-            entry["org"] = org_name_lookup.get(org_id, org_id)
+            entry["orgId"] = int(org_id) if org_id.isdigit() else org_id
             entry["_org_id"] = org_id
 
         groups[group_name].append(entry)
@@ -958,7 +1008,7 @@ def _process_org_mapping(org_mapping_str: str, org_map: dict[int, str]) -> list[
     # Collapse: if a group maps to ALL orgs with the same role, use org: "*"
     for group_name in group_order:
         mappings_list = groups[group_name]
-        if any(m["org"] == "*" for m in mappings_list):
+        if any(m.get("orgId") == "*" for m in mappings_list):
             continue
 
         role_counts: dict[str, list[dict[str, Any]]] = {}
@@ -969,7 +1019,7 @@ def _process_org_mapping(org_mapping_str: str, org_map: dict[int, str]) -> list[
             covered_ids = {m["_org_id"] for m in role_mappings if "_org_id" in m}
             if len(all_org_ids) > 1 and covered_ids >= all_org_ids:
                 remaining = [m for m in mappings_list if m["role"] != role]
-                remaining.insert(0, {"org": "*", "role": role})
+                remaining.insert(0, {"orgId": "*", "role": role})
                 groups[group_name] = remaining
                 break
 
@@ -980,7 +1030,7 @@ def _process_org_mapping(org_mapping_str: str, org_map: dict[int, str]) -> list[
         if group_name == "*":
             group_entry["wildcard_group"] = True
         group_entry["org_mappings"] = [
-            {"org": m["org"], "role": m["role"]} for m in groups[group_name]
+            {"orgId": m["orgId"], "role": m["role"]} for m in groups[group_name]
         ]
         result.append(group_entry)
 
@@ -1042,14 +1092,28 @@ def print_summary(ctx: ImportContext) -> None:
     print("  Generated files:")
     print(f"    envs/{ctx.env_name}/")
 
+    # Show flat files (organizations.yaml, sso.yaml, keycloak.yaml, terraform.tfvars)
     for f in sorted(ctx.config_dir.iterdir()):
-        print(f"      {f.name}")
+        if f.is_file():
+            print(f"      {f.name}")
+
+    # Show per-org resource directories
+    for resource in ("datasources", "folders", "teams", "service_accounts"):
+        resource_dir = ctx.config_dir / resource
+        if resource_dir.exists():
+            print(f"      {resource}/")
+            for org_dir in sorted(resource_dir.iterdir()):
+                if org_dir.is_dir():
+                    count = sum(1 for _ in org_dir.iterdir())
+                    print(f"        {org_dir.name}/  ({count} file(s))")
 
     alerting_dir = ctx.config_dir / "alerting"
     if alerting_dir.exists():
-        print(f"    envs/{ctx.env_name}/alerting/")
-        for f in sorted(alerting_dir.iterdir()):
-            print(f"      {f.name}")
+        print(f"    envs/{ctx.env_name}/alerting/ (one subdir per org)")
+        for org_dir in sorted(alerting_dir.iterdir()):
+            if org_dir.is_dir():
+                count = sum(1 for _ in org_dir.iterdir())
+                print(f"        {org_dir.name}/  ({count} file(s))")
 
     if ctx.import_dashboards:
         dash_dir = ctx.output_dir / "envs" / ctx.env_name / "dashboards"

@@ -1,0 +1,23 @@
+# =============================================================================
+# BASE — Shared Datasources
+# =============================================================================
+# Entries here are deployed to ALL environments unless overridden in envs/<env>/.
+#
+# Each datasource MUST specify orgId (numeric) to scope it to the right org.
+# Use envs/<env>/datasources/<Org Name>/datasources.yaml to change the URL or
+# credentials per environment (matched by uid).
+#
+# Example:
+#   datasources:
+#     - name: "Prometheus"
+#       uid: "prometheus-main"
+#       type: "prometheus"
+#       url: "http://prometheus:9090"
+#       orgId: 1
+#       is_default: true
+#
+# Environment-specific overrides go in:
+#   envs/<env>/datasources/<Org Name>/datasources.yaml
+# =============================================================================
+
+datasources: []

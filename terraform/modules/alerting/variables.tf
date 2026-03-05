@@ -26,7 +26,7 @@ variable "folder_ids" {
 
 variable "org_ids" {
   description = "Map of organization names to their IDs"
-  type        = map(string)
+  type        = map(number)
   default     = {}
 }
 

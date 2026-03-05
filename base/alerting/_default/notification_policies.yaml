@@ -1,0 +1,22 @@
+# =============================================================================
+# BASE — Shared Notification Policies
+# =============================================================================
+# Entries here are deployed to ALL environments unless overridden in envs/<env>/.
+#
+# Each policy MUST specify orgId (numeric) to target the correct organization.
+#
+# Example:
+#   policies:
+#     - orgId: 1
+#       receiver: "grafana-default-email"
+#       group_by: ["grafana_folder", "alertname"]
+#       routes:
+#         - receiver: "slack-oncall"
+#           matchers:
+#             - "severity = critical"
+#
+# Environment-specific overrides go in:
+#   envs/<env>/alerting/<Org Name>/notification_policies.yaml
+# =============================================================================
+
+policies: []

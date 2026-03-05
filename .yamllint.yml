@@ -14,6 +14,10 @@ rules:
   comments:
     min-spaces-from-content: 1
   comments-indentation: disable
+  # Indentation: disable enforcement because imported YAML files use compact
+  # sequence style (- at same column as parent key) while hand-authored files
+  # use indented sequences. Both are valid YAML; we don't reformat on import.
+  indentation: disable
 
 # Only lint YAML config files, not CI or other auto-generated files
 ignore: |

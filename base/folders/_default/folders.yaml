@@ -1,0 +1,18 @@
+# =============================================================================
+# BASE — Shared Folders
+# =============================================================================
+# Entries here are deployed to ALL environments unless overridden in envs/<env>/.
+#
+# Each folder MUST specify orgId (numeric) to scope it to the right org.
+#
+# Example:
+#   folders:
+#     - title: "Infrastructure"
+#       uid: "infrastructure"
+#       orgId: 1
+#
+# Environment-specific overrides go in:
+#   envs/<env>/folders/<Org Name>/folders.yaml
+# =============================================================================
+
+folders: []

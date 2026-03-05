@@ -208,6 +208,21 @@ yaml-lint:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
+schema-validation:
+  stage: validate
+  image: python:3.12-slim
+  before_script:
+    - pip install yamale PyYAML --quiet
+  script:
+    - |
+      echo "═══════════════════════════════════════════════"
+      echo "  Schema Validation (base/ + envs/)"
+      echo "═══════════════════════════════════════════════"
+    - python3 scripts/validate_config.py
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
 tfsec:
   stage: validate
   image:

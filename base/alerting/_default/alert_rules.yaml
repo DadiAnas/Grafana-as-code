@@ -1,0 +1,27 @@
+apiVersion: 1
+# =============================================================================
+# BASE — Shared Alert Rules
+# =============================================================================
+# Entries here are deployed to ALL environments unless overridden in envs/<env>/.
+#
+# Each rule group MUST specify orgId (numeric) to target the correct organization.
+#
+# Example:
+#   groups:
+#     - name: "shared-infra-alerts"
+#       folder: "infrastructure"
+#       orgId: 1
+#       interval: "1m"
+#       rules:
+#         - title: "High CPU Usage"
+#           condition: "C"
+#           for: "5m"
+#           noDataState: "NoData"
+#           execErrState: "Error"
+#           data: []
+#
+# Environment-specific overrides go in:
+#   envs/<env>/alerting/<Org Name>/alert_rules.yaml
+# =============================================================================
+
+groups: []

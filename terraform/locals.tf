@@ -31,15 +31,24 @@ locals {
 
   # =============================================================================
   # Folders (base + environment-specific merged)
-  # Environment-specific folders override base ones with same uid
+  # Reads from: {base,env}/folders/<OrgName>/folders.yaml  (per-org dirs)
+  # Falls back gracefully if no files exist.
   # =============================================================================
-  shared_folders = try(yamldecode(file("${local.base_path}/folders.yaml")), { folders = [] })
-  env_folders    = try(yamldecode(file("${local.env_path}/folders.yaml")), { folders = [] })
+  shared_folder_files = toset(fileset("${local.base_path}/folders", "*/folders.yaml"))
+  env_folder_files    = toset(fileset("${local.env_path}/folders", "*/folders.yaml"))
 
-  # Create maps by org:uid for merging (env overrides base)
-  # Using composite key to handle same folder UID across different orgs
-  shared_folder_map = { for f in try(local.shared_folders.folders, []) : "${try(f.org, "_")}:${f.uid}" => f }
-  env_folder_map    = { for f in try(local.env_folders.folders, []) : "${try(f.org, "_")}:${f.uid}" => f }
+  shared_folders_all = flatten([
+    for f in local.shared_folder_files :
+    try(yamldecode(file("${local.base_path}/folders/${f}")).folders, [])
+  ])
+  env_folders_all = flatten([
+    for f in local.env_folder_files :
+    try(yamldecode(file("${local.env_path}/folders/${f}")).folders, [])
+  ])
+
+  # Create maps by orgId:uid for merging (env overrides base; supports both orgId and org name)
+  shared_folder_map = { for f in local.shared_folders_all : "${coalesce(try(tostring(f.orgId), null), try(f.org, "_"))}:${f.uid}" => f }
+  env_folder_map    = { for f in local.env_folders_all : "${coalesce(try(tostring(f.orgId), null), try(f.org, "_"))}:${f.uid}" => f }
   merged_folder_map = merge(local.shared_folder_map, local.env_folder_map)
 
   folders_config = {
@@ -48,15 +57,23 @@ locals {
 
   # =============================================================================
   # Teams (base + environment-specific merged)
-  # Environment-specific teams override base ones with same name
+  # Reads from: {base,env}/teams/<OrgName>/teams.yaml  (per-org dirs)
   # =============================================================================
-  shared_teams = try(yamldecode(file("${local.base_path}/teams.yaml")), { teams = [] })
-  env_teams    = try(yamldecode(file("${local.env_path}/teams.yaml")), { teams = [] })
+  shared_team_files = toset(fileset("${local.base_path}/teams", "*/teams.yaml"))
+  env_team_files    = toset(fileset("${local.env_path}/teams", "*/teams.yaml"))
 
-  # Create maps by name/org for merging (env overrides base)
-  # Composite key "name/org" supports same team name in different orgs
-  shared_team_map = { for t in local.shared_teams.teams : "${t.name}/${try(t.org, "Main Org.")}" => t }
-  env_team_map    = { for t in local.env_teams.teams : "${t.name}/${try(t.org, "Main Org.")}" => t }
+  shared_teams_all = flatten([
+    for f in local.shared_team_files :
+    try(yamldecode(file("${local.base_path}/teams/${f}")).teams, [])
+  ])
+  env_teams_all = flatten([
+    for f in local.env_team_files :
+    try(yamldecode(file("${local.env_path}/teams/${f}")).teams, [])
+  ])
+
+  # Create maps by orgId/name for merging (env overrides base)
+  shared_team_map = { for t in local.shared_teams_all : "${t.name}/${coalesce(try(tostring(t.orgId), null), try(t.org, "_"))}" => t }
+  env_team_map    = { for t in local.env_teams_all : "${t.name}/${coalesce(try(tostring(t.orgId), null), try(t.org, "_"))}" => t }
   merged_team_map = merge(local.shared_team_map, local.env_team_map)
 
   teams_config = {
@@ -65,15 +82,23 @@ locals {
 
   # =============================================================================
   # Service Accounts (base + environment-specific merged)
-  # Environment-specific service accounts override base ones with same name
+  # Reads from: {base,env}/service_accounts/<OrgName>/service_accounts.yaml
   # =============================================================================
-  shared_service_accounts = try(yamldecode(file("${local.base_path}/service_accounts.yaml")), { service_accounts = [] })
-  env_service_accounts    = try(yamldecode(file("${local.env_path}/service_accounts.yaml")), { service_accounts = [] })
+  shared_sa_files = toset(fileset("${local.base_path}/service_accounts", "*/service_accounts.yaml"))
+  env_sa_files    = toset(fileset("${local.env_path}/service_accounts", "*/service_accounts.yaml"))
 
-  # Create maps by org:name for merging (env overrides base)
-  # Using composite key to handle same SA name across different orgs
-  shared_sa_map = { for sa in local.shared_service_accounts.service_accounts : "${try(sa.org, "_")}:${sa.name}" => sa }
-  env_sa_map    = { for sa in local.env_service_accounts.service_accounts : "${try(sa.org, "_")}:${sa.name}" => sa }
+  shared_service_accounts_all = flatten([
+    for f in local.shared_sa_files :
+    try(yamldecode(file("${local.base_path}/service_accounts/${f}")).service_accounts, [])
+  ])
+  env_service_accounts_all = flatten([
+    for f in local.env_sa_files :
+    try(yamldecode(file("${local.env_path}/service_accounts/${f}")).service_accounts, [])
+  ])
+
+  # Create maps by orgId:name for merging (env overrides base)
+  shared_sa_map = { for sa in local.shared_service_accounts_all : "${coalesce(try(tostring(sa.orgId), null), try(sa.org, "_"))}:${sa.name}" => sa }
+  env_sa_map    = { for sa in local.env_service_accounts_all : "${coalesce(try(tostring(sa.orgId), null), try(sa.org, "_"))}:${sa.name}" => sa }
   merged_sa_map = merge(local.shared_sa_map, local.env_sa_map)
 
   service_accounts_config = {
@@ -82,15 +107,23 @@ locals {
 
   # =============================================================================
   # Datasources (base + environment-specific merged)
-  # Environment-specific datasources override base ones with same uid
+  # Reads from: {base,env}/datasources/<OrgName>/datasources.yaml  (per-org dirs)
   # =============================================================================
-  shared_datasources = try(yamldecode(file("${local.base_path}/datasources.yaml")), { datasources = [] })
-  env_datasources    = try(yamldecode(file("${local.env_path}/datasources.yaml")), { datasources = [] })
+  shared_ds_files = toset(fileset("${local.base_path}/datasources", "*/datasources.yaml"))
+  env_ds_files    = toset(fileset("${local.env_path}/datasources", "*/datasources.yaml"))
 
-  # Create maps by org:uid for merging (env overrides base)
-  # Using composite key to handle same datasource UID across different orgs
-  shared_ds_map = { for ds in local.shared_datasources.datasources : "${try(ds.org, "_")}:${ds.uid}" => ds }
-  env_ds_map    = { for ds in local.env_datasources.datasources : "${try(ds.org, "_")}:${ds.uid}" => ds }
+  shared_datasources_all = flatten([
+    for f in local.shared_ds_files :
+    try(yamldecode(file("${local.base_path}/datasources/${f}")).datasources, [])
+  ])
+  env_datasources_all = flatten([
+    for f in local.env_ds_files :
+    try(yamldecode(file("${local.env_path}/datasources/${f}")).datasources, [])
+  ])
+
+  # Create maps by orgId:uid for merging (env overrides base)
+  shared_ds_map = { for ds in local.shared_datasources_all : "${coalesce(try(tostring(ds.orgId), null), try(ds.org, "_"))}:${ds.uid}" => ds }
+  env_ds_map    = { for ds in local.env_datasources_all : "${coalesce(try(tostring(ds.orgId), null), try(ds.org, "_"))}:${ds.uid}" => ds }
   merged_ds_map = merge(local.shared_ds_map, local.env_ds_map)
 
   datasources_config = {
@@ -99,15 +132,22 @@ locals {
 
   # =============================================================================
   # Alert Rules (base + environment-specific merged)
-  # Uses Grafana's native export format with groups
-  # Environment-specific groups are merged with base groups
+  # Reads from: {base,env}/alerting/<OrgName>/alert_rules.yaml  (per-org dirs)
   # =============================================================================
-  shared_alert_rules = try(yamldecode(file("${local.base_path}/alerting/alert_rules.yaml")), { groups = [] })
-  env_alert_rules    = try(yamldecode(file("${local.env_path}/alerting/alert_rules.yaml")), { groups = [] })
+  shared_ar_files = toset(fileset("${local.base_path}/alerting", "*/alert_rules.yaml"))
+  env_ar_files    = toset(fileset("${local.env_path}/alerting", "*/alert_rules.yaml"))
 
-  # Create maps by org:folder-name for merging (env overrides base)
-  shared_ar_map = { for g in try(local.shared_alert_rules.groups, []) : "${try(g.org, "_")}:${g.folder}-${g.name}" => g }
-  env_ar_map    = { for g in try(local.env_alert_rules.groups, []) : "${try(g.org, "_")}:${g.folder}-${g.name}" => g }
+  shared_alert_rules_all = flatten([
+    for f in local.shared_ar_files :
+    try(yamldecode(file("${local.base_path}/alerting/${f}")).groups, [])
+  ])
+  env_alert_rules_all = flatten([
+    for f in local.env_ar_files :
+    try(yamldecode(file("${local.env_path}/alerting/${f}")).groups, [])
+  ])
+
+  shared_ar_map = { for g in local.shared_alert_rules_all : "${coalesce(try(tostring(g.orgId), null), try(g.org, "_"))}:${g.folder}-${g.name}" => g }
+  env_ar_map    = { for g in local.env_alert_rules_all : "${coalesce(try(tostring(g.orgId), null), try(g.org, "_"))}:${g.folder}-${g.name}" => g }
   merged_ar_map = merge(local.shared_ar_map, local.env_ar_map)
 
   alert_rules_config = {
@@ -116,16 +156,22 @@ locals {
 
   # =============================================================================
   # Contact Points (base + environment-specific merged)
-  # Uses Grafana's native export format: contactPoints array
-  # Environment-specific contact points override base ones with same name
+  # Reads from: {base,env}/alerting/<OrgName>/contact_points.yaml  (per-org dirs)
   # =============================================================================
-  shared_contact_points = try(yamldecode(file("${local.base_path}/alerting/contact_points.yaml")), { contactPoints = [] })
-  env_contact_points    = try(yamldecode(file("${local.env_path}/alerting/contact_points.yaml")), { contactPoints = [] })
+  shared_cp_files = toset(fileset("${local.base_path}/alerting", "*/contact_points.yaml"))
+  env_cp_files    = toset(fileset("${local.env_path}/alerting", "*/contact_points.yaml"))
 
-  # Create maps by org:name for merging (env overrides base)
-  # Using composite key to handle same contact point name across different orgs
-  shared_cp_map = { for cp in try(local.shared_contact_points.contactPoints, []) : "${try(cp.org, "_")}:${cp.name}" => cp }
-  env_cp_map    = { for cp in try(local.env_contact_points.contactPoints, []) : "${try(cp.org, "_")}:${cp.name}" => cp }
+  shared_contact_points_all = flatten([
+    for f in local.shared_cp_files :
+    try(yamldecode(file("${local.base_path}/alerting/${f}")).contactPoints, [])
+  ])
+  env_contact_points_all = flatten([
+    for f in local.env_cp_files :
+    try(yamldecode(file("${local.env_path}/alerting/${f}")).contactPoints, [])
+  ])
+
+  shared_cp_map = { for cp in local.shared_contact_points_all : "${coalesce(try(tostring(cp.orgId), null), try(cp.org, "_"))}:${cp.name}" => cp }
+  env_cp_map    = { for cp in local.env_contact_points_all : "${coalesce(try(tostring(cp.orgId), null), try(cp.org, "_"))}:${cp.name}" => cp }
   merged_cp_map = merge(local.shared_cp_map, local.env_cp_map)
 
   contact_points_config = {
@@ -134,23 +180,22 @@ locals {
 
   # =============================================================================
   # Notification Policies (base + environment-specific merged)
-  # Uses Grafana's native export format: policies array
-  # Supports both 'org' (name) and 'orgId' (numeric) for organization reference
-  # Environment-specific policies override base ones with same org/orgId
+  # Reads from: {base,env}/alerting/<OrgName>/notification_policies.yaml
   # =============================================================================
-  shared_notification_policies = try(yamldecode(file("${local.base_path}/alerting/notification_policies.yaml")), { policies = [] })
-  env_notification_policies    = try(yamldecode(file("${local.env_path}/alerting/notification_policies.yaml")), { policies = [] })
+  shared_np_files = toset(fileset("${local.base_path}/alerting", "*/notification_policies.yaml"))
+  env_np_files    = toset(fileset("${local.env_path}/alerting", "*/notification_policies.yaml"))
 
-  # Create maps by org name or orgId for merging (env overrides base)
-  # Use coalesce to prefer org name over orgId for the key
-  shared_np_map = {
-    for np in try(local.shared_notification_policies.policies, []) :
-    coalesce(try(np.org, null), try(tostring(np.orgId), "unknown")) => np
-  }
-  env_np_map = {
-    for np in try(local.env_notification_policies.policies, []) :
-    coalesce(try(np.org, null), try(tostring(np.orgId), "unknown")) => np
-  }
+  shared_notification_policies_all = flatten([
+    for f in local.shared_np_files :
+    try(yamldecode(file("${local.base_path}/alerting/${f}")).policies, [])
+  ])
+  env_notification_policies_all = flatten([
+    for f in local.env_np_files :
+    try(yamldecode(file("${local.env_path}/alerting/${f}")).policies, [])
+  ])
+
+  shared_np_map = { for np in local.shared_notification_policies_all : coalesce(try(np.org, null), try(tostring(np.orgId), "unknown")) => np }
+  env_np_map    = { for np in local.env_notification_policies_all : coalesce(try(np.org, null), try(tostring(np.orgId), "unknown")) => np }
   merged_np_map = merge(local.shared_np_map, local.env_np_map)
 
   notification_policies_config = {

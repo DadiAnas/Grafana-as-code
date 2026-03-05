@@ -1,0 +1,11 @@
+# Schema for: organizations.yaml
+organizations: list(include('organization'), required=False)
+
+---
+organization:
+  name: str()
+  id: int(required=False)
+  description: str(required=False)
+  admins: list(str(), required=False)
+  editors: list(str(), required=False)
+  viewers: list(str(), required=False)

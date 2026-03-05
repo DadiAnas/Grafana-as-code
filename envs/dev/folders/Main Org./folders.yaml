@@ -1,0 +1,38 @@
+folders:
+- title: 2general
+  uid: 2general
+  org: Main Org.
+  orgId: 1
+  permissions:
+  - team: grafana-viewers
+    permission: Admin
+- title: Alerts
+  uid: alerts
+  org: Main Org.
+  orgId: 1
+  permissions: []
+- title: Applications
+  uid: applications
+  org: Main Org.
+  orgId: 1
+  permissions: []
+- title: Business
+  uid: business
+  org: Main Org.
+  orgId: 1
+  permissions: []
+- title: Infrastructure
+  uid: infrastructure
+  org: Main Org.
+  orgId: 1
+  permissions: []
+- title: Slos
+  uid: slos
+  org: Main Org.
+  orgId: 1
+  permissions: []
+- title: Subfolder
+  uid: subfolder
+  org: Main Org.
+  orgId: 1
+  permissions: []

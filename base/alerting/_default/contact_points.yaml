@@ -1,0 +1,21 @@
+# =============================================================================
+# BASE — Shared Contact Points
+# =============================================================================
+# Entries here are deployed to ALL environments unless overridden in envs/<env>/.
+#
+# Each contact point MUST specify orgId (numeric org ID) or omit it to apply
+# only when matched by name from the env-specific files.
+#
+# To add a shared contact point for a specific org across all environments:
+#   - name: "shared-email-oncall"
+#     orgId: 1                     # Main Org. always has ID 1
+#     receivers:
+#       - type: "email"
+#         settings:
+#           addresses: "oncall@example.com"
+#
+# Environment-specific overrides go in:
+#   envs/<env>/alerting/<Org Name>/contact_points.yaml
+# =============================================================================
+
+contactPoints: []

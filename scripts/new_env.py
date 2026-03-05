@@ -1107,29 +1107,26 @@ def main() -> None:  # noqa: C901
 
     # ── Dry-run ─────────────────────────────────────────────────────────────
     if dry_run:
-        print(f"{Colors.YELLOW}=== DRY RUN \u2014 No files will be created ==={Colors.NC}")
+        print(f"{Colors.YELLOW}=== DRY RUN — No files will be created ==={Colors.NC}")
         print()
         print("  Would create:")
-        print(f"    \u2713 envs/{env_name}/terraform.tfvars")
-        print(f"    \u2713 envs/{env_name}/backend.tfbackend")
-        print(f"    \u2713 envs/{env_name}/")
-        print("        \u251c\u2500\u2500 organizations.yaml")
-        print("        \u251c\u2500\u2500 folders.yaml")
-        print("        \u251c\u2500\u2500 teams.yaml")
-        print("        \u251c\u2500\u2500 datasources.yaml")
-        print("        \u251c\u2500\u2500 service_accounts.yaml")
-        print("        \u251c\u2500\u2500 sso.yaml")
-        print("        \u251c\u2500\u2500 keycloak.yaml")
-        print("        \u2514\u2500\u2500 alerting/")
-        print("            \u251c\u2500\u2500 alert_rules.yaml")
-        print("            \u251c\u2500\u2500 contact_points.yaml")
-        print("            \u2514\u2500\u2500 notification_policies.yaml")
-        print(f"    \u2713 envs/{env_name}/dashboards/")
+        print(f"    ✓ envs/{env_name}/terraform.tfvars")
+        print(f"    ✓ envs/{env_name}/backend.tfbackend")
+        print(f"    ✓ envs/{env_name}/")
+        print("        ├── organizations.yaml")
+        print("        ├── sso.yaml")
+        print("        └── keycloak.yaml")
+        print(f"    ✓ envs/{env_name}/alerting/   (one subdir per org)")
+        print(f"    ✓ envs/{env_name}/dashboards/ (one subdir per org)")
+        print(f"    ✓ envs/{env_name}/datasources/ (one subdir per org)")
+        print(f"    ✓ envs/{env_name}/folders/     (one subdir per org)")
+        print(f"    ✓ envs/{env_name}/teams/        (one subdir per org)")
+        print(f"    ✓ envs/{env_name}/service_accounts/ (one subdir per org)")
         org_names = _get_org_names(orgs, project_root)
         for org in org_names:
-            print(f"        \u2514\u2500\u2500 {org}/")
+            print(f"        └── {org}/")
         print()
-        print(f"  Total: {Colors.BOLD}13+ files{Colors.NC}")
+        print(f"  Total: {Colors.BOLD}9+ files + per-org dirs{Colors.NC}")
         print()
         print("  To create for real, run without --dry-run")
         sys.exit(0)
@@ -1139,7 +1136,7 @@ def main() -> None:  # noqa: C901
     env_path.mkdir(parents=True, exist_ok=True)
 
     # 1. terraform.tfvars
-    print(f"{Colors.BLUE}[1/4]{Colors.NC} Creating {Colors.YELLOW}envs/{env_name}/terraform.tfvars{Colors.NC}")
+    print(f"{Colors.BLUE}[1/5]{Colors.NC} Creating {Colors.YELLOW}envs/{env_name}/terraform.tfvars{Colors.NC}")
     tfvars_path = env_path / "terraform.tfvars"
     tfvars_path.write_text(
         _generate_tfvars(env_name, grafana_url, vault_addr, vault_mount,
@@ -1148,43 +1145,58 @@ def main() -> None:  # noqa: C901
     created_files.append(f"envs/{env_name}/terraform.tfvars")
 
     # 2. backend.tfbackend
-    print(f"{Colors.BLUE}[2/4]{Colors.NC} Creating {Colors.YELLOW}envs/{env_name}/backend.tfbackend{Colors.NC}")
+    print(f"{Colors.BLUE}[2/5]{Colors.NC} Creating {Colors.YELLOW}envs/{env_name}/backend.tfbackend{Colors.NC}")
     backend_path = env_path / "backend.tfbackend"
     backend_path.write_text(_generate_backend(env_name, backend))
     created_files.append(f"envs/{env_name}/backend.tfbackend")
 
-    # 3. YAML config files
-    print(f"{Colors.BLUE}[3/4]{Colors.NC} Creating {Colors.YELLOW}envs/{env_name}/{Colors.NC} configuration files")
-    alerting_path = env_path / "alerting"
-    alerting_path.mkdir(parents=True, exist_ok=True)
+    # 3. YAML config files (base env files only)
+    print(f"{Colors.BLUE}[3/5]{Colors.NC} Creating {Colors.YELLOW}envs/{env_name}/{Colors.NC} configuration files")
 
     yaml_files: list[tuple[str, str]] = [
         ("organizations.yaml", _generate_organizations(env_name)),
-        ("datasources.yaml", _generate_datasources(env_name, vault_mount, datasources)),
-        ("folders.yaml", _generate_folders(env_name)),
-        ("teams.yaml", _generate_teams(env_name)),
-        ("service_accounts.yaml", _generate_service_accounts(env_name)),
         ("sso.yaml", _generate_sso(env_name, vault_mount, keycloak_url)),
         ("keycloak.yaml", _generate_keycloak(env_name, vault_mount, keycloak_url)),
-        ("alerting/alert_rules.yaml", _generate_alert_rules(env_name)),
-        ("alerting/contact_points.yaml", _generate_contact_points(env_name)),
-        ("alerting/notification_policies.yaml", _generate_notification_policies(env_name)),
     ]
     for filename, content in yaml_files:
         (env_path / filename).write_text(content)
 
-    created_files.append(f"envs/{env_name}/ (10 files)")
+    created_files.append(f"envs/{env_name}/ (3 files)")
 
     # 4. Dashboard directories
-    print(f"{Colors.BLUE}[4/4]{Colors.NC} Creating {Colors.YELLOW}envs/{env_name}/dashboards/{Colors.NC} directory structure")
+    print(f"{Colors.BLUE}[4/5]{Colors.NC} Creating {Colors.YELLOW}envs/{env_name}/dashboards/{Colors.NC} directory structure")
     org_names = _get_org_names(orgs, project_root)
     for org in org_names:
         org_dir = env_path / "dashboards" / org
         org_dir.mkdir(parents=True, exist_ok=True)
         (org_dir / ".gitkeep").touch()
-        print(f"       \u2514\u2500\u2500 envs/{env_name}/dashboards/{Colors.CYAN}{org}{Colors.NC}/")
+        print(f"       └── envs/{env_name}/dashboards/{Colors.CYAN}{org}{Colors.NC}/")
 
-    created_files.append(f"envs/{env_name}/dashboards/")
+    created_files.append(f"envs/{env_name}/dashboards/ (dirs)")
+
+    # 5. Resource directory structures (alerting, datasources, folders, teams, service_accounts)
+    print(f"{Colors.BLUE}[5/5]{Colors.NC} Creating {Colors.YELLOW}envs/{env_name}/<resource>/{Colors.NC} directory structures")
+    resource_types = ["alerting", "datasources", "folders", "teams", "service_accounts"]
+    for res_type in resource_types:
+        res_dir = env_path / res_type
+        res_dir.mkdir(parents=True, exist_ok=True)
+        for org in org_names:
+            org_subdir = res_dir / org
+            org_subdir.mkdir(parents=True, exist_ok=True)
+            # For each organzation, create default templates inside the subdirectories
+            if res_type == "alerting":
+                (org_subdir / "alert_rules.yaml").write_text(_generate_alert_rules(env_name))
+                (org_subdir / "contact_points.yaml").write_text(_generate_contact_points(env_name))
+                (org_subdir / "notification_policies.yaml").write_text(_generate_notification_policies(env_name))
+            else:
+                tmpl_func = globals().get(f"_generate_{res_type}")
+                if tmpl_func:
+                    content = tmpl_func(env_name, vault_mount, "") if res_type == 'datasources' else tmpl_func(env_name)
+                    (org_subdir / f"{res_type}.yaml").write_text(content)
+        print(f"       └── envs/{env_name}/{res_type}/  ({len(org_names)} org dir(s) + default files)")
+
+    for res_type in resource_types:
+        created_files.append(f"envs/{env_name}/{res_type}/ (dirs + files)")
 
     # ── Summary ──────────────────────────────────────────────────────────────
     print()

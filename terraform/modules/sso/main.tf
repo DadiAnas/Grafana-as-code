@@ -40,8 +40,15 @@ locals {
   # Named group mappings (specific group names → specific or wildcard orgs)
   named_group_mappings = flatten([
     for group in local.named_groups : [
-      for mapping in group.org_mappings :
-      mapping.org == "*" ? "${group.name}:*:${mapping.role}" : "${group.name}:${var.org_ids[mapping.org]}:${mapping.role}"
+      for mapping in group.org_mappings : (
+        # Wildcard org — pass through as "*"
+        try(mapping.org, null) == "*" || try(tostring(mapping.orgId), null) == "*"
+        ? "${group.name}:*:${mapping.role}"
+        # Named org — resolve via org_ids map (by name) or use numeric orgId directly
+        : try(mapping.org, null) != null
+        ? "${group.name}:${var.org_ids[mapping.org]}:${mapping.role}"
+        : "${group.name}:${mapping.orgId}:${mapping.role}"
+      )
       if mapping.role != "GrafanaAdmin"
     ]
   ])
@@ -50,8 +57,13 @@ locals {
   # These mean "all IdP groups get this role in this org"
   wildcard_group_mappings = flatten([
     for group in local.wildcard_groups : [
-      for mapping in group.org_mappings :
-      mapping.org == "*" ? "*:*:${mapping.role}" : "*:${var.org_ids[mapping.org]}:${mapping.role}"
+      for mapping in group.org_mappings : (
+        try(mapping.org, null) == "*" || try(tostring(mapping.orgId), null) == "*"
+        ? "*:*:${mapping.role}"
+        : try(mapping.org, null) != null
+        ? "*:${var.org_ids[mapping.org]}:${mapping.role}"
+        : "*:${mapping.orgId}:${mapping.role}"
+      )
       if mapping.role != "GrafanaAdmin"
     ]
   ])

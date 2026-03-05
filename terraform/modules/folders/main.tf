@@ -230,7 +230,7 @@ resource "grafana_folder_permission" "permissions" {
 
   # Use statically-known values to avoid dependency cycle
   folder_uid = each.value.folder_uid
-  org_id     = try(var.org_ids[each.value.folder_org], null) != null ? var.org_ids[each.value.folder_org] : try(tonumber(each.value.folder_orgId), null)
+  org_id     = local.folder_org_map[each.key]
 
   dynamic "permissions" {
     for_each = [for p in each.value.perms : p if p.team != null]

@@ -1,0 +1,20 @@
+# =============================================================================
+# BASE — Shared Teams
+# =============================================================================
+# Entries here are deployed to ALL environments unless overridden in envs/<env>/.
+#
+# Each team MUST specify orgId (numeric) to scope it to the right org.
+#
+# Example:
+#   teams:
+#     - name: "Platform Team"
+#       orgId: 1
+#       members:
+#         - login: "admin"
+#           role: "Admin"
+#
+# Environment-specific overrides go in:
+#   envs/<env>/teams/<Org Name>/teams.yaml
+# =============================================================================
+
+teams: []

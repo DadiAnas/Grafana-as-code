@@ -1,0 +1,16 @@
+# Schema for: teams/<Org>/teams.yaml
+teams: list(include('team'), required=False)
+
+---
+team:
+  name: str()
+  orgId: int(required=False)
+  org: str(required=False)
+  email: str(required=False)
+  external_groups: list(str(), required=False)
+  members: list(include('member'), required=False)
+
+---
+member:
+  email: str()
+  role: enum('Member', 'Admin', required=False)

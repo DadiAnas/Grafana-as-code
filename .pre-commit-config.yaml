@@ -1,0 +1,60 @@
+# =============================================================================
+# Pre-commit hooks for Grafana-as-Code
+# =============================================================================
+# Install:  pip install pre-commit && pre-commit install
+#        or: make pre-commit-install
+#
+# Run manually on all files:  pre-commit run --all-files
+# Run on staged files only:   pre-commit run
+# Skip for one commit:        git commit --no-verify
+# =============================================================================
+
+repos:
+  # ── 1. General hygiene ──────────────────────────────────────────────────────
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: '\.md$'            # allow trailing spaces in markdown
+      - id: end-of-file-fixer
+        exclude: '\.json$'          # dashboards may not have trailing newline
+      - id: check-yaml
+        args: [--unsafe]            # basic YAML parse check (allows custom tags)
+        exclude: '^\.pre-commit-config\.yaml$'
+      - id: check-merge-conflict    # block commits with <<<<<<< markers
+      - id: check-added-large-files
+        args: [--maxkb=500]         # dashboards can be big; set reasonable limit
+      - id: mixed-line-ending
+        args: [--fix=lf]
+
+  # ── 2. YAML syntax & style (yamllint) ───────────────────────────────────────
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.35.1
+    hooks:
+      - id: yamllint
+        name: YAML Lint
+        args: [-c, .yamllint.yml]
+        # Only lint our config files — skip CI workflows, schemas, terraform
+        files: >-
+          (?x)^(
+            base/.*\.ya?ml|
+            envs/.*\.ya?ml
+          )$
+
+  # ── 3. Schema validation (custom local hook) ─────────────────────────────────
+  - repo: local
+    hooks:
+      - id: validate-config-schema
+        name: YAML Schema Validation
+        language: python
+        entry: python3 scripts/validate_config.py
+        # Only trigger when a relevant config YAML is staged
+        files: >-
+          (?x)^(
+            base/.*\.ya?ml|
+            envs/.*\.ya?ml|
+            schemas/.*\.ya?ml
+          )$
+        # Run once for all matched files (not once per file)
+        pass_filenames: false
+        additional_dependencies: [yamale>=4.0.0, PyYAML>=6.0]

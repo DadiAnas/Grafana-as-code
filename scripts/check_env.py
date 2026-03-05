@@ -102,35 +102,47 @@ def main() -> None:
     # ── Configuration Files ──
     print(f"{Colors.BOLD}── Configuration Files ──{Colors.NC}")
 
-    expected_config_files = [
+    # Flat files still kept at env root
+    flat_config_files = [
         "organizations.yaml",
-        "datasources.yaml",
-        "folders.yaml",
-        "teams.yaml",
-        "service_accounts.yaml",
         "sso.yaml",
         "keycloak.yaml",
-        "alerting/alert_rules.yaml",
-        "alerting/contact_points.yaml",
-        "alerting/notification_policies.yaml",
     ]
 
-    for cfg in expected_config_files:
+    for cfg in flat_config_files:
         if (project_root / "envs" / env_name / cfg).is_file():
             pass_(f"envs/{env_name}/{cfg}")
         else:
             warn_(f"envs/{env_name}/{cfg} is missing (shared config will apply)")
+
+    # Per-org directory resources
+    per_org_resources = ["datasources", "folders", "teams", "service_accounts", "alerting"]
+    for resource in per_org_resources:
+        resource_dir = project_root / "envs" / env_name / resource
+        if resource_dir.is_dir():
+            org_count = sum(1 for d in resource_dir.iterdir() if d.is_dir())
+            pass_(f"envs/{env_name}/{resource}/  ({org_count} org dir(s))")
+        else:
+            warn_(f"envs/{env_name}/{resource}/ is missing (shared config will apply)")
 
     print()
 
     # ── Shared Configuration ──
     print(f"{Colors.BOLD}── Shared Configuration ──{Colors.NC}")
 
-    for cfg in expected_config_files:
+    for cfg in flat_config_files:
         if (project_root / "base" / cfg).is_file():
             pass_(f"base/{cfg}")
         else:
             fail_(f"base/{cfg} is missing!")
+
+    for resource in per_org_resources:
+        resource_dir = project_root / "base" / resource
+        if resource_dir.is_dir():
+            org_count = sum(1 for d in resource_dir.iterdir() if d.is_dir())
+            pass_(f"base/{resource}/ ({org_count} org dir(s))")
+        else:
+            info_(f"base/{resource}/ not present (env-level config only)")
 
     print()
 

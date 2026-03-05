@@ -1,5 +1,5 @@
 resource "grafana_service_account" "service_accounts" {
-  for_each = { for sa in var.service_accounts.service_accounts : "${try(sa.org, "_")}:${sa.name}" => sa }
+  for_each = { for sa in var.service_accounts.service_accounts : "${coalesce(try(sa.org, null), try(tostring(sa.orgId), "_"))}:${sa.name}" => sa }
 
   name        = each.value.name
   role        = each.value.role

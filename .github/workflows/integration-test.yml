@@ -133,6 +133,11 @@ jobs:
       - name: "Step 1: Terraform Validate"
         run: terraform -chdir=terraform validate
 
+      - name: "Step 1: Schema Validation"
+        run: |
+          pip install yamale --quiet
+          python3 scripts/validate_config.py --base-only
+
       # ─────────────────────────────────────────────────────────────────
       # Step 2: Bootstrap Vault + Create Test Environment
       # ─────────────────────────────────────────────────────────────────
@@ -298,16 +303,26 @@ jobs:
           cat envs/ci-import/organizations.yaml | head -20
 
           echo ""
-          echo "Folders:"
-          cat envs/ci-import/folders.yaml | head -30
+          echo "Folders (per-org dirs):"
+          find envs/ci-import/folders -name 'folders.yaml' 2>/dev/null | head -10 | while read f; do
+            echo "  $f"; head -5 "$f"; echo "  ---"
+          done
 
           echo ""
-          echo "Teams:"
-          cat envs/ci-import/teams.yaml | head -20
+          echo "Teams (per-org dirs):"
+          find envs/ci-import/teams -name 'teams.yaml' 2>/dev/null | head -5 | while read f; do
+            echo "  $f"
+          done
 
           echo ""
-          echo "Datasources:"
-          cat envs/ci-import/datasources.yaml | head -20
+          echo "Datasources (per-org dirs):"
+          find envs/ci-import/datasources -name 'datasources.yaml' 2>/dev/null | head -5 | while read f; do
+            echo "  $f"
+          done
+
+          echo ""
+          echo "Alerting (per-org dirs):"
+          find envs/ci-import/alerting -type f 2>/dev/null | head -15 || echo "(none)"
 
           echo ""
           echo "Dashboard files:"
@@ -318,15 +333,28 @@ jobs:
 
       - name: "Step 6: Validate imported config"
         run: |
-          # Ensure required YAML files were created
-          for file in organizations folders teams datasources sso keycloak service_accounts; do
-            [ -f "envs/ci-import/${file}.yaml" ] || { echo "Missing envs/ci-import/${file}.yaml"; exit 1; }
-          done
+          # Ensure organizations.yaml and flat files are present
+          [ -f "envs/ci-import/organizations.yaml" ] || { echo "Missing organizations.yaml"; exit 1; }
+          [ -f "envs/ci-import/sso.yaml" ] || { echo "Missing sso.yaml"; exit 1; }
+          [ -f "envs/ci-import/keycloak.yaml" ] || { echo "Missing keycloak.yaml"; exit 1; }
+          [ -f "envs/ci-import/terraform.tfvars" ] || { echo "Missing terraform.tfvars"; exit 1; }
 
-          # Ensure tfvars was created
-          [ -f "envs/ci-import/terraform.tfvars" ] || { echo "Missing envs/ci-import/terraform.tfvars"; exit 1; }
+          # Ensure per-org resource directories exist
+          [ -d "envs/ci-import/folders" ] || { echo "Missing folders/ directory"; exit 1; }
+          [ -d "envs/ci-import/datasources" ] || { echo "Missing datasources/ directory"; exit 1; }
+          [ -d "envs/ci-import/teams" ] || { echo "Missing teams/ directory"; exit 1; }
+          [ -d "envs/ci-import/service_accounts" ] || { echo "Missing service_accounts/ directory"; exit 1; }
+          [ -d "envs/ci-import/alerting" ] || { echo "Missing alerting/ directory"; exit 1; }
 
-          echo "All imported config files present"
+          # Verify at least one org subdir was created for key resources
+          FOLDER_FILES=$(find envs/ci-import/folders -name 'folders.yaml' 2>/dev/null | wc -l)
+          DS_FILES=$(find envs/ci-import/datasources -name 'datasources.yaml' 2>/dev/null | wc -l)
+          echo "Org-specific folder files: ${FOLDER_FILES}"
+          echo "Org-specific datasource files: ${DS_FILES}"
+          [ "${FOLDER_FILES}" -ge 1 ] || { echo "No per-org folder files found"; exit 1; }
+          [ "${DS_FILES}" -ge 1 ] || { echo "No per-org datasource files found"; exit 1; }
+
+          echo "All imported config files/dirs present"
 
       # ─────────────────────────────────────────────────────────────────
       # Step 7: Apply imported config (import round-trip)
@@ -452,18 +480,27 @@ jobs:
             GRAFANA_URL=https://grafana.test.example.com \
             DATASOURCES=prometheus,loki,postgres
 
-          # Verify files
+          # Verify required files and per-org dirs
           [ -f "envs/scaffold-test/terraform.tfvars" ] || { echo "Missing tfvars"; exit 1; }
           [ -d "envs/scaffold-test" ] || { echo "Missing config dir"; exit 1; }
           [ -d "envs/scaffold-test/dashboards" ] || { echo "Missing dashboards dir"; exit 1; }
+          [ -d "envs/scaffold-test/folders" ] || { echo "Missing folders/ dir"; exit 1; }
+          [ -d "envs/scaffold-test/datasources" ] || { echo "Missing datasources/ dir"; exit 1; }
+          [ -d "envs/scaffold-test/alerting" ] || { echo "Missing alerting/ dir"; exit 1; }
 
           echo ""
           echo "=== Scaffold tfvars ==="
           cat envs/scaffold-test/terraform.tfvars
 
           echo ""
-          echo "=== Scaffold datasources ==="
-          cat envs/scaffold-test/datasources.yaml | head -30
+          echo "=== Scaffold datasources (per-org) ==="
+          find envs/scaffold-test/datasources -name 'datasources.yaml' | while read f; do
+            echo "$f:"; head -5 "$f"; echo "---"
+          done
+
+          echo ""
+          echo "=== Scaffold alerting (per-org) ==="
+          find envs/scaffold-test/alerting -type f | head -10
 
           echo ""
           echo "Scaffolding verified"

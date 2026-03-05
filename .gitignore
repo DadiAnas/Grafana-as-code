@@ -78,3 +78,9 @@ plan.out
 # Backups (from make backup)
 backups/
 tfplan*
+
+# Python virtual environment
+.venv/
+venv/
+__pycache__/
+*.pyc

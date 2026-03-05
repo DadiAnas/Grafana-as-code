@@ -1,0 +1,31 @@
+teams:
+- name: Data Team
+  email: data@example.com
+  org: Main Org.
+  orgId: 1
+  members: []
+- name: Frontend Team
+  email: frontend@example.com
+  org: Main Org.
+  orgId: 1
+  members: []
+- name: Platform Team
+  email: platform@example.com
+  org: Main Org.
+  orgId: 1
+  members: []
+- name: QA Team
+  email: qa-team-npr@example.com
+  org: Main Org.
+  orgId: 1
+  members: []
+- name: SRE Team
+  email: sre@example.com
+  org: Main Org.
+  orgId: 1
+  members: []
+- name: grafana-viewers
+  email: grafana-viewers@example.com
+  org: Main Org.
+  orgId: 1
+  members: []

@@ -56,16 +56,23 @@ jobs:
         run: |
           # Find which environments have changed files
           ENVS=()
-          
+
           # Check envs/ and base/ directories
-          CHANGED_FILES=$(git diff --name-only ${{ github.event.before || 'HEAD~1' }} HEAD 2>/dev/null || git diff --name-only HEAD~1 HEAD)
-          
+          # Determine base SHA safely across push, PR, and manual triggers
+          # PR: GITHUB_BASE_REF is set; push: use HEAD~1; manual: HEAD~1
+          if [ -n "$GITHUB_BASE_REF" ]; then
+            BASE_SHA=$(git merge-base HEAD "origin/$GITHUB_BASE_REF" 2>/dev/null || echo "HEAD~1")
+          else
+            BASE_SHA="HEAD~1"
+          fi
+          CHANGED_FILES=$(git diff --name-only "$BASE_SHA" HEAD 2>/dev/null || echo "")
+
           for file in $CHANGED_FILES; do
             if [[ "$file" =~ ^envs/([^/]+)/ ]]; then
               ENVS+=("${BASH_REMATCH[1]}")
             fi
           done
-          
+
           # Also detect if shared configs changed (affects all envs)
           SHARED_CHANGED=false
           if echo "$CHANGED_FILES" | grep -qE '^(base/|base/dashboards/|.*\.tf$)'; then
@@ -75,10 +82,10 @@ jobs:
               [ -f "$f" ] && ENVS+=("$(basename "$(dirname "$f")")")  # envs/<name>/terraform.tfvars → <name>
             done
           fi
-          
+
           # Deduplicate
           UNIQUE_ENVS=($(printf '%s\n' "${ENVS[@]}" | sort -u))
-          
+
           if [ ${#UNIQUE_ENVS[@]} -eq 0 ]; then
             echo "has_changes=false" >> "$GITHUB_OUTPUT"
             echo "environments=[]" >> "$GITHUB_OUTPUT"
@@ -126,6 +133,12 @@ jobs:
               truthy: disable
               document-start: disable
 
+      - name: Schema Validation
+        run: |
+          pip install yamale --quiet
+          python3 scripts/validate_config.py
+        continue-on-error: false
+
       - name: Setup TFLint
         uses: terraform-linters/setup-tflint@v4
 
@@ -145,19 +158,19 @@ jobs:
             const fmt = '${{ steps.fmt.outcome }}';
             const validate = '${{ steps.validate.outcome }}';
             const tflint = '${{ steps.tflint.outcome }}';
-            
+
             const statusIcon = (s) => s === 'success' ? '✅' : '❌';
-            
+
             const body = `### Terraform Lint Results
-            
+
             | Check | Status |
             |-------|--------|
             | 🖌 Format | ${statusIcon(fmt)} |
             | Validate | ${statusIcon(validate)} |
             | 🔍 TFLint | ${statusIcon(tflint)} |
-            
+
             *Pushed by @${{ github.actor }}*`;
-            
+
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
@@ -217,26 +230,26 @@ jobs:
             const plan = fs.readFileSync('plan_output.txt', 'utf8');
             const outcome = '${{ steps.plan.outcome }}';
             const icon = outcome === 'success' ? '✅' : '❌';
-            
+
             // Truncate if too long
             const maxLen = 60000;
-            const truncated = plan.length > maxLen 
-              ? plan.substring(0, maxLen) + '\n\n... (truncated)' 
+            const truncated = plan.length > maxLen
+              ? plan.substring(0, maxLen) + '\n\n... (truncated)'
               : plan;
-            
+
             const body = `### ${icon} Terraform Plan: \`${{ matrix.environment }}\`
-            
+
             <details>
             <summary>Show Plan Output</summary>
-            
+
             \`\`\`hcl
             ${truncated}
             \`\`\`
-            
+
             </details>
-            
+
             *Environment: \`${{ matrix.environment }}\` | Pushed by @${{ github.actor }}*`;
-            
+
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,

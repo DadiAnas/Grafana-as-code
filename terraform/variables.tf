@@ -11,7 +11,7 @@ variable "grafana_url" {
 }
 
 variable "environment" {
-  description = "Environment name — must match a directory under config/ and dashboards/"
+  description = "Environment name — must match a directory under envs/"
   type        = string
   # Add your environment names here. You can add as many as you need.
   validation {

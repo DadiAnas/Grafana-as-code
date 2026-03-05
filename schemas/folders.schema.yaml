@@ -1,0 +1,18 @@
+# Schema for: folders/<Org>/folders.yaml
+folders: list(include('folder'), required=False)
+
+---
+folder:
+  title: str(required=False)
+  name: str(required=False)        # legacy alias for title
+  uid: str()
+  orgId: int(required=False)
+  org: str(required=False)
+  permissions: list(include('permission'), required=False)
+
+---
+permission:
+  team: str(required=False)
+  role: str(required=False)
+  user: int(required=False)
+  permission: str()

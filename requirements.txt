@@ -8,3 +8,9 @@ requests>=2.28.0
 
 # YAML parsing and generation
 PyYAML>=6.0
+
+# YAML schema validation (used by scripts/validate_config.py)
+yamale>=4.0.0
+
+# Git pre-commit hook framework
+pre-commit>=3.7.0

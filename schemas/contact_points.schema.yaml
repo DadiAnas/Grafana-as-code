@@ -1,0 +1,15 @@
+# Schema for: alerting/<Org>/contact_points.yaml
+contactPoints: list(include('contact_point'), required=False)
+
+---
+contact_point:
+  name: str()
+  orgId: int(required=False)
+  org: str(required=False)
+  receivers: list(include('receiver'), required=False)
+
+---
+receiver:
+  type: str()
+  settings: any(required=False)
+  disableResolveMessage: bool(required=False)

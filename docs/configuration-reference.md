@@ -19,21 +19,24 @@ This document provides a complete reference for all YAML configuration files use
 
 ## Configuration Merge Pattern
 
-All resources follow a **shared + environment-specific** pattern where environment configs override shared ones:
+All resources follow a **shared + environment-specific** pattern where environment configs override shared ones.
+All per-org resources are stored in **subdirectories named after the Grafana organization**.
 
 | Resource | Shared Location | Env Location | Merge Key |
 |----------|----------------|--------------|-----------|
-| Datasources | `base/datasources.yaml` | `envs/{env}/datasources.yaml` | `uid` |
+| Datasources | `base/datasources/_default/datasources.yaml` | `envs/{env}/datasources/{Org}/datasources.yaml` | `orgId:uid` |
 | Organizations | `base/organizations.yaml` | `envs/{env}/organizations.yaml` | `name` |
-| Folders | `base/folders.yaml` | `envs/{env}/folders.yaml` | `uid` |
-| Teams | `base/teams.yaml` | `envs/{env}/teams.yaml` | `name/org` |
-| Service Accounts | `base/service_accounts.yaml` | `envs/{env}/service_accounts.yaml` | `name` |
-| Alert Rules | `base/alerting/alert_rules.yaml` | `envs/{env}/alerting/alert_rules.yaml` | `org:folder-name` |
-| Contact Points | `base/alerting/contact_points.yaml` | `envs/{env}/alerting/contact_points.yaml` | `org:name` |
-| Notification Policies | `base/alerting/notification_policies.yaml` | `envs/{env}/alerting/notification_policies.yaml` | `org` |
+| Folders | `base/folders/_default/folders.yaml` | `envs/{env}/folders/{Org}/folders.yaml` | `orgId:uid` |
+| Teams | `base/teams/_default/teams.yaml` | `envs/{env}/teams/{Org}/teams.yaml` | `name/orgId` |
+| Service Accounts | `base/service_accounts/_default/service_accounts.yaml` | `envs/{env}/service_accounts/{Org}/service_accounts.yaml` | `orgId:name` |
+| Alert Rules | `base/alerting/_default/alert_rules.yaml` | `envs/{env}/alerting/{Org}/alert_rules.yaml` | `orgId:folder-name` |
+| Contact Points | `base/alerting/_default/contact_points.yaml` | `envs/{env}/alerting/{Org}/contact_points.yaml` | `orgId:name` |
+| Notification Policies | `base/alerting/_default/notification_policies.yaml` | `envs/{env}/alerting/{Org}/notification_policies.yaml` | `orgId` |
 | Dashboards | `base/dashboards/{folder}/` | `envs/{env}/dashboards/{folder}/` | filename |
 
 **Environment-specific configs override shared configs** with the same merge key.
+
+> **Note:** Resources use `orgId` (numeric Grafana org ID) rather than `org` (name string). The `import_from_grafana.py` script automatically fills in the correct `orgId` for each organization when importing.
 
 ---
 
@@ -63,13 +66,13 @@ organizations:
 organizations:
   - name: "Main Organization"
     id: 1
-    
+
   - name: "Public"
     description: "Shared dashboards for all users"
     admins: []
     editors: []
     viewers: []
-    
+
   - name: "Platform Team"
     admins:
       - "platform-admin@example.com"
@@ -81,16 +84,16 @@ organizations:
 
 ## Folders
 
-**File**: `base/folders.yaml`
-**Env Override**: `envs/{env}/folders.yaml`
+**File**: `base/folders/_default/folders.yaml`
+**Env Override**: `envs/{env}/folders/{Org Name}/folders.yaml`
 
-Defines the folder structure for organizing dashboards. Folders can be assigned to specific organizations.
+Defines the folder structure for organizing dashboards. Each file is placed in the subdirectory matching the Grafana org name, using `orgId` to scope it.
 
 ```yaml
 folders:
-  - name: "Folder Name"            # Required: Display name
+  - title: "Folder Name"           # Required: Display name
     uid: "folder-uid"             # Required: Unique identifier
-    org: "Organization Name"      # Optional: Parent organization (defaults to Main)
+    orgId: 1                      # Required: Numeric org ID
     permissions:                   # Optional: Access control (see below)
       - team: "Team Name"         # Grant access to a team
         permission: "View"        # View, Edit, or Admin
@@ -112,45 +115,41 @@ By default, **all folders** are managed with zero-default permissions — Grafan
 ### Example
 
 ```yaml
+# envs/prod/folders/Main Organization/folders.yaml
 folders:
-  # Main Organization folders
-  - name: "Infrastructure"
+  - title: "Infrastructure"
     uid: "infrastructure"
-    org: "Main Organization"
+    orgId: 1
     permissions:
       - team: "SRE Team"
         permission: "Edit"
       - team: "grafana-viewers"
         permission: "View"
 
-  - name: "Applications"
+  - title: "Applications"
     uid: "applications"
-    org: "Main Organization"
+    orgId: 1
     permissions: []               # No access except Org Admins
-    
-  # Platform Team folders
-  - name: "Kubernetes"
+
+# envs/prod/folders/Platform Team/folders.yaml
+folders:
+  - title: "Kubernetes"
     uid: "platform-kubernetes"
-    org: "Platform Team"
+    orgId: 3
     permissions:
       - role: "Viewer"
         permission: "View"
-    
-  # Application Team folders
-  - name: "API Services"
-    uid: "app-api"
-    org: "Application Team"
 ```
 
 ---
 
 ## Datasources
 
-**Files**: 
-- Shared: `base/datasources.yaml`
-- Environment: `envs/{env}/datasources.yaml`
+**Files**:
+- Shared: `base/datasources/_default/datasources.yaml`
+- Environment: `envs/{env}/datasources/{Org Name}/datasources.yaml`
 
-Defines data sources with full parameter support. Environment-specific datasources override shared ones with the same `uid`.
+Defines data sources with full parameter support. Environment-specific datasources override shared ones with the same `orgId:uid` composite key.
 
 ### All Parameters
 
@@ -160,7 +159,7 @@ datasources:
     type: "datasource-type"        # Required: prometheus, loki, postgres, etc.
     uid: "unique-id"               # Required: Unique identifier
     url: "http://host:port"        # Required: Connection URL
-    org: "Organization Name"       # Optional: Parent organization
+    orgId: 1                       # Required: Numeric org ID
     is_default: true/false         # Optional: Default datasource
     access_mode: "proxy"           # Optional: proxy or direct
     basic_auth_enabled: true/false # Optional: Enable basic auth
@@ -198,34 +197,38 @@ datasources:
 #### Prometheus with Custom Headers
 
 ```yaml
-- name: "My Prometheus"
-  type: "prometheus"
-  uid: "prometheus-main"
-  url: "http://prometheus:9090"
-  org: "Main Organization"
-  is_default: true
-  http_headers:
-    X-Custom-Header: "my-value"
-  json_data:
-    httpMethod: "POST"
-    timeInterval: "15s"
-    queryTimeout: "60s"
+# envs/prod/datasources/Main Organization/datasources.yaml
+datasources:
+  - name: "My Prometheus"
+    type: "prometheus"
+    uid: "prometheus-main"
+    url: "http://prometheus:9090"
+    orgId: 1
+    is_default: true
+    http_headers:
+      X-Custom-Header: "my-value"
+    json_data:
+      httpMethod: "POST"
+      timeInterval: "15s"
+      queryTimeout: "60s"
 ```
 
 #### PostgreSQL with Vault
 
 ```yaml
-- name: "PostgreSQL"
-  type: "postgres"
-  uid: "postgres"
-  url: "postgres.example.com:5432"
-  use_vault: true
-  database_name: "app_db"
-  username: "grafana_reader"
-  json_data:
-    sslmode: "require"
-    maxOpenConns: 10
-    maxIdleConns: 5
+datasources:
+  - name: "PostgreSQL"
+    type: "postgres"
+    uid: "postgres"
+    url: "postgres.example.com:5432"
+    orgId: 1
+    use_vault: true
+    database_name: "app_db"
+    username: "grafana_reader"
+    json_data:
+      sslmode: "require"
+      maxOpenConns: 10
+      maxIdleConns: 5
 ```
 
 #### Elasticsearch
@@ -246,15 +249,15 @@ datasources:
 
 ## Teams
 
-**File**: `base/teams.yaml`
-**Env Override**: `envs/{env}/teams.yaml`
+**File**: `base/teams/_default/teams.yaml`
+**Env Override**: `envs/{env}/teams/{Org Name}/teams.yaml`
 
-Defines teams for access control. Teams use a **composite key** (`name/org`) internally, so the same team name can exist in different organizations.
+Defines teams for access control. Teams use a composite key (`name/orgId`) internally, so the same team name can exist in different organizations.
 
 ```yaml
 teams:
   - name: "Team Name"             # Required: Display name
-    org: "Organization Name"      # Optional: Parent organization (default: Main Org.)
+    orgId: 1                      # Required: Numeric org ID
     email: "team@example.com"     # Optional: Team email
     external_groups:              # Optional: IdP groups for team sync
       - "keycloak-group-name"
@@ -294,9 +297,10 @@ These create two separate teams, each synced from the same Keycloak group but sc
 ### Example
 
 ```yaml
+# envs/prod/teams/Platform Team/teams.yaml
 teams:
   - name: "Platform Engineering"
-    org: "Platform Team"
+    orgId: 3
     email: "platform@example.com"
     external_groups:
       - "grafana-platform-team"
@@ -306,8 +310,10 @@ teams:
       - email: "bob@example.com"
         role: "Member"
 
+# envs/prod/teams/Main Organization/teams.yaml
+teams:
   - name: "SRE"
-    org: "Main Org."
+    orgId: 1
     external_groups:
       - "grafana-sre"
     members:
@@ -319,15 +325,15 @@ teams:
 
 ## Service Accounts
 
-**File**: `base/service_accounts.yaml`
-**Env Override**: `envs/{env}/service_accounts.yaml`
+**File**: `base/service_accounts/_default/service_accounts.yaml`
+**Env Override**: `envs/{env}/service_accounts/{Org Name}/service_accounts.yaml`
 
 Defines service accounts for API access.
 
 ```yaml
 service_accounts:
   - name: "Account Name"          # Required: Display name
-    org: "Organization Name"      # Optional: Parent organization
+    orgId: 1                      # Required: Numeric org ID
     role: "Viewer"                # Required: Viewer, Editor, or Admin
     is_disabled: false            # Optional: Disable account
     tokens:                       # Optional: API tokens
@@ -338,15 +344,17 @@ service_accounts:
 ### Example
 
 ```yaml
+# envs/prod/service_accounts/Main Organization/service_accounts.yaml
 service_accounts:
   - name: "ci-cd-deployer"
-    org: "Main Organization"
+    orgId: 1
     role: "Editor"
     tokens:
       - name: "github-actions"
         seconds_to_live: 31536000  # 1 year
 
   - name: "monitoring-readonly"
+    orgId: 1
     role: "Viewer"
     tokens:
       - name: "prometheus-scraper"
@@ -357,14 +365,11 @@ service_accounts:
 
 ## Alert Rules
 
-**Files**: 
-- Shared: `base/alerting/alert_rules.yaml`
-- Environment: `envs/{env}/alerting/alert_rules.yaml`
+**Files**:
+- Shared: `base/alerting/_default/alert_rules.yaml`
+- Environment: `envs/{env}/alerting/{Org Name}/alert_rules.yaml`
 
-Uses **Grafana's native YAML export format** with `org` name instead of `orgId`. This makes it easy to:
-- Export alerts from Grafana UI and use directly
-- Copy/paste between environments
-- Use familiar Grafana format
+Uses **Grafana's native YAML export format** with `orgId` (numeric) to scope rules to the correct organization.
 
 ### Format Overview
 
@@ -372,7 +377,7 @@ Uses **Grafana's native YAML export format** with `org` name instead of `orgId`.
 apiVersion: 1
 
 groups:
-  - org: "Organization Name"    # Use org name instead of orgId
+  - orgId: 1                    # Numeric org ID
     name: GroupName             # Rule group name
     folder: folder-uid          # Parent folder UID
     interval: 1m                # Evaluation interval
@@ -402,10 +407,11 @@ groups:
 ### Complete Example
 
 ```yaml
+# envs/prod/alerting/Platform Team/alert_rules.yaml
 apiVersion: 1
 
 groups:
-  - org: "Platform Team"
+  - orgId: 3
     name: Infrastructure
     folder: platform-alerts
     interval: 1m
@@ -467,8 +473,7 @@ groups:
 1. Go to **Alerting > Alert rules** in Grafana
 2. Click the export button (download icon)
 3. Select **YAML** format
-4. Replace `orgId: 1` with `org: "Your Org Name"`
-5. Save to your config file
+4. The export already uses `orgId` — save directly to `envs/<env>/alerting/<Org Name>/alert_rules.yaml`
 
 
 ### State Handling Options
@@ -530,7 +535,7 @@ alert_rules:
 
 ## Contact Points
 
-**Files**: 
+**Files**:
 - Shared: `base/alerting/contact_points.yaml`
 - Environment: `envs/{env}/alerting/contact_points.yaml`
 
@@ -578,9 +583,10 @@ contactPoints:
 ### Email Settings
 
 ```yaml
+# envs/prod/alerting/Main Organization/contact_points.yaml
 contactPoints:
   - name: "email-alerts"
-    org: "Main Organization"
+    orgId: 1
     receivers:
       - type: "email"
         settings:
@@ -600,7 +606,7 @@ contactPoints:
 ```yaml
 contactPoints:
   - name: "webhook-critical"
-    org: "Main Organization"
+    orgId: 1
     receivers:
       - type: "webhook"
         settings:
@@ -615,7 +621,7 @@ contactPoints:
 ```yaml
 contactPoints:
   - name: "slack-alerts"
-    org: "Main Organization"
+    orgId: 1
     receivers:
       - type: "slack"
         settings:
@@ -634,7 +640,7 @@ contactPoints:
 ```yaml
 contactPoints:
   - name: "pagerduty-critical"
-    org: "Main Organization"
+    orgId: 1
     receivers:
       - type: "pagerduty"
         settings:
@@ -652,7 +658,7 @@ contactPoints:
 ```yaml
 contactPoints:
   - name: "opsgenie-alerts"
-    org: "Main Organization"
+    orgId: 1
     receivers:
       - type: "opsgenie"
         settings:
@@ -671,7 +677,7 @@ contactPoints:
 ```yaml
 contactPoints:
   - name: "telegram-alerts"
-    org: "Main Organization"
+    orgId: 1
     receivers:
       - type: "telegram"
         settings:
@@ -688,7 +694,7 @@ contactPoints:
 ```yaml
 contactPoints:
   - name: "teams-alerts"
-    org: "Main Organization"
+    orgId: 1
     receivers:
       - type: "teams"
         settings:
@@ -704,14 +710,14 @@ contactPoints:
 ## Notification Policies
 
 **Files**:
-- Shared: `base/alerting/notification_policies.yaml`
-- Environment: `envs/{env}/alerting/notification_policies.yaml`
+- Shared: `base/alerting/_default/notification_policies.yaml`
+- Environment: `envs/{env}/alerting/{Org Name}/notification_policies.yaml`
 
 Defines routing for alerts to contact points. Uses Grafana's native format — one policy per organization.
 
 ```yaml
 policies:
-  - org: "Organization Name"         # Required: Organization name
+  - orgId: 1                         # Required: Numeric org ID
     receiver: "default-contact"      # Required: Default contact point
     group_by:                         # Optional: Grouping labels
       - "alertname"
@@ -729,8 +735,9 @@ policies:
 ### Example
 
 ```yaml
+# envs/prod/alerting/Main Organization/notification_policies.yaml
 policies:
-  - org: "Main Organization"
+  - orgId: 1
     receiver: "email-prod"
     group_by:
       - "alertname"
@@ -763,7 +770,7 @@ policies:
 
 ## Mute Timings
 
-**Files**: 
+**Files**:
 - Shared: `base/alerting/mute_timings.yaml`
 - Environment: `envs/{env}/alerting/mute_timings.yaml`
 

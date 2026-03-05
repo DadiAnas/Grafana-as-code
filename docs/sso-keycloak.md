@@ -279,8 +279,8 @@ The SSO module generates `org_mapping` strings from these groups using org numer
 The role is determined using a JMESPath expression:
 
 ```
-contains(groups[*], 'grafana-admin') && 'Admin' || 
-contains(groups[*], 'grafana-editor') && 'Editor' || 
+contains(groups[*], 'grafana-admin') && 'Admin' ||
+contains(groups[*], 'grafana-editor') && 'Editor' ||
 'Viewer'
 ```
 

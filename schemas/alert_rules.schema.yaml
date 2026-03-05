@@ -1,0 +1,25 @@
+# Schema for: alerting/<Org>/alert_rules.yaml
+apiVersion: int(required=False)
+groups: list(include('rule_group'), required=False)
+
+---
+rule_group:
+  name: str()
+  folder: str()
+  orgId: int(required=False)
+  org: str(required=False)
+  interval: str(required=False)
+  rules: list(include('alert_rule'), required=False)
+
+---
+alert_rule:
+  uid: str(required=False)
+  title: str()
+  condition: str()
+  for: str(required=False)
+  noDataState: enum('NoData', 'OK', 'Alerting', 'KeepLast', required=False)
+  execErrState: enum('Error', 'OK', 'Alerting', 'KeepLast', required=False)
+  isPaused: bool(required=False)
+  annotations: map(str(), str(), required=False)
+  labels: map(str(), str(), required=False)
+  data: list(any(), required=False)

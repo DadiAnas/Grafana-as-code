@@ -112,6 +112,9 @@ module "folders" {
   environment          = var.environment
   org_ids              = module.organizations.organization_ids
   team_details         = module.teams.team_details
+  # user_ids: optional — add a map of email→Grafana user ID here to enable
+  # user-based folder permissions (e.g. { "admin@example.com" = 1 })
+  # user_ids           = var.folder_user_ids
 
   depends_on = [module.organizations, module.teams]
 }

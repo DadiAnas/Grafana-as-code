@@ -10,11 +10,11 @@
 #   make apply ENV=staging
 # =============================================================================
 
-.PHONY: help init plan apply destroy fmt validate clean output state-list \
+.PHONY: help init plan apply destroy fmt validate validate-config clean output state-list \
         vault-setup vault-verify new-env delete-env list-envs check-env \
         ci-init ci-plan ci-apply ci-destroy apply-auto \
         dev-up dev-down dev-bootstrap lint import drift backup promote \
-        dashboard-diff test dry-run
+        dashboard-diff test dry-run pre-commit-install pre-commit-run
 
 # Default environment — override with: make plan ENV=staging
 ENV ?= myenv
@@ -61,7 +61,10 @@ help:
 	@echo "  ─── Utilities ─────────────────────────────────────────────"
 	@echo "  fmt           Format all Terraform files"
 	@echo "  validate      Validate Terraform configuration"
-	@echo "  lint          Run TFLint + YAML lint"
+	@echo "  validate-config  Schema-validate all YAML config files [ENV=prod]"
+	@echo "  lint          Run TFLint + YAML lint + schema validation"
+	@echo "  pre-commit-install  Install git pre-commit hooks"
+	@echo "  pre-commit-run      Run all pre-commit hooks on all files"
 	@echo "  clean         Remove Terraform cache and plans"
 	@echo "  output        Show Terraform outputs             ENV=staging"
 	@echo "  state-list    List all resources in state"
@@ -217,6 +220,27 @@ lint:
 	@echo ""
 	@echo "Running YAML lint..."
 	@yamllint -d '{extends: default, rules: {line-length: {max: 200}, truthy: disable, document-start: disable}}' base/ envs/ 2>/dev/null || echo "(install yamllint: pip install yamllint)"
+	@echo ""
+	@echo "Running schema validation..."
+	@python3 scripts/validate_config.py
+
+validate-config:
+	@python3 scripts/validate_config.py $(if $(ENV),--env $(ENV),)
+
+# Install pre-commit hooks into the local git repo
+pre-commit-install:
+	@echo "Installing pre-commit hooks..."
+	@pip install pre-commit yamale PyYAML --quiet 2>/dev/null || \
+		pip install pre-commit yamale PyYAML --quiet --break-system-packages 2>/dev/null || \
+		echo "Run: pip install pre-commit yamale PyYAML (or use a venv)"
+	@pre-commit install
+	@echo ""
+	@echo "  Pre-commit hooks installed. They will run on every 'git commit'."
+	@echo "  To run manually: make pre-commit-run"
+
+# Run all pre-commit hooks against all files (useful for first-time check)
+pre-commit-run:
+	@pre-commit run --all-files
 
 output:
 	@echo "Terraform outputs for $(ENV):"

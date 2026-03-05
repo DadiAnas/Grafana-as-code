@@ -1,5 +1,5 @@
 # Discover all dashboard JSON files organized by folder
-# 
+#
 # Directory structure:
 #   base/dashboards/<Org>/<folder>/<dashboard>.json       → Deployed to ALL environments
 #   envs/<env>/dashboards/<Org>/<folder>/<dashboard>.json  → Deployed to SPECIFIC environment only

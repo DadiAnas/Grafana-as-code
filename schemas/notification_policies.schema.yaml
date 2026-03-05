@@ -1,0 +1,13 @@
+# Schema for: alerting/<Org>/notification_policies.yaml
+policies: list(include('policy'), required=False)
+
+---
+policy:
+  orgId: int(required=False)
+  org: str(required=False)
+  receiver: str()
+  group_by: list(str(), required=False)
+  group_wait: str(required=False)
+  group_interval: str(required=False)
+  repeat_interval: str(required=False)
+  routes: list(any(), required=False)

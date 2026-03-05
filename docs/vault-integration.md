@@ -266,10 +266,10 @@ Update `main.tf` for AppRole:
 ```hcl
 provider "vault" {
   address = var.vault_address
-  
+
   auth_login {
     path = "auth/approle/login"
-    
+
     parameters = {
       role_id   = var.vault_role_id
       secret_id = var.vault_secret_id
@@ -302,10 +302,10 @@ vault write -f auth/approle/role/grafana-terraform/secret-id
 ```hcl
 provider "vault" {
   address = var.vault_address
-  
+
   auth_login {
     path = "auth/kubernetes/login"
-    
+
     parameters = {
       role = "grafana-terraform"
       jwt  = file("/var/run/secrets/kubernetes.io/serviceaccount/token")
@@ -333,14 +333,14 @@ jobs:
   terraform:
     runs-on: ubuntu-latest
     environment: production
-    
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: ${{ env.TF_VERSION }}
-      
+
       - name: Import Vault Secrets
         uses: hashicorp/vault-action@v2
         with:
@@ -349,13 +349,13 @@ jobs:
           roleId: ${{ secrets.VAULT_ROLE_ID }}
           secretId: ${{ secrets.VAULT_SECRET_ID }}
           exportToken: true
-      
+
       - name: Terraform Init
         run: terraform -chdir=terraform init -backend-config=../envs/prod/backend.tfbackend
-      
+
       - name: Terraform Plan
         run: terraform plan -var-file=envs/prod.tfvars -out=tfplan
-      
+
       - name: Terraform Apply
         if: github.ref == 'refs/heads/main'
         run: terraform apply -auto-approve tfplan

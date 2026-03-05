@@ -10,7 +10,7 @@ locals {
   # Priority: org (name lookup) > orgId (numeric fallback) > default to 1
   # Org names are stable across environments; numeric IDs are not.
   resolve_org_id = {
-    for cp in try(var.contact_points.contactPoints, []) : "${try(cp.org, "_")}:${cp.name}" => (
+    for cp in try(var.contact_points.contactPoints, []) : "${coalesce(try(cp.org, null), try(tostring(cp.orgId), "_"))}:${cp.name}" => (
       # If org name is provided, look it up in org_ids map (preferred — stable across envs)
       try(cp.org, null) != null && try(var.org_ids[cp.org], null) != null ? var.org_ids[cp.org] :
       # Fallback: if orgId is provided and is a number, use it directly
@@ -22,9 +22,9 @@ locals {
 
   # Create map for contact points - group by org:name to handle same name across orgs
   contact_points_by_name = {
-    for cp in try(var.contact_points.contactPoints, []) : "${try(cp.org, "_")}:${cp.name}" => {
+    for cp in try(var.contact_points.contactPoints, []) : "${coalesce(try(cp.org, null), try(tostring(cp.orgId), "_"))}:${cp.name}" => {
       name      = cp.name
-      org_id    = local.resolve_org_id["${try(cp.org, "_")}:${cp.name}"]
+      org_id    = local.resolve_org_id["${coalesce(try(cp.org, null), try(tostring(cp.orgId), "_"))}:${cp.name}"]
       receivers = cp.receivers
     }
   }
@@ -623,15 +623,18 @@ resource "grafana_notification_policy" "policy" {
 locals {
   mute_timings_map = {
     for mt in try(var.mute_timings.mute_timings, []) :
-    "${mt.org}-${mt.name}" => mt
+    "${coalesce(try(mt.org, null), try(tostring(mt.orgId), "_"))}-${mt.name}" => mt
   }
 }
 
 resource "grafana_mute_timing" "mute_timings" {
   for_each = local.mute_timings_map
 
-  name   = each.value.name
-  org_id = try(var.org_ids[each.value.org], null)
+  name = each.value.name
+  org_id = (
+    try(each.value.org, null) != null && try(var.org_ids[each.value.org], null) != null ? var.org_ids[each.value.org] :
+    try(tonumber(each.value.orgId), null)
+  )
 
   dynamic "intervals" {
     for_each = each.value.intervals
