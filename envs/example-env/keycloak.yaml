@@ -1,7 +1,0 @@
-# Keycloak configuration — must be configured manually
-
-keycloak:
-  enabled: false
-  realm_id: "master"
-  client_id: "grafana"
-  root_url: "http://localhost:3000"

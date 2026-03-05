@@ -1,0 +1,59 @@
+# =============================================================================
+# DEV — Datasource Overrides
+# =============================================================================
+# Override shared datasource settings for THIS environment only.
+# Matching is by datasource "uid" — shared entries with the same UID
+# are replaced by entries here.
+#
+# Common use case: same datasource type, different URL per environment.
+#
+# For secrets (passwords, tokens), set use_vault: true and store credentials
+# in Vault at: grafana/dev/datasources/<datasource-name>
+# =============================================================================
+
+datasources: []
+
+  # --- Example: Override Prometheus URL for this environment ---
+  # - name: "Prometheus"
+  #   type: "prometheus"
+  #   uid: "prometheus"                    # Must match the shared UID to override
+  #   url: "http://prometheus-dev:9090"
+  #   org: "Main Organization"
+  #   is_default: true
+  #   access_mode: "proxy"
+  #   json_data:
+  #     httpMethod: "POST"
+  #     timeInterval: "15s"
+  #
+  # --- Example: Loki with environment-specific URL ---
+  # - name: "Loki"
+  #   type: "loki"
+  #   uid: "loki"
+  #   url: "http://loki-dev:3100"
+  #   org: "Main Organization"
+  #   json_data:
+  #     maxLines: 1000
+  #
+  # --- Example: PostgreSQL with Vault credentials ---
+  # - name: "PostgreSQL"
+  #   type: "grafana-postgresql-datasource"
+  #   uid: "postgres"
+  #   url: "postgres-dev.example.com:5432"
+  #   org: "Main Organization"
+  #   use_vault: true                      # Reads from: grafana/dev/datasources/PostgreSQL
+  #   json_data:
+  #     database: "grafana_dev"
+  #     sslmode: "require"
+  #     maxOpenConns: 10
+  #
+  # --- Example: Elasticsearch ---
+  # - name: "Elasticsearch"
+  #   type: "elasticsearch"
+  #   uid: "elasticsearch"
+  #   url: "http://elasticsearch-dev:9200"
+  #   org: "Main Organization"
+  #   json_data:
+  #     esVersion: "8.0.0"
+  #     timeField: "@timestamp"
+  #     logMessageField: "message"
+  #     logLevelField: "level"

@@ -1,12 +1,13 @@
+# Imported from http://localhost:3000 on 2026-03-05T05:09:07.817095
+
 datasources:
-- name: Public-Metrics
-  uid: public-prometheus
-  type: prometheus
-  url: http://prometheus.public.local:9090
-  org: Public
-  orgId: 2
-  access: proxy
+- name: "Public-Metrics"
+  uid: "public-prometheus"
+  type: "prometheus"
+  url: "http://prometheus.public.local:9090"
+  orgId: 6
+  access: "proxy"
   is_default: true
   json_data:
-    httpMethod: GET
-    timeInterval: 60s
+    httpMethod: "GET"
+    timeInterval: "60s"

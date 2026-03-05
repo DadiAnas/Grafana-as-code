@@ -1,6 +1,7 @@
+# Imported from http://localhost:3000 on 2026-03-05T05:09:08.260406
+
 teams:
-- name: Dev Team
-  email: dev-team@example.com
-  org: Development
-  orgId: 4
+- name: "Dev Team"
+  orgId: 3
   members: []
+  email: "dev-team@example.com"

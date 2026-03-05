@@ -1,7 +1,25 @@
-# Keycloak configuration — must be configured manually
+# =============================================================================
+# DEV — Keycloak Client Management (Optional)
+# =============================================================================
+# Set enabled: true to let Terraform manage a Keycloak OAuth client
+# for Grafana. This is SEPARATE from SSO — SSO can use any provider,
+# while this manages the Keycloak client configuration itself.
+#
+# Credentials from Vault at: grafana/dev/keycloak/provider-auth
+# =============================================================================
 
-keycloak:
-  enabled: false
-  realm_id: "master"
-  client_id: "grafana"
-  root_url: "http://localhost:3000"
+keycloak: {}
+
+  # --- Example: Manage Keycloak client via Terraform ---
+  # enabled: true
+  # url: "https://keycloak.example.com"
+  # realm: "grafana"
+  # client_id: "grafana-dev"
+  # client_name: "Grafana Dev"
+  #
+  # access_type: "CONFIDENTIAL"
+  # standard_flow_enabled: true
+  # valid_redirect_uris:
+  #   - "https://grafana-dev.example.com/login/generic_oauth"
+  # web_origins:
+  #   - "https://grafana-dev.example.com"

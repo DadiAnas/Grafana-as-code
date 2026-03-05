@@ -1,285 +1,287 @@
-# alert_rules per org
+# Imported from http://localhost:3000 on 2026-03-05T05:09:08.379471
 
+apiVersion: 1
 groups:
-- name: Applications
-  folder: alerts
-  org: Main Org.
-  interval: 1m
+- name: "Applications"
+  folder: "alerts"
+  orgId: 1
+  interval: "1m"
   rules:
-  - title: High Error Rate
-    condition: C
-    for: 2m
+  - title: "High Error Rate"
+    condition: "C"
+    for: "2m"
     annotations:
-      description: Error rate is above 5%
-      summary: High error rate detected
+      description: "Error rate is above 5%"
+      summary: "High error rate detected"
     labels:
-      severity: critical
-      team: backend
-    noDataState: NoData
-    execErrState: Error
+      severity: "critical"
+      team: "backend"
+    noDataState: "NoData"
+    execErrState: "Error"
     data:
-    - refId: A
-      queryType: ''
+    - refId: "A"
+      queryType: ""
       relativeTimeRange:
         from: 600
         to: 0
-      datasourceUid: prometheus
+      datasourceUid: "prometheus"
       model:
-        expr: sum(rate(http_requests_total{status=~"5.."}[5m])) / sum(rate(http_requests_total[5m]))
-          * 100
+        expr: "sum(rate(http_requests_total{status=~\"5..\"}[5m])) / sum(rate(http_requests_total[5m]))\
+          \ * 100"
         intervalMs: 1000
         maxDataPoints: 43200
-        refId: A
-    - refId: B
-      queryType: ''
+        refId: "A"
+    - refId: "B"
+      queryType: ""
       relativeTimeRange:
         from: 600
         to: 0
-      datasourceUid: __expr__
+      datasourceUid: "__expr__"
       model:
-        expression: A
+        expression: "A"
         intervalMs: 1000
         maxDataPoints: 43200
-        reducer: mean
-        refId: B
-        type: reduce
-    - refId: C
-      queryType: ''
+        reducer: "mean"
+        refId: "B"
+        type: "reduce"
+    - refId: "C"
+      queryType: ""
       relativeTimeRange:
         from: 600
         to: 0
-      datasourceUid: __expr__
+      datasourceUid: "__expr__"
       model:
         conditions:
         - evaluator:
             params:
             - 5
-            type: gt
-        expression: B
+            type: "gt"
+        expression: "B"
         intervalMs: 1000
         maxDataPoints: 43200
-        refId: C
-        type: threshold
-  - title: High Latency
-    condition: C
-    for: 5m
+        refId: "C"
+        type: "threshold"
+  - title: "High Latency"
+    condition: "C"
+    for: "5m"
     annotations:
-      description: P99 latency is above 1 second
-      summary: High latency detected
+      description: "P99 latency is above 1 second"
+      summary: "High latency detected"
     labels:
-      severity: warning
-      team: backend
-    noDataState: NoData
-    execErrState: Error
+      severity: "warning"
+      team: "backend"
+    noDataState: "NoData"
+    execErrState: "Error"
     data:
-    - refId: A
-      queryType: ''
+    - refId: "A"
+      queryType: ""
       relativeTimeRange:
         from: 600
         to: 0
-      datasourceUid: prometheus
+      datasourceUid: "prometheus"
       model:
-        expr: histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m]))
-          by (le))
+        expr: "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m]))\
+          \ by (le))"
         intervalMs: 1000
         maxDataPoints: 43200
-        refId: A
-    - refId: B
-      queryType: ''
+        refId: "A"
+    - refId: "B"
+      queryType: ""
       relativeTimeRange:
         from: 600
         to: 0
-      datasourceUid: __expr__
+      datasourceUid: "__expr__"
       model:
-        expression: A
+        expression: "A"
         intervalMs: 1000
         maxDataPoints: 43200
-        reducer: mean
-        refId: B
-        type: reduce
-    - refId: C
-      queryType: ''
+        reducer: "mean"
+        refId: "B"
+        type: "reduce"
+    - refId: "C"
+      queryType: ""
       relativeTimeRange:
         from: 600
         to: 0
-      datasourceUid: __expr__
+      datasourceUid: "__expr__"
       model:
         conditions:
         - evaluator:
             params:
             - 1
-            type: gt
-        expression: B
+            type: "gt"
+        expression: "B"
         intervalMs: 1000
         maxDataPoints: 43200
-        refId: C
-        type: threshold
-- name: Infrastructure
-  folder: alerts
-  org: Main Org.
-  interval: 1m
+        refId: "C"
+        type: "threshold"
+- name: "Infrastructure"
+  folder: "alerts"
+  orgId: 1
+  interval: "1m"
   rules:
-  - title: High CPU Usage
-    condition: C
-    for: 5m
+  - title: "High CPU Usage"
+    condition: "C"
+    for: "5m"
     annotations:
-      description: CPU usage is above 80% for more than 5 minutes
-      runbook_url: https://wiki.example.com/runbooks/high-cpu
-      summary: High CPU usage detected
+      description: "CPU usage is above 80% for more than 5 minutes"
+      runbook_url: "https://wiki.example.com/runbooks/high-cpu"
+      summary: "High CPU usage detected"
     labels:
-      severity: warning
-      team: platform
-    noDataState: OK
-    execErrState: Alerting
+      severity: "warning"
+      team: "platform"
+    noDataState: "OK"
+    execErrState: "Alerting"
     data:
-    - refId: A
-      queryType: ''
+    - refId: "A"
+      queryType: ""
       relativeTimeRange:
         from: 600
         to: 0
-      datasourceUid: prometheus
+      datasourceUid: "prometheus"
       model:
-        expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m]))
-          * 100)
-        interval: ''
+        expr: "100 - (avg by(instance) (irate(node_cpu_seconds_total{mode=\"idle\"\
+          }[5m])) * 100)"
+        interval: ""
         intervalMs: 1000
-        legendFormat: '{{instance}}'
+        legendFormat: "{{instance}}"
         maxDataPoints: 43200
-        refId: A
-    - refId: B
-      queryType: ''
+        refId: "A"
+    - refId: "B"
+      queryType: ""
       relativeTimeRange:
         from: 600
         to: 0
-      datasourceUid: __expr__
+      datasourceUid: "__expr__"
       model:
-        expression: A
+        expression: "A"
         intervalMs: 1000
         maxDataPoints: 43200
-        reducer: mean
-        refId: B
-        type: reduce
-    - refId: C
-      queryType: ''
+        reducer: "mean"
+        refId: "B"
+        type: "reduce"
+    - refId: "C"
+      queryType: ""
       relativeTimeRange:
         from: 600
         to: 0
-      datasourceUid: __expr__
+      datasourceUid: "__expr__"
       model:
         conditions:
         - evaluator:
             params:
             - 80
-            type: gt
-        expression: B
+            type: "gt"
+        expression: "B"
         intervalMs: 1000
         maxDataPoints: 43200
-        refId: C
-        type: threshold
-  - title: High Memory Usage
-    condition: C
-    for: 5m
+        refId: "C"
+        type: "threshold"
+  - title: "High Memory Usage"
+    condition: "C"
+    for: "5m"
     annotations:
-      description: Memory usage is above 85%
-      summary: High memory usage detected
+      description: "Memory usage is above 85%"
+      summary: "High memory usage detected"
     labels:
-      severity: warning
-      team: platform
-    noDataState: NoData
-    execErrState: Error
+      severity: "warning"
+      team: "platform"
+    noDataState: "NoData"
+    execErrState: "Error"
     data:
-    - refId: A
-      queryType: ''
+    - refId: "A"
+      queryType: ""
       relativeTimeRange:
         from: 600
         to: 0
-      datasourceUid: prometheus
+      datasourceUid: "prometheus"
       model:
-        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes))
-          * 100
+        expr: "(1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes))\
+          \ * 100"
         intervalMs: 1000
         maxDataPoints: 43200
-        refId: A
-    - refId: B
-      queryType: ''
+        refId: "A"
+    - refId: "B"
+      queryType: ""
       relativeTimeRange:
         from: 600
         to: 0
-      datasourceUid: __expr__
+      datasourceUid: "__expr__"
       model:
-        expression: A
+        expression: "A"
         intervalMs: 1000
         maxDataPoints: 43200
-        reducer: mean
-        refId: B
-        type: reduce
-    - refId: C
-      queryType: ''
+        reducer: "mean"
+        refId: "B"
+        type: "reduce"
+    - refId: "C"
+      queryType: ""
       relativeTimeRange:
         from: 600
         to: 0
-      datasourceUid: __expr__
+      datasourceUid: "__expr__"
       model:
         conditions:
         - evaluator:
             params:
             - 85
-            type: gt
-        expression: B
+            type: "gt"
+        expression: "B"
         intervalMs: 1000
         maxDataPoints: 43200
-        refId: C
-        type: threshold
-  - title: Disk Space Low
-    condition: C
-    for: 10m
+        refId: "C"
+        type: "threshold"
+  - title: "Disk Space Low"
+    condition: "C"
+    for: "10m"
     annotations:
-      description: Disk usage is above 90%
-      summary: Low disk space
+      description: "Disk usage is above 90%"
+      summary: "Low disk space"
     labels:
-      severity: critical
-      team: platform
-    noDataState: NoData
-    execErrState: Error
+      severity: "critical"
+      team: "platform"
+    noDataState: "NoData"
+    execErrState: "Error"
     data:
-    - refId: A
-      queryType: ''
+    - refId: "A"
+      queryType: ""
       relativeTimeRange:
         from: 600
         to: 0
-      datasourceUid: prometheus
+      datasourceUid: "prometheus"
       model:
-        expr: (1 - (node_filesystem_avail_bytes / node_filesystem_size_bytes)) * 100
+        expr: "(1 - (node_filesystem_avail_bytes / node_filesystem_size_bytes)) *\
+          \ 100"
         intervalMs: 1000
         maxDataPoints: 43200
-        refId: A
-    - refId: B
-      queryType: ''
+        refId: "A"
+    - refId: "B"
+      queryType: ""
       relativeTimeRange:
         from: 600
         to: 0
-      datasourceUid: __expr__
+      datasourceUid: "__expr__"
       model:
-        expression: A
+        expression: "A"
         intervalMs: 1000
         maxDataPoints: 43200
-        reducer: max
-        refId: B
-        type: reduce
-    - refId: C
-      queryType: ''
+        reducer: "max"
+        refId: "B"
+        type: "reduce"
+    - refId: "C"
+      queryType: ""
       relativeTimeRange:
         from: 600
         to: 0
-      datasourceUid: __expr__
+      datasourceUid: "__expr__"
       model:
         conditions:
         - evaluator:
             params:
             - 90
-            type: gt
-        expression: B
+            type: "gt"
+        expression: "B"
         intervalMs: 1000
         maxDataPoints: 43200
-        refId: C
-        type: threshold
+        refId: "C"
+        type: "threshold"

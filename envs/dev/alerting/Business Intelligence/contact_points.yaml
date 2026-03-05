@@ -1,11 +1,18 @@
-# contact_points per org
+# Imported from http://localhost:3000 on 2026-03-05T05:09:08.321530
 
 contactPoints:
-- name: grafana-default-email
-  org: Business Intelligence
+- name: "email receiver"
+  orgId: 5
   receivers:
-  - type: email
+  - type: "email"
     settings:
-      addresses: <example@email.com>
+      addresses: "<example@email.com>"
+    disableResolveMessage: false
+- name: "grafana-default-email"
+  orgId: 5
+  receivers:
+  - type: "email"
+    settings:
+      addresses: "<example@email.com>"
       singleEmail: false
     disableResolveMessage: false

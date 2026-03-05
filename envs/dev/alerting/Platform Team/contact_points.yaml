@@ -1,39 +1,58 @@
-# contact_points per org
+# Imported from http://localhost:3000 on 2026-03-05T05:09:08.343677
 
 contactPoints:
-- name: grafana-default-email
-  org: Platform Team
+- name: "email receiver"
+  orgId: 2
   receivers:
-  - type: email
+  - type: "email"
     settings:
-      addresses: <example@email.com>
+      addresses: "<example@email.com>"
+    disableResolveMessage: false
+- name: "grafana-default-email"
+  orgId: 2
+  receivers:
+  - type: "email"
+    settings:
+      addresses: "<example@email.com>"
       singleEmail: false
     disableResolveMessage: false
-- name: platform-email-npr
-  org: Platform Team
+- name: "platform-email-npr"
+  orgId: 2
   receivers:
-  - type: email
+  - type: "email"
     settings:
-      addresses: platform-team-npr@example.com
+      addresses: "platform-team-npr@example.com"
       singleEmail: true
-      subject: '[NPR-Platform] [{{ .Status | toUpper }}] {{ .CommonLabels.alertname
-        }}'
+      subject: "[NPR-Platform] [{{ .Status | toUpper }}] {{ .CommonLabels.alertname\
+        \ }}"
     disableResolveMessage: false
-- name: platform-webhook
-  org: Platform Team
+- name: "platform-webhook"
+  orgId: 2
   receivers:
-  - type: webhook
+  - type: "webhook"
     settings:
-      httpMethod: POST
+      httpMethod: "POST"
       maxAlerts: 0
-      url: https://api.platform.example.com/alerts
+      url: "https://api.platform.example.com/alerts"
+      password: "VAULT_SECRET_REQUIRED"
+      tlsClientCert: "VAULT_SECRET_REQUIRED"
+      tlsClientKey: "VAULT_SECRET_REQUIRED"
+      authorizationCredentials: "VAULT_SECRET_REQUIRED"
+    vault_secrets: "\u26A0 Fill in Vault at grafana/dev/contact_points/platform-webhook:\
+      \ password, tlsClientCert, tlsClientKey, authorizationCredentials"
     disableResolveMessage: false
-- name: platform-webhook-npr
-  org: Platform Team
+- name: "platform-webhook-npr"
+  orgId: 2
   receivers:
-  - type: webhook
+  - type: "webhook"
     settings:
-      httpMethod: POST
+      httpMethod: "POST"
       maxAlerts: 0
-      url: https://hooks.platform.example.com/npr/alerts
+      url: "https://hooks.platform.example.com/npr/alerts"
+      password: "VAULT_SECRET_REQUIRED"
+      tlsClientCert: "VAULT_SECRET_REQUIRED"
+      tlsClientKey: "VAULT_SECRET_REQUIRED"
+      authorizationCredentials: "VAULT_SECRET_REQUIRED"
+    vault_secrets: "\u26A0 Fill in Vault at grafana/dev/contact_points/platform-webhook-npr:\
+      \ password, tlsClientCert, tlsClientKey, authorizationCredentials"
     disableResolveMessage: false

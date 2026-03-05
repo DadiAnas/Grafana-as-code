@@ -1,33 +1,39 @@
+# Imported from http://localhost:3000 on 2026-03-05T05:09:07.787781
+
 datasources:
-- name: Debug-Prometheus
-  uid: debug-prometheus
-  type: prometheus
-  url: http://prometheus-debug-npr.example.com:9090
-  org: Platform Team
-  orgId: 5
-  access: proxy
+- name: "Debug-Prometheus"
+  uid: "debug-prometheus"
+  type: "prometheus"
+  url: "http://prometheus-debug-npr.example.com:9090"
+  orgId: 2
+  access: "proxy"
   is_default: false
+  basic_auth_enabled: true
   json_data:
-    httpMethod: POST
-    timeInterval: 5s
-- name: Platform-Loki
-  uid: platform-loki
-  type: loki
-  url: http://loki.platform.local:3100
-  org: Platform Team
-  orgId: 5
-  access: proxy
+    httpMethod: "POST"
+    oauthPassThru: false
+    sigV4Auth: false
+    timeInterval: "5s"
+    timeout: 20
+  use_vault: true
+  vault_secret_fields: "Store in Vault at grafana/<env>/datasources/Debug-Prometheus:\
+    \ basicAuthPassword"
+- name: "Platform-Loki"
+  uid: "platform-loki"
+  type: "loki"
+  url: "http://loki.platform.local:3100"
+  orgId: 2
+  access: "proxy"
   is_default: false
   json_data:
     maxLines: 1000
-- name: Platform-Prometheus
-  uid: platform-prometheus
-  type: prometheus
-  url: http://prometheus.platform.local:9090
-  org: Platform Team
-  orgId: 5
-  access: proxy
+- name: "Platform-Prometheus"
+  uid: "platform-prometheus"
+  type: "prometheus"
+  url: "http://prometheus.platform.local:9090"
+  orgId: 2
+  access: "proxy"
   is_default: true
   json_data:
-    httpMethod: POST
-    timeInterval: 15s
+    httpMethod: "POST"
+    timeInterval: "15s"

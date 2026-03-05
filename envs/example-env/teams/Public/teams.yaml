@@ -1,6 +1,0 @@
-teams:
-- name: grafana-viewers
-  email: grafana-viewers@example.com
-  org: Public
-  orgId: 2
-  members: []

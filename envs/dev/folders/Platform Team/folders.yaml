@@ -1,16 +1,20 @@
+# Imported from http://localhost:3000 on 2026-03-05T05:09:08.185059
+# NOTE: Folder UIDs have been slugified from the original random Grafana UIDs
+#       for better readability in both YAML config and directory structure.
+
 folders:
-- title: Platform Cicd
-  uid: platform-cicd
-  org: Platform Team
-  orgId: 5
+- title: "Platform Cicd"
+  uid: "platform-cicd"
+  _comment_original_uid: "platform-cicd"
+  orgId: 2
   permissions: []
-- title: Platform Infrastructure
-  uid: platform-infrastructure
-  org: Platform Team
-  orgId: 5
+- title: "Platform Infrastructure"
+  uid: "platform-infrastructure"
+  _comment_original_uid: "platform-infrastructure"
+  orgId: 2
   permissions: []
-- title: Platform Kubernetes
-  uid: platform-kubernetes
-  org: Platform Team
-  orgId: 5
+- title: "Platform Kubernetes"
+  uid: "platform-kubernetes"
+  _comment_original_uid: "platform-kubernetes"
+  orgId: 2
   permissions: []

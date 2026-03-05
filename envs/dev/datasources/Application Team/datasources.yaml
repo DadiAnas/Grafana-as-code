@@ -1,12 +1,13 @@
+# Imported from http://localhost:3000 on 2026-03-05T05:09:07.695704
+
 datasources:
-- name: App-Prometheus
-  uid: app-prometheus
-  type: prometheus
-  url: http://prometheus.apps.local:9090
-  org: Application Team
-  orgId: 3
-  access: proxy
+- name: "App-Prometheus"
+  uid: "app-prometheus"
+  type: "prometheus"
+  url: "http://prometheus.apps.local:9090"
+  orgId: 4
+  access: "proxy"
   is_default: true
   json_data:
-    httpMethod: POST
-    timeInterval: 15s
+    httpMethod: "POST"
+    timeInterval: "15s"

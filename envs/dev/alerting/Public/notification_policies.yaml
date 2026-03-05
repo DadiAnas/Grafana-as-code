@@ -1,11 +1,14 @@
-# notification_policies per org
+# Imported from http://localhost:3000 on 2026-03-05T05:09:08.435999
+#
+# Notification Policies define how alerts are routed to contact points.
+# Format follows Grafana's provisioning API structure.
 
 policies:
-- org: Public
-  receiver: grafana-default-email
+- orgId: 6
+  receiver: "grafana-default-email"
   group_by:
-  - grafana_folder
-  - alertname
-  group_wait: 30s
-  group_interval: 5m
-  repeat_interval: 4h
+  - "grafana_folder"
+  - "alertname"
+  group_wait: "30s"
+  group_interval: "5m"
+  repeat_interval: "4h"

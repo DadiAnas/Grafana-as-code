@@ -1,19 +1,26 @@
-# contact_points per org
+# Imported from http://localhost:3000 on 2026-03-05T05:09:08.351362
 
 contactPoints:
-- name: bi-email
-  org: Public
+- name: "bi-email"
+  orgId: 6
   receivers:
-  - type: email
+  - type: "email"
     settings:
-      addresses: bi-team@example.com;analysts@example.com
+      addresses: "bi-team@example.com;analysts@example.com"
       singleEmail: false
     disableResolveMessage: false
-- name: grafana-default-email
-  org: Public
+- name: "email receiver"
+  orgId: 6
   receivers:
-  - type: email
+  - type: "email"
     settings:
-      addresses: <example@email.com>
+      addresses: "<example@email.com>"
+    disableResolveMessage: false
+- name: "grafana-default-email"
+  orgId: 6
+  receivers:
+  - type: "email"
+    settings:
+      addresses: "<example@email.com>"
       singleEmail: false
     disableResolveMessage: false

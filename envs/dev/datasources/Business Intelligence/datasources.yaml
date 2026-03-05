@@ -1,13 +1,14 @@
+# Imported from http://localhost:3000 on 2026-03-05T05:09:07.723307
+
 datasources:
-- name: BI-PostgreSQL
-  uid: bi-postgres
-  type: grafana-postgresql-datasource
-  url: postgres.bi.local:5432
-  org: Business Intelligence
-  orgId: 6
-  access: proxy
+- name: "BI-PostgreSQL"
+  uid: "bi-postgres"
+  type: "grafana-postgresql-datasource"
+  url: "postgres.bi.local:5432"
+  orgId: 5
+  access: "proxy"
   is_default: true
   json_data:
-    database: analytics
+    database: "analytics"
     maxOpenConns: 100
-    sslmode: require
+    sslmode: "require"

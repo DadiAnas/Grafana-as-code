@@ -1,0 +1,30 @@
+# =============================================================================
+# DEV — Team Overrides
+# =============================================================================
+# Override shared team settings for THIS environment only.
+# Matching is by team "name" — shared entries with the same name
+# are replaced by entries here.
+#
+# Teams are organization-scoped. Each team must specify "org".
+# Teams can be assigned folder permissions (see folders.yaml).
+# =============================================================================
+
+teams: []
+
+  # --- Example: Override team members for this environment ---
+  # - name: "Backend Team"
+  #   org: "Main Organization"
+  #   email: "backend-dev@example.com"
+  #   members:
+  #     - "dev1@example.com"
+  #     - "dev2@example.com"
+  #   preferences:
+  #     theme: "dark"
+  #     # home_dashboard_uid: "my-dashboard"
+  #
+  # --- Example: Environment-specific team ---
+  # - name: "Dev On-Call"
+  #   org: "Main Organization"
+  #   email: "oncall-dev@example.com"
+  #   preferences:
+  #     theme: "dark"

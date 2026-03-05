@@ -1,0 +1,44 @@
+# =============================================================================
+# DEV — Notification Policy Overrides
+# =============================================================================
+# Override shared notification policies for THIS environment only.
+# Matching is by organization.
+#
+# Policies define HOW alerts are routed to contact points:
+#   - receiver: the default contact point
+#   - group_by: labels to group alerts by
+#   - routes: child policies with label matchers
+# =============================================================================
+
+policies: []
+
+  # --- Example: Route alerts by severity ---
+  # - org: "Main Organization"
+  #   receiver: "dev-email-alerts"     # Default contact point
+  #   group_by:
+  #     - "alertname"
+  #     - "namespace"
+  #   group_wait: "30s"
+  #   group_interval: "5m"
+  #   repeat_interval: "4h"
+  #   routes:
+  #     # Critical alerts → PagerDuty
+  #     - receiver: "dev-pagerduty"
+  #       matchers:
+  #         - "severity = critical"
+  #       continue: false
+  #       group_wait: "10s"                    # Alert faster for critical
+  #
+  #     # Warning alerts → Slack
+  #     - receiver: "dev-slack"
+  #       matchers:
+  #         - "severity = warning"
+  #       continue: true                       # Also send to default receiver
+  #       repeat_interval: "1h"
+  #
+  #     # Mute notifications for specific labels
+  #     # - receiver: "dev-email-alerts"
+  #     #   matchers:
+  #     #     - "alertname = Watchdog"
+  #     #   mute_time_intervals:
+  #     #     - "weekends"
