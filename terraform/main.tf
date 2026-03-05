@@ -29,7 +29,7 @@ provider "vault" {
 # Path: var.vault_mount / var.vault_path_grafana_auth
 data "vault_kv_secret_v2" "grafana_auth" {
   mount     = var.vault_mount
-  name      = var.vault_path_grafana_auth
+  name      = replace(var.vault_path_grafana_auth, "{env}", var.environment)
   namespace = var.vault_namespace != "" ? var.vault_namespace : null
 }
 
@@ -40,7 +40,7 @@ data "vault_kv_secret_v2" "keycloak_provider_auth" {
   count = local.keycloak_config.enabled ? 1 : 0
 
   mount     = var.vault_mount
-  name      = var.vault_path_keycloak
+  name      = replace(var.vault_path_keycloak, "{env}", var.environment)
   namespace = var.vault_namespace != "" ? var.vault_namespace : null
 }
 

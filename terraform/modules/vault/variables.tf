@@ -19,42 +19,43 @@ variable "vault_namespace" {
 # Secret path prefixes (relative to vault_mount)
 # Defaults mirror the layout written by import_from_grafana.py.
 # Override in terraform.tfvars to match your Vault topology.
+# Use the literal string {env} to have it replaced with var.environment.
 # ---------------------------------------------------------------------------
 
 variable "vault_path_grafana_auth" {
   description = "Path within the mount for the Grafana admin auth secret."
   type        = string
-  default     = "grafana/auth"
+  default     = "{env}/grafana/auth"
 }
 
 variable "vault_path_datasources" {
   description = "Prefix within the mount for per-datasource secrets. The datasource name is appended."
   type        = string
-  default     = "grafana/datasources"
+  default     = "{env}/datasources"
 }
 
 variable "vault_path_contact_points" {
   description = "Prefix within the mount for contact-point secrets. The contact point name is appended."
   type        = string
-  default     = "grafana/alerting/contact-points"
+  default     = "{env}/alerting/contact-points"
 }
 
 variable "vault_path_sso" {
   description = "Path within the mount for SSO / Keycloak OIDC credentials."
   type        = string
-  default     = "grafana/sso/keycloak"
+  default     = "{env}/sso/keycloak"
 }
 
 variable "vault_path_keycloak" {
   description = "Path within the mount for Keycloak provider-auth credentials."
   type        = string
-  default     = "grafana/keycloak/client"
+  default     = "{env}/keycloak/client"
 }
 
 variable "vault_path_service_accounts" {
   description = "Prefix within the mount for service-account secrets. The account name is appended."
   type        = string
-  default     = "grafana/service-accounts"
+  default     = "{env}/service-accounts"
 }
 
 # ---------------------------------------------------------------------------

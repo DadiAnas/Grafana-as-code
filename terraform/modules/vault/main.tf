@@ -17,7 +17,7 @@ data "vault_kv_secret_v2" "datasources" {
   for_each = var.datasource_names
 
   mount     = var.vault_mount
-  name      = "${var.vault_path_datasources}/${each.value}"
+  name      = "${replace(var.vault_path_datasources, "{env}", var.environment)}/${each.value}"
   namespace = var.vault_namespace != "" ? var.vault_namespace : null
 }
 
@@ -26,27 +26,25 @@ data "vault_kv_secret_v2" "contact_points" {
   for_each = var.contact_point_names
 
   mount     = var.vault_mount
-  name      = "${var.vault_path_contact_points}/${each.value}"
+  name      = "${replace(var.vault_path_contact_points, "{env}", var.environment)}/${each.value}"
   namespace = var.vault_namespace != "" ? var.vault_namespace : null
 }
 
 # SSO / Keycloak OIDC credentials
-# Default path: grafana/sso/keycloak  (overridable via vault_path_sso)
 data "vault_kv_secret_v2" "sso" {
   count = var.load_sso_secrets ? 1 : 0
 
   mount     = var.vault_mount
-  name      = var.vault_path_sso
+  name      = replace(var.vault_path_sso, "{env}", var.environment)
   namespace = var.vault_namespace != "" ? var.vault_namespace : null
 }
 
 # Keycloak provider-auth credentials (only when Terraform manages the Keycloak client)
-# Default path: grafana/keycloak/client  (overridable via vault_path_keycloak)
 data "vault_kv_secret_v2" "keycloak" {
   count = var.load_keycloak_secrets ? 1 : 0
 
   mount     = var.vault_mount
-  name      = var.vault_path_keycloak
+  name      = replace(var.vault_path_keycloak, "{env}", var.environment)
   namespace = var.vault_namespace != "" ? var.vault_namespace : null
 }
 
@@ -55,6 +53,6 @@ data "vault_kv_secret_v2" "service_accounts" {
   for_each = var.service_account_names
 
   mount     = var.vault_mount
-  name      = "${var.vault_path_service_accounts}/${each.value}"
+  name      = "${replace(var.vault_path_service_accounts, "{env}", var.environment)}/${each.value}"
   namespace = var.vault_namespace != "" ? var.vault_namespace : null
 }

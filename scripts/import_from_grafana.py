@@ -1204,12 +1204,12 @@ vault_mount   = "grafana"
 # Defaults match the layout this script writes secrets to.
 # Uncomment and change ONLY if your Vault topology differs.
 #
-# vault_path_grafana_auth      = "grafana/auth"
-# vault_path_datasources       = "grafana/datasources"
-# vault_path_contact_points    = "grafana/alerting/contact-points"
-# vault_path_sso               = "grafana/sso/keycloak"
-# vault_path_keycloak          = "grafana/keycloak/client"
-# vault_path_service_accounts  = "grafana/service-accounts"
+# vault_path_grafana_auth      = "{env}/grafana/auth"
+# vault_path_datasources       = "{env}/datasources"
+# vault_path_contact_points    = "{env}/alerting/contact-points"
+# vault_path_sso               = "{env}/sso/keycloak"
+# vault_path_keycloak          = "{env}/keycloak/client"
+# vault_path_service_accounts  = "{env}/service-accounts"
 
 # Keycloak Configuration (optional — only if you enable SSO via Keycloak)
 # keycloak_url = "https://keycloak.example.com"

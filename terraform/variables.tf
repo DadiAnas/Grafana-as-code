@@ -66,43 +66,43 @@ variable "vault_namespace" {
 # ---------------------------------------------------------------------------
 # Vault secret path prefixes
 # Each variable is the path suffix appended after vault_mount.
-# The import script writes secrets to these same paths by default.
+# You can use the literal string {env} which will be replaced by var.environment.
 # ---------------------------------------------------------------------------
 
 variable "vault_path_grafana_auth" {
   description = "Vault path (within the mount) for the Grafana admin auth secret."
   type        = string
-  default     = "grafana/auth"
+  default     = "{env}/grafana/auth"
 }
 
 variable "vault_path_datasources" {
-  description = "Vault path prefix for per-datasource credential secrets. The datasource name is appended: <prefix>/<datasource-name>."
+  description = "Vault path prefix for per-datasource credential secrets. The datasource name is appended."
   type        = string
-  default     = "grafana/datasources"
+  default     = "{env}/datasources"
 }
 
 variable "vault_path_contact_points" {
-  description = "Vault path prefix for alerting contact-point credential secrets. The contact point name is appended: <prefix>/<cp-name>."
+  description = "Vault path prefix for alerting contact-point credential secrets. The contact point name is appended."
   type        = string
-  default     = "grafana/alerting/contact-points"
+  default     = "{env}/alerting/contact-points"
 }
 
 variable "vault_path_sso" {
   description = "Vault path (within the mount) for SSO / Keycloak OIDC credentials."
   type        = string
-  default     = "grafana/sso/keycloak"
+  default     = "{env}/sso/keycloak"
 }
 
 variable "vault_path_keycloak" {
-  description = "Vault path (within the mount) for Keycloak provider-auth credentials (used when Terraform manages the Keycloak client)."
+  description = "Vault path (within the mount) for Keycloak provider-auth credentials."
   type        = string
-  default     = "grafana/keycloak/client"
+  default     = "{env}/keycloak/client"
 }
 
 variable "vault_path_service_accounts" {
-  description = "Vault path prefix for per-service-account credential secrets. The service account name is appended: <prefix>/<name>."
+  description = "Vault path prefix for per-service-account credential secrets. The service account name is appended."
   type        = string
-  default     = "grafana/service-accounts"
+  default     = "{env}/service-accounts"
 }
 
 # =============================================================================
