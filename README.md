@@ -36,7 +36,7 @@ Manage your Grafana instance entirely as code using Terraform. Import an existin
 |----------|-------------|
 | **Import** | Auto-generate YAML + dashboard JSON from a running Grafana instance |
 | **Multi-Environment** | Base + per-environment configs (`dev`, `staging`, `prod`, …) |
-| **Multi-Organization** | Manage multiple Grafana orgs — resources keyed by composite `orgId:name` to prevent collisions |
+| **Multi-Organization** | Manage multiple Grafana orgs |
 | **Dashboards** | Version-controlled JSON dashboards, organized by org → folder |
 | **Nested Folders** | Auto-discovered from directory structure with team-based permissions |
 | **Alerting** | Alert rules, 20+ contact point types, notification policies, mute timings |
