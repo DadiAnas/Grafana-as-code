@@ -1,31 +1,3 @@
-# Uncomment and configure for remote state storage
-# Each environment uses a separate state file via backend config files
-
-# terraform {
-#   backend "s3" {
-#     # Configuration provided via -backend-config flag
-#     # See envs/<env>/backend.tfbackend files
-#   }
-# }
-
-# Alternative: Azure Blob Storage
-# terraform {
-#   backend "azurerm" {
-#     # Configuration provided via -backend-config flag
-#   }
-# }
-
-# Alternative: GCS
-# terraform {
-#   backend "gcs" {
-#     # Configuration provided via -backend-config flag
-#   }
-# }
-
-# Alternative: GitLab HTTP Backend (managed Terraform state)
-# terraform {
-#   backend "http" {
-#     # Configuration provided via -backend-config flag
-#     # Auth via TF_HTTP_USERNAME / TF_HTTP_PASSWORD env vars
-#   }
-# }
+terraform {
+  backend "local" {}
+}

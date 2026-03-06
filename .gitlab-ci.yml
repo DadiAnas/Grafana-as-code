@@ -40,6 +40,24 @@ default:
   before_script:
     - cd ${TF_ROOT}
     - terraform --version
+    # Auto-detect backend: <env>.<type>.tfbackend → terraform { backend "<type>" {} }
+    - |
+      tf_auto_init() {
+        local env="$1"
+        local bf=$(ls envs/${env}/${env}.*.tfbackend 2>/dev/null | head -1)
+        if [ -z "$bf" ]; then bf=$(ls envs/${env}/backend.tfbackend 2>/dev/null | head -1); fi
+        if [ -n "$bf" ]; then
+          local btype=$(echo "$bf" | sed -n 's/.*\.\(.*\)\.tfbackend$/\1/p')
+          if [ -n "$btype" ] && [ "$btype" != "local" ]; then
+            printf 'terraform {\n  backend "%s" {}\n}\n' "$btype" > terraform/backend.tf
+            terraform -chdir=terraform init -backend-config="../${bf}" -reconfigure
+          else
+            terraform -chdir=terraform init -reconfigure
+          fi
+        else
+          terraform -chdir=terraform init -reconfigure
+        fi
+      }
   cache:
     key: terraform-${CI_COMMIT_REF_SLUG}
     paths:
@@ -58,7 +76,7 @@ default:
       echo "═══════════════════════════════════════════════"
       echo "  Planning: ${ENV_NAME}"
       echo "═══════════════════════════════════════════════"
-    - terraform -chdir=terraform init -backend-config="../envs/${ENV_NAME}/backend.tfbackend" -reconfigure
+    - tf_auto_init "${ENV_NAME}"
     - |
       terraform -chdir=terraform plan \
         -var-file="../envs/${ENV_NAME}/terraform.tfvars" \
@@ -97,7 +115,7 @@ default:
       echo "═══════════════════════════════════════════════"
       echo "  Applying: ${ENV_NAME}"
       echo "═══════════════════════════════════════════════"
-    - terraform -chdir=terraform init -backend-config="../envs/${ENV_NAME}/backend.tfbackend" -reconfigure
+    - tf_auto_init "${ENV_NAME}"
     - |
       terraform -chdir=terraform apply \
         -var-file="../envs/${ENV_NAME}/terraform.tfvars" \
@@ -117,7 +135,7 @@ default:
 .destroy-template:
   stage: cleanup
   script:
-    - terraform -chdir=terraform init -backend-config="../envs/${ENV_NAME}/backend.tfbackend" -reconfigure
+    - tf_auto_init "${ENV_NAME}"
     - |
       echo "⚠️  DESTROYING environment: ${ENV_NAME}"
       terraform -chdir=terraform destroy \
@@ -133,7 +151,7 @@ default:
 .drift-template:
   stage: drift
   script:
-    - terraform -chdir=terraform init -backend-config="../envs/${ENV_NAME}/backend.tfbackend" -reconfigure
+    - tf_auto_init "${ENV_NAME}"
     - |
       set +e
       terraform -chdir=terraform plan \

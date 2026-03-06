@@ -7,7 +7,7 @@
 #
 # Requirements:
 #   - GitHub Secrets: VAULT_ADDR, VAULT_TOKEN, GRAFANA_URL (per environment)
-#   - Terraform state backend configured in envs/<env>/backend.tfbackend
+#   - Terraform state backend configured in envs/<env>/<env>.<type>.tfbackend
 #
 # STATUS: Disabled until real infrastructure secrets are configured.
 #         Re-enable by uncommenting the on: triggers below.
@@ -202,8 +202,20 @@ jobs:
 
       - name: Terraform Init
         run: |
-          terraform -chdir=terraform init \
-            -backend-config="../envs/${{ matrix.environment }}/backend.tfbackend"
+          ENV="${{ matrix.environment }}"
+          BF=$(ls envs/${ENV}/${ENV}.*.tfbackend 2>/dev/null | head -1)
+          if [ -z "$BF" ]; then BF=$(ls envs/${ENV}/backend.tfbackend 2>/dev/null | head -1); fi
+          if [ -n "$BF" ]; then
+            BTYPE=$(echo "$BF" | sed -n 's/.*\.\(.*\)\.tfbackend$/\1/p')
+            if [ -n "$BTYPE" ] && [ "$BTYPE" != "local" ]; then
+              printf 'terraform {\n  backend "%s" {}\n}\n' "$BTYPE" > terraform/backend.tf
+              terraform -chdir=terraform init -backend-config="../${BF}" -reconfigure
+            else
+              terraform -chdir=terraform init -reconfigure
+            fi
+          else
+            terraform -chdir=terraform init -reconfigure
+          fi
         env:
           VAULT_ADDR: ${{ secrets.VAULT_ADDR }}
           VAULT_TOKEN: ${{ secrets.VAULT_TOKEN }}
@@ -282,8 +294,20 @@ jobs:
 
       - name: Terraform Init
         run: |
-          terraform -chdir=terraform init \
-            -backend-config="../envs/${{ matrix.environment }}/backend.tfbackend"
+          ENV="${{ matrix.environment }}"
+          BF=$(ls envs/${ENV}/${ENV}.*.tfbackend 2>/dev/null | head -1)
+          if [ -z "$BF" ]; then BF=$(ls envs/${ENV}/backend.tfbackend 2>/dev/null | head -1); fi
+          if [ -n "$BF" ]; then
+            BTYPE=$(echo "$BF" | sed -n 's/.*\.\(.*\)\.tfbackend$/\1/p')
+            if [ -n "$BTYPE" ] && [ "$BTYPE" != "local" ]; then
+              printf 'terraform {\n  backend "%s" {}\n}\n' "$BTYPE" > terraform/backend.tf
+              terraform -chdir=terraform init -backend-config="../${BF}" -reconfigure
+            else
+              terraform -chdir=terraform init -reconfigure
+            fi
+          else
+            terraform -chdir=terraform init -reconfigure
+          fi
         env:
           VAULT_ADDR: ${{ secrets.VAULT_ADDR }}
           VAULT_TOKEN: ${{ secrets.VAULT_TOKEN }}
@@ -319,7 +343,20 @@ jobs:
       - name: Check for drift
         id: drift
         run: |
-          terraform -chdir=terraform init -backend-config="../envs/${{ matrix.environment }}/backend.tfbackend"
+          ENV="${{ matrix.environment }}"
+          BF=$(ls envs/${ENV}/${ENV}.*.tfbackend 2>/dev/null | head -1)
+          if [ -z "$BF" ]; then BF=$(ls envs/${ENV}/backend.tfbackend 2>/dev/null | head -1); fi
+          if [ -n "$BF" ]; then
+            BTYPE=$(echo "$BF" | sed -n 's/.*\.\(.*\)\.tfbackend$/\1/p')
+            if [ -n "$BTYPE" ] && [ "$BTYPE" != "local" ]; then
+              printf 'terraform {\n  backend "%s" {}\n}\n' "$BTYPE" > terraform/backend.tf
+              terraform -chdir=terraform init -backend-config="../${BF}" -reconfigure
+            else
+              terraform -chdir=terraform init -reconfigure
+            fi
+          else
+            terraform -chdir=terraform init -reconfigure
+          fi
           terraform -chdir=terraform plan \
             -var-file="../envs/${{ matrix.environment }}/terraform.tfvars" \
             -var="environment=${{ matrix.environment }}" \

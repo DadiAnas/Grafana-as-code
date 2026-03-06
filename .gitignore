@@ -18,8 +18,8 @@ crash.*.log
 !*.tfvars.example
 !envs/*/terraform.tfvars
 
-# Backend configs
-!envs/*/backend.tfbackend
+# Backend configs  (<env>.<type>.tfbackend naming convention)
+!envs/*/*.tfbackend
 
 # Override files
 override.tf

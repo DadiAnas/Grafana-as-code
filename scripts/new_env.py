@@ -165,7 +165,25 @@ def _generate_tfvars(
     )
 
 
+# Map user-facing backend names to Terraform backend types
+BACKEND_TYPE_MAP = {
+    "s3": "s3",
+    "azurerm": "azurerm",
+    "gcs": "gcs",
+    "gitlab": "http",
+}
+
+
+def _backend_filename(env_name: str, backend: str) -> str:
+    """Return the tfbackend filename: <env>.<type>.tfbackend"""
+    if not backend:
+        return f"{env_name}.local.tfbackend"
+    tf_type = BACKEND_TYPE_MAP.get(backend, backend)
+    return f"{env_name}.{tf_type}.tfbackend"
+
+
 def _generate_backend(env_name: str, backend: str) -> str:
+    backend_file = _backend_filename(env_name, backend)
     s3 = "" if backend == "s3" else "#"
     azure = "" if backend == "azurerm" else "#"
     gcs = "" if backend == "gcs" else "#"
@@ -174,16 +192,15 @@ def _generate_backend(env_name: str, backend: str) -> str:
         f"# =============================================================================\n"
         f"# BACKEND CONFIGURATION \u2014 {env_name}\n"
         f"# =============================================================================\n"
-        f"# Remote state backends store terraform.tfstate on a shared backend\n"
-        f"# instead of the local filesystem, enabling team collaboration.\n"
+        f"# File: envs/{env_name}/{backend_file}\n"
+        f"# The backend type is auto-detected from the filename by \"make init\".\n"
         f"#\n"
         f"# Usage:\n"
         f"#   make init ENV={env_name}\n"
-        f"# Or:\n"
-        f"#   terraform init -backend-config=envs/{env_name}/backend.tfbackend\n"
         f"#\n"
-        f"# Uncomment ONE backend section below (or use BACKEND= when creating the env).\n"
-        f"# For local-only state, you can leave everything commented.\n"
+        f"# Naming convention: <env>.<backend-type>.tfbackend\n"
+        f"#   e.g. {env_name}.s3.tfbackend, {env_name}.azurerm.tfbackend,\n"
+        f"#        {env_name}.http.tfbackend (GitLab), {env_name}.local.tfbackend\n"
         f"# =============================================================================\n"
         f"\n"
         f'# --- AWS S3 Backend ---\n'
@@ -1102,8 +1119,8 @@ def main() -> None:  # noqa: C901
         print("Existing files:")
         if (env_path / "terraform.tfvars").is_file():
             print(f"  \u2713 envs/{env_name}/terraform.tfvars")
-        if (env_path / "backend.tfbackend").is_file():
-            print(f"  \u2713 envs/{env_name}/backend.tfbackend")
+        for bf in sorted(env_path.glob(f"{env_name}.*.tfbackend")) + sorted(env_path.glob("backend.tfbackend")):
+            print(f"  \u2713 envs/{env_name}/{bf.name}")
         if env_path.is_dir():
             print(f"  \u2713 envs/{env_name}/")
         if (env_path / "dashboards").is_dir():
@@ -1142,7 +1159,7 @@ def main() -> None:  # noqa: C901
         print()
         print("  Would create:")
         print(f"    ✓ envs/{env_name}/terraform.tfvars")
-        print(f"    ✓ envs/{env_name}/backend.tfbackend")
+        print(f"    ✓ envs/{env_name}/{_backend_filename(env_name, backend)}")
         print(f"    ✓ envs/{env_name}/")
         print("        ├── organizations.yaml")
         print("        ├── sso.yaml")
@@ -1175,11 +1192,12 @@ def main() -> None:  # noqa: C901
     )
     created_files.append(f"envs/{env_name}/terraform.tfvars")
 
-    # 2. backend.tfbackend
-    print(f"{Colors.BLUE}[2/5]{Colors.NC} Creating {Colors.YELLOW}envs/{env_name}/backend.tfbackend{Colors.NC}")
-    backend_path = env_path / "backend.tfbackend"
+    # 2. <env>.<type>.tfbackend
+    _bfn = _backend_filename(env_name, backend)
+    print(f"{Colors.BLUE}[2/5]{Colors.NC} Creating {Colors.YELLOW}envs/{env_name}/{_bfn}{Colors.NC}")
+    backend_path = env_path / _bfn
     backend_path.write_text(_generate_backend(env_name, backend))
-    created_files.append(f"envs/{env_name}/backend.tfbackend")
+    created_files.append(f"envs/{env_name}/{_bfn}")
 
     # 3. YAML config files (base env files only)
     print(f"{Colors.BLUE}[3/5]{Colors.NC} Creating {Colors.YELLOW}envs/{env_name}/{Colors.NC} configuration files")

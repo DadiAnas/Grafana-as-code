@@ -22,7 +22,13 @@ ENV ?= myenv
 # Paths (new structure)
 TF_DIR      = terraform
 TF_VAR_FILE = ../envs/$(ENV)/terraform.tfvars
-TF_BACKEND  = ../envs/$(ENV)/backend.tfbackend
+
+# Auto-detect backend: envs/<ENV>/<ENV>.<type>.tfbackend (new convention)
+# Falls back to envs/<ENV>/backend.tfbackend (legacy)
+_NEW_BACKEND := $(firstword $(wildcard envs/$(ENV)/$(ENV).*.tfbackend))
+_OLD_BACKEND := $(wildcard envs/$(ENV)/backend.tfbackend)
+BACKEND_FILE := $(or $(_NEW_BACKEND),$(_OLD_BACKEND))
+TF_BACKEND   = $(if $(BACKEND_FILE),../$(BACKEND_FILE),)
 
 # ============================
 # Help
@@ -173,7 +179,25 @@ check-env:
 
 init:
 	@echo "Initializing Terraform for $(ENV)..."
-	terraform -chdir=$(TF_DIR) init -backend-config=$(TF_BACKEND) -reconfigure
+	@# Auto-detect backend type from filename: <env>.<type>.tfbackend → <type>
+	@BACKEND_FILE="$(BACKEND_FILE)"; \
+	if [ -n "$$BACKEND_FILE" ]; then \
+		BTYPE=$$(basename "$$BACKEND_FILE" | sed -n 's/^[^.]*\.\(.*\)\.tfbackend$$/\1/p'); \
+		if [ -z "$$BTYPE" ]; then BTYPE=""; fi; \
+		if [ -n "$$BTYPE" ] && [ "$$BTYPE" != "local" ]; then \
+			echo "  Backend: $$BTYPE ($$BACKEND_FILE)"; \
+			printf 'terraform {\n  backend "%s" {}\n}\n' "$$BTYPE" > $(TF_DIR)/backend.tf; \
+			terraform -chdir=$(TF_DIR) init -backend-config=$(TF_BACKEND) -reconfigure; \
+		else \
+			echo "  Backend: local state"; \
+			printf 'terraform {\n  backend "local" {}\n}\n' > $(TF_DIR)/backend.tf; \
+			terraform -chdir=$(TF_DIR) init -reconfigure; \
+		fi; \
+	else \
+		echo "  Backend: local state (no backend file found)"; \
+		printf 'terraform {\n  backend "local" {}\n}\n' > $(TF_DIR)/backend.tf; \
+		terraform -chdir=$(TF_DIR) init -reconfigure; \
+	fi
 
 plan:
 	@echo "Planning changes for $(ENV)..."
@@ -384,7 +408,20 @@ vault-verify:
 # =============================================================================
 
 ci-init:
-	terraform -chdir=$(TF_DIR) init -backend-config=$(TF_BACKEND) -input=false
+	@BACKEND_FILE="$(BACKEND_FILE)"; \
+	if [ -n "$$BACKEND_FILE" ]; then \
+		BTYPE=$$(basename "$$BACKEND_FILE" | sed -n 's/^[^.]*\.\(.*\)\.tfbackend$$/\1/p'); \
+		if [ -n "$$BTYPE" ] && [ "$$BTYPE" != "local" ]; then \
+			printf 'terraform {\n  backend "%s" {}\n}\n' "$$BTYPE" > $(TF_DIR)/backend.tf; \
+			terraform -chdir=$(TF_DIR) init -backend-config=$(TF_BACKEND) -input=false -reconfigure; \
+		else \
+			printf 'terraform {\n  backend "local" {}\n}\n' > $(TF_DIR)/backend.tf; \
+			terraform -chdir=$(TF_DIR) init -input=false -reconfigure; \
+		fi; \
+	else \
+		printf 'terraform {\n  backend "local" {}\n}\n' > $(TF_DIR)/backend.tf; \
+		terraform -chdir=$(TF_DIR) init -input=false -reconfigure; \
+	fi
 
 ci-plan:
 	terraform -chdir=$(TF_DIR) plan -var-file=$(TF_VAR_FILE) -input=false -out=tfplan

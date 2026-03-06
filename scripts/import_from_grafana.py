@@ -1466,18 +1466,35 @@ def run_terraform_imports(ctx: ImportContext) -> None:
     # Resolve paths
     tf_dir = ctx.output_dir / "terraform"
     var_file = f"../envs/{ctx.env_name}/terraform.tfvars"
-    backend_config = f"../envs/{ctx.env_name}/backend.tfbackend"
 
     if not tf_dir.is_dir():
         print(f"  {Colors.RED}✗ Terraform directory not found: {tf_dir}{Colors.NC}")
         return
 
-    # Step 1: terraform init
+    # Step 1: terraform init — auto-detect backend file
     print(f"  {Colors.DIM}Running terraform init...{Colors.NC}")
     init_cmd = ["terraform", "init", "-input=false"]
-    backend_file = ctx.output_dir / "envs" / ctx.env_name / "backend.tfbackend"
-    if backend_file.exists():
-        init_cmd += [f"-backend-config={backend_config}", "-reconfigure"]
+
+    # Look for <env>.<type>.tfbackend (new convention), fall back to backend.tfbackend (legacy)
+    env_dir = ctx.output_dir / "envs" / ctx.env_name
+    backend_files = sorted(env_dir.glob(f"{ctx.env_name}.*.tfbackend"))
+    if not backend_files:
+        backend_files = sorted(env_dir.glob("backend.tfbackend"))
+    if backend_files:
+        bf = backend_files[0]
+        backend_config = f"../envs/{ctx.env_name}/{bf.name}"
+        # Extract backend type from filename: <env>.<type>.tfbackend -> <type>
+        parts = bf.stem.split(".", 1)  # e.g. ["prod", "s3"]
+        backend_type = parts[1] if len(parts) > 1 else "local"
+        if backend_type != "local":
+            # Generate backend.tf with the correct backend block
+            backend_tf = tf_dir / "backend.tf"
+            backend_tf.write_text(f'terraform {{\n  backend "{backend_type}" {{}}\n}}\n')
+            init_cmd += [f"-backend-config={backend_config}", "-reconfigure"]
+        else:
+            init_cmd += ["-reconfigure"]
+    else:
+        init_cmd += ["-reconfigure"]
 
     result = subprocess.run(
         init_cmd,
