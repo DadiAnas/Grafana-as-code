@@ -41,7 +41,17 @@ repos:
             envs/.*\.ya?ml
           )$
 
-  # ── 3. Schema validation (custom local hook) ─────────────────────────────────
+  # ── 3. Terraform format check ─────────────────────────────────────────────────
+  - repo: local
+    hooks:
+      - id: terraform-fmt
+        name: Terraform Format Check
+        language: system
+        entry: terraform fmt -check -recursive -diff terraform/
+        files: '\.tf$'
+        pass_filenames: false
+
+  # ── 4. Schema validation (custom local hook) ─────────────────────────────────
   - repo: local
     hooks:
       - id: validate-config-schema
