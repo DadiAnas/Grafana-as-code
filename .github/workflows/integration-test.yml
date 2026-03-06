@@ -181,6 +181,60 @@ jobs:
       - name: "Step 2: Verify environment"
         run: make check-env ENV=${ENV_NAME}
 
+      - name: "Step 2: Seed test resources"
+        run: |
+          # Base configs are empty templates — seed the CI env with real resources
+          # so that plan/apply actually creates something to verify.
+
+          # Add a second organization (id=1 is skipped by TF — it already exists)
+          cat > envs/${ENV_NAME}/organizations.yaml << 'EOF'
+          organizations:
+            - name: "CI Test Org"
+              admins: []
+              editors: []
+              viewers: []
+          EOF
+
+          # Add a folder
+          mkdir -p "envs/${ENV_NAME}/folders/Main Org."
+          cat > "envs/${ENV_NAME}/folders/Main Org./folders.yaml" << 'EOF'
+          folders:
+            - title: "CI Test Folder"
+              uid: "ci-test-folder"
+              orgId: 1
+              permissions: []
+          EOF
+
+          # Add a datasource
+          mkdir -p "envs/${ENV_NAME}/datasources/Main Org."
+          cat > "envs/${ENV_NAME}/datasources/Main Org./datasources.yaml" << 'EOF'
+          datasources:
+            - name: "CI Prometheus"
+              uid: "ci-prometheus"
+              type: "prometheus"
+              url: "http://localhost:9090"
+              orgId: 1
+              access: "proxy"
+              is_default: true
+          EOF
+
+          # Add a team
+          mkdir -p "envs/${ENV_NAME}/teams/Main Org."
+          cat > "envs/${ENV_NAME}/teams/Main Org./teams.yaml" << 'EOF'
+          teams:
+            - name: "CI Test Team"
+              orgId: 1
+              members: []
+          EOF
+
+          echo "Test resources seeded"
+          echo ""
+          echo "=== Organizations ==="
+          cat envs/${ENV_NAME}/organizations.yaml
+          echo ""
+          echo "=== Folders ==="
+          cat "envs/${ENV_NAME}/folders/Main Org./folders.yaml"
+
       # ─────────────────────────────────────────────────────────────────
       # Step 3: Terraform Init → Plan → Apply
       # ─────────────────────────────────────────────────────────────────
