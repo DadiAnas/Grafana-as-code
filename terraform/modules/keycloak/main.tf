@@ -50,7 +50,7 @@ resource "keycloak_openid_client" "grafana" {
 # Create roles within the Grafana client (Admin, Editor, Viewer)
 # -----------------------------------------------------------------------------
 resource "keycloak_role" "grafana_roles" {
-  for_each = var.enabled ? { for role in var.keycloak_config.roles : role.name => role } : {}
+  for_each = var.enabled ? { for k, v in { for role in var.keycloak_config.roles : role.name => role... } : k => v[length(v) - 1] } : {}
 
   realm_id    = var.keycloak_config.realm_id
   client_id   = keycloak_openid_client.grafana[0].id
@@ -64,7 +64,7 @@ resource "keycloak_role" "grafana_roles" {
 # The actual role mappings are handled by Grafana SSO org_mapping in sso.yaml
 # -----------------------------------------------------------------------------
 resource "keycloak_group" "grafana_groups" {
-  for_each = var.enabled ? { for group in var.keycloak_config.groups : group.name => group } : {}
+  for_each = var.enabled ? { for k, v in { for group in var.keycloak_config.groups : group.name => group... } : k => v[length(v) - 1] } : {}
 
   realm_id = var.keycloak_config.realm_id
   name     = each.value.name
@@ -195,7 +195,7 @@ resource "keycloak_openid_user_client_role_protocol_mapper" "roles" {
 
 # Custom protocol mappers from config
 resource "keycloak_generic_protocol_mapper" "custom" {
-  for_each = var.enabled ? { for mapper in var.keycloak_config.mappers : mapper.name => mapper } : {}
+  for_each = var.enabled ? { for k, v in { for mapper in var.keycloak_config.mappers : mapper.name => mapper... } : k => v[length(v) - 1] } : {}
 
   realm_id        = var.keycloak_config.realm_id
   client_id       = keycloak_openid_client.grafana[0].id
