@@ -21,9 +21,9 @@ terraform {
 # When use_vault is false the provider is still declared (required by Terraform)
 # but no actual calls are made — all vault data sources use count = 0.
 provider "vault" {
-  address   = var.use_vault ? var.vault_address : "http://localhost:8200"
-  token     = var.use_vault && var.vault_token != "" ? var.vault_token : null
-  namespace = var.use_vault && var.vault_namespace != "" ? var.vault_namespace : null
+  address          = var.use_vault ? var.vault_address : "http://localhost:8200"
+  token            = var.use_vault && var.vault_token != "" ? var.vault_token : null
+  namespace        = var.use_vault && var.vault_namespace != "" ? var.vault_namespace : null
   skip_child_token = !var.use_vault
 }
 
@@ -112,8 +112,8 @@ module "vault_secrets" {
 
 # Convenience locals — empty maps when Vault is disabled
 locals {
-  vault_ds_creds = var.use_vault ? module.vault_secrets[0].datasource_credentials : {}
-  vault_cp_creds = var.use_vault ? module.vault_secrets[0].contact_point_credentials : {}
+  vault_ds_creds  = var.use_vault ? module.vault_secrets[0].datasource_credentials : {}
+  vault_cp_creds  = var.use_vault ? module.vault_secrets[0].contact_point_credentials : {}
   vault_sso_creds = var.use_vault ? module.vault_secrets[0].sso_credentials : {}
   vault_kc_creds  = var.use_vault ? module.vault_secrets[0].keycloak_credentials : {}
 }

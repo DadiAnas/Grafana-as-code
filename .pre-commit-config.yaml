@@ -45,11 +45,12 @@ repos:
   - repo: local
     hooks:
       - id: terraform-fmt
-        name: Terraform Format Check
+        name: Terraform Format
         language: system
-        entry: terraform fmt -check -recursive -diff terraform/
-        files: '\.tf$'
+        entry: terraform fmt -recursive -diff terraform/
+        always_run: true
         pass_filenames: false
+        files: ''
 
   # ── 4. Schema validation (custom local hook) ─────────────────────────────────
   - repo: local
