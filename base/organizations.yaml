@@ -10,7 +10,7 @@
 
 organizations:
   # Default organization — always exists in Grafana (id: 1)
-  - name: "Main Organization"
+  - name: "Main Org."
     id: 1
 
   # --- Example: Add more organizations ---

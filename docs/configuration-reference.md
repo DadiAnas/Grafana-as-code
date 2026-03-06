@@ -725,6 +725,14 @@ policies:
     group_wait: "30s"                # Optional: Initial wait
     group_interval: "5m"             # Optional: Interval between groups
     repeat_interval: "4h"            # Optional: Repeat interval
+    mute_time_intervals:             # Optional: Mute timing names
+      - "weekends"
+    active_time_intervals:           # Optional: Active timing names
+      - "business-hours"
+    object_matchers:                 # Optional: Grafana-style matchers
+      - ["severity", "=", "critical"]
+    matchers:                        # Optional: Prometheus-style matchers
+      - "team=platform"
     routes:                           # Optional: Child route policies
       - receiver: "webhook-critical"
         object_matchers:

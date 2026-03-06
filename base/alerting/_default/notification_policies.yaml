@@ -5,15 +5,43 @@
 #
 # Each policy MUST specify orgId (numeric) to target the correct organization.
 #
+# Full Grafana provisioning format reference:
+#   https://grafana.com/docs/grafana/latest/alerting/set-up/provision-alerting-resources/file-provisioning/#import-notification-policies
+#
+# Root policy fields:
+#   orgId:                  <int>   Organization ID (default: 1)
+#   receiver:               <str>   Default contact point for this org
+#   group_by:               <list>  Labels to group alerts by (use ['...'] for no grouping)
+#   group_wait:             <dur>   Wait before first notification (default: 30s)
+#   group_interval:         <dur>   Wait between subsequent notifications (default: 5m)
+#   repeat_interval:        <dur>   Wait before re-sending (default: 4h)
+#   routes:                 <list>  Nested child policies (same schema, recursive)
+#
+# Nested route (child policy) additional fields:
+#   receiver:               <str>   Contact point (optional — inherits from parent)
+#   matchers:               <list>  Prometheus-style: ["severity = critical"]
+#   object_matchers:        <list>  Grafana-style: [["label", "op", "value"]]
+#   continue:               <bool>  Keep matching sibling routes (default: false)
+#   mute_time_intervals:    <list>  Suppress notifications during these named intervals
+#   active_time_intervals:  <list>  Only notify during these intervals (Grafana 12.1+)
+#   group_by / group_wait / group_interval / repeat_interval: override parent
+#   routes:                 <list>  Further nested child policies
+#
 # Example:
 #   policies:
 #     - orgId: 1
 #       receiver: "grafana-default-email"
 #       group_by: ["grafana_folder", "alertname"]
+#       group_wait: "30s"
+#       group_interval: "5m"
+#       repeat_interval: "4h"
 #       routes:
 #         - receiver: "slack-oncall"
-#           matchers:
-#             - "severity = critical"
+#           object_matchers:
+#             - ["severity", "=", "critical"]
+#           continue: false
+#           mute_time_intervals:
+#             - "weekends"
 #
 # Environment-specific overrides go in:
 #   envs/<env>/alerting/<Org Name>/notification_policies.yaml

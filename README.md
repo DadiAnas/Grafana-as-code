@@ -34,7 +34,7 @@ Manage your Grafana instance entirely as code using Terraform. Import an existin
 
 | Category | Capabilities |
 |----------|-------------|
-| **Import** | Auto-generate YAML + dashboard JSON from a running Grafana instance |
+| **Import** | Auto-generate YAML + dashboard JSON from a running Grafana instance, with automatic Terraform state import |
 | **Multi-Environment** | Base + per-environment configs (`dev`, `staging`, `prod`, …) |
 | **Multi-Organization** | Manage multiple Grafana orgs |
 | **Dashboards** | Version-controlled JSON dashboards, organized by org → folder |
@@ -175,6 +175,8 @@ The fastest way to adopt Grafana-as-Code is to import your existing Grafana conf
 
 ```bash
 # 1. Import everything from your Grafana instance
+#    This generates YAML configs AND imports existing resources into Terraform state
+export VAULT_TOKEN="your-token"
 make import ENV=prod \
   GRAFANA_URL=https://grafana.example.com \
   AUTH=admin:password
@@ -183,12 +185,10 @@ make import ENV=prod \
 ls envs/prod/
 ls envs/prod/dashboards/
 
-# 3. Set up Vault secrets
-export VAULT_TOKEN="your-token"
+# 3. Set up Vault secrets (datasource passwords, SSO client secrets, etc.)
 make vault-setup ENV=prod
 
-# 4. Initialize and apply
-make init  ENV=prod
+# 4. Plan and apply (init is handled by import)
 make plan  ENV=prod    # ← Review the plan carefully
 make apply ENV=prod
 ```
@@ -240,6 +240,10 @@ make init ENV=dev && make plan ENV=dev && make apply ENV=dev
 
 The import script (`scripts/import_from_grafana.py`) connects to a running Grafana instance and auto-generates all the YAML configuration files and dashboard JSON needed to manage it with Terraform.
 
+After generating YAML files, it automatically runs `terraform import` for every discovered resource (datasources, folders, teams, service accounts, contact points, notification policies, alert rule groups, and dashboards) so that `terraform plan` shows no drift for existing resources.
+
+> **Note:** `VAULT_TOKEN` must be exported before running `make import` — Terraform needs it to read secrets during the import phase.
+
 ### What Gets Imported
 
 | Resource | Output | Notes |
@@ -274,6 +278,16 @@ python3 scripts/import_from_grafana.py prod \
   --grafana-url=https://grafana.example.com \
   --auth=admin:password \
   --no-dashboards
+
+# Generate YAML only — skip terraform state import
+make import ENV=prod \
+  GRAFANA_URL=https://grafana.example.com \
+  AUTH=admin:password
+# Then pass --no-tf-import via direct script invocation:
+python3 scripts/import_from_grafana.py prod \
+  --grafana-url=https://grafana.example.com \
+  --auth=admin:password \
+  --no-tf-import
 ```
 
 ### Command Options
@@ -284,14 +298,15 @@ python3 scripts/import_from_grafana.py prod \
 | `--grafana-url=<url>` | *(required)* Grafana instance URL |
 | `--auth=<credentials>` | *(required)* `user:password` or API token |
 | `--no-dashboards` | Skip dashboard JSON export |
+| `--no-tf-import` | Skip automatic Terraform state import (only generate YAML) |
 | `--output-dir=<path>` | Custom output directory (default: project root) |
 
 ### Post-Import Steps
 
 1. **Review all generated YAML files** — adjust names, roles, and settings as needed
 2. **Set up Vault secrets** — datasource passwords, SSO client secrets, etc. are not exported
-3. **Run `terraform plan`** — review the plan carefully before applying
-4. **Apply** — Terraform will create all resources with the imported configuration
+3. **Run `make plan`** — the import already ran `terraform init` and `terraform import`, so plan should show minimal/no changes
+4. **Apply** — `make apply` converges any remaining cosmetic drift (e.g. dashboard commit messages)
 
 ---
 
@@ -532,6 +547,8 @@ make validate-config ENV=prod    # single environment
 | SSO wildcard `*` not working | Use `wildcard_group: true` flag for `name: "*"` groups |
 | Where did `*.tf` files go? | They're in `terraform/`. The Makefile handles `-chdir` automatically |
 | Missing per-org dirs after import | Run `make import ENV=<env>` again — all org dirs are now always created even if empty |
+| Terraform import fails with Vault error | Export `VAULT_TOKEN` before running `make import` — Terraform needs Vault access during the state import phase |
+| Resources already in state | The import script detects and silently skips resources already present in Terraform state |
 
 ---
 
