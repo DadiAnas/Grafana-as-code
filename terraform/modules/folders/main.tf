@@ -110,7 +110,7 @@ locals {
           title(replace(data.uid, "-", " "))
         )
       )
-      org = data.org
+      org    = data.org
       org_id = try(var.org_ids[data.org], null) != null ? var.org_ids[data.org] : try(tonumber(data.orgId), 1)
       permissions = try(
         [for f in try(var.folder_permissions.folders, []) : f.permissions if f.uid == data.uid && try(f.org, "") == data.org][0],
@@ -219,7 +219,7 @@ resource "grafana_folder" "subfolders" {
   # Reference parent folder - could be a regular folder or a builtin (like "General")
   parent_folder_uid = each.value.parent_is_builtin ? (
     local.builtin_folder_refs[each.value.parent_path].uid
-  ) : (
+    ) : (
     grafana_folder.folders[each.value.parent_path].uid
   )
 }
