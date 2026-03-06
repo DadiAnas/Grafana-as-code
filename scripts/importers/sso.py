@@ -38,6 +38,13 @@ def import_sso(ctx: ImportContext) -> None:
             f.write(yaml_dump({"sso": sso_config}))
             print(f"  {Colors.GREEN}✓{Colors.NC} SSO config (enabled) → envs/{ctx.env_name}/sso.yaml")
 
+    # Track SSO for terraform import (only when enabled)
+    if enabled_provider is not None:
+        ctx.tf_imports.append((
+            'module.sso.grafana_sso_settings.generic_oauth[0]',
+            'generic_oauth',
+        ))
+
     ctx.imported_count += 1
 
     # Create keycloak.yaml if it doesn't exist

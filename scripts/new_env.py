@@ -187,11 +187,9 @@ def _backend_filename(env_name: str, backend: str) -> str:
 
 def _generate_backend(env_name: str, backend: str) -> str:
     backend_file = _backend_filename(env_name, backend)
-    s3 = "" if backend == "s3" else "#"
-    azure = "" if backend == "azurerm" else "#"
-    gcs = "" if backend == "gcs" else "#"
-    gitlab = "" if backend == "gitlab" else "#"
-    return (
+    tf_type = BACKEND_TYPE_MAP.get(backend, backend) if backend else "local"
+
+    header = (
         f"# =============================================================================\n"
         f"# BACKEND CONFIGURATION \u2014 {env_name}\n"
         f"# =============================================================================\n"
@@ -201,47 +199,85 @@ def _generate_backend(env_name: str, backend: str) -> str:
         f"# Usage:\n"
         f"#   make init ENV={env_name}\n"
         f"#\n"
-        f"# Naming convention: <env>.<backend-type>.tfbackend\n"
+        f"# To switch backend types, create a new file with the naming convention:\n"
+        f"#   <env>.<backend-type>.tfbackend\n"
         f"#   e.g. {env_name}.s3.tfbackend, {env_name}.azurerm.tfbackend,\n"
         f"#        {env_name}.http.tfbackend (GitLab), {env_name}.local.tfbackend\n"
         f"# =============================================================================\n"
         f"\n"
-        f'# --- AWS S3 Backend ---\n'
-        f'# Prerequisites: S3 bucket + DynamoDB table for state locking\n'
-        f'# See: https://developer.hashicorp.com/terraform/language/backend/s3\n'
-        f'{s3} bucket         = "my-terraform-state"\n'
-        f'{s3} key            = "{env_name}/grafana/terraform.tfstate"\n'
-        f'{s3} region         = "us-east-1"\n'
-        f'{s3} encrypt        = true\n'
-        f'{s3} dynamodb_table = "terraform-locks"\n'
-        f"\n"
-        f'# --- Azure Blob Storage ---\n'
-        f'# Prerequisites: Storage account + container\n'
-        f'# See: https://developer.hashicorp.com/terraform/language/backend/azurerm\n'
-        f'{azure} resource_group_name  = "my-rg"\n'
-        f'{azure} storage_account_name = "mytfstate"\n'
-        f'{azure} container_name       = "tfstate"\n'
-        f'{azure} key                  = "{env_name}/grafana/terraform.tfstate"\n'
-        f"\n"
-        f'# --- Google Cloud Storage ---\n'
-        f'# Prerequisites: GCS bucket with versioning enabled\n'
-        f'# See: https://developer.hashicorp.com/terraform/language/backend/gcs\n'
-        f'{gcs} bucket = "my-terraform-state"\n'
-        f'{gcs} prefix = "{env_name}/grafana"\n'
-        f"\n"
-        f'# --- GitLab HTTP Backend ---\n'
-        f'# Prerequisites: GitLab project with Terraform state enabled\n'
-        f'# Auth: set TF_HTTP_USERNAME and TF_HTTP_PASSWORD env vars\n'
-        f'#   export TF_HTTP_USERNAME="gitlab-ci-token"  # or your username\n'
-        f'#   export TF_HTTP_PASSWORD="${{CI_JOB_TOKEN}}"   # or a personal access token\n'
-        f'# See: https://docs.gitlab.com/ee/user/infrastructure/iac/terraform_state.html\n'
-        f'{gitlab} address        = "https://gitlab.example.com/api/v4/projects/<PROJECT_ID>/terraform/state/{env_name}"\n'
-        f'{gitlab} lock_address   = "https://gitlab.example.com/api/v4/projects/<PROJECT_ID>/terraform/state/{env_name}/lock"\n'
-        f'{gitlab} unlock_address = "https://gitlab.example.com/api/v4/projects/<PROJECT_ID>/terraform/state/{env_name}/lock"\n'
-        f'{gitlab} lock_method    = "POST"\n'
-        f'{gitlab} unlock_method  = "DELETE"\n'
-        f'{gitlab} retry_wait_min = 5\n'
     )
+
+    if tf_type == "local":
+        return header + (
+            f'# --- Local Backend ---\n'
+            f'# See: https://developer.hashicorp.com/terraform/language/backend/local\n'
+            f'# =============================================================================\n'
+            f'\n'
+            f'# State file is stored per-environment inside the envs/ directory.\n'
+            f'path = "../envs/{env_name}/terraform.tfstate"\n'
+            f'\n'
+            f'# Workspace directory (optional, uncomment to customise)\n'
+            f'# workspace_dir = "../envs/{env_name}/workspaces"\n'
+        )
+
+    if tf_type == "s3":
+        return header + (
+            f'# --- AWS S3 Backend ---\n'
+            f'# Prerequisites: S3 bucket + DynamoDB table for state locking\n'
+            f'# See: https://developer.hashicorp.com/terraform/language/backend/s3\n'
+            f'# =============================================================================\n'
+            f'\n'
+            f'bucket         = "my-terraform-state"\n'
+            f'key            = "{env_name}/grafana/terraform.tfstate"\n'
+            f'region         = "us-east-1"\n'
+            f'encrypt        = true\n'
+            f'dynamodb_table = "terraform-locks"\n'
+        )
+
+    if tf_type == "azurerm":
+        return header + (
+            f'# --- Azure Blob Storage ---\n'
+            f'# Prerequisites: Storage account + container\n'
+            f'# See: https://developer.hashicorp.com/terraform/language/backend/azurerm\n'
+            f'# =============================================================================\n'
+            f'\n'
+            f'resource_group_name  = "my-rg"\n'
+            f'storage_account_name = "mytfstate"\n'
+            f'container_name       = "tfstate"\n'
+            f'key                  = "{env_name}/grafana/terraform.tfstate"\n'
+        )
+
+    if tf_type == "gcs":
+        return header + (
+            f'# --- Google Cloud Storage ---\n'
+            f'# Prerequisites: GCS bucket with versioning enabled\n'
+            f'# See: https://developer.hashicorp.com/terraform/language/backend/gcs\n'
+            f'# =============================================================================\n'
+            f'\n'
+            f'bucket = "my-terraform-state"\n'
+            f'prefix = "{env_name}/grafana"\n'
+        )
+
+    if tf_type == "http":
+        return header + (
+            f'# --- GitLab HTTP Backend ---\n'
+            f'# Prerequisites: GitLab project with Terraform state enabled\n'
+            f'# Auth: set TF_HTTP_USERNAME and TF_HTTP_PASSWORD env vars\n'
+            f'#   export TF_HTTP_USERNAME="gitlab-ci-token"  # or your username\n'
+            f'#   export TF_HTTP_PASSWORD="${{CI_JOB_TOKEN}}"   # or a personal access token\n'
+            f'# See: https://docs.gitlab.com/ee/user/infrastructure/iac/terraform_state.html\n'
+            f'# =============================================================================\n'
+            f'\n'
+            f'address        = "https://gitlab.example.com/api/v4/projects/<PROJECT_ID>/terraform/state/{env_name}"\n'
+            f'lock_address   = "https://gitlab.example.com/api/v4/projects/<PROJECT_ID>/terraform/state/{env_name}/lock"\n'
+            f'unlock_address = "https://gitlab.example.com/api/v4/projects/<PROJECT_ID>/terraform/state/{env_name}/lock"\n'
+            f'lock_method    = "POST"\n'
+            f'unlock_method  = "DELETE"\n'
+            f'retry_wait_min = 5\n'
+        )
+
+    # Unknown type — write an empty placeholder
+    return header + f'# Configure your "{tf_type}" backend parameters below.\n'
 
 
 def _generate_organizations(env_name: str) -> str:

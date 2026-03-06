@@ -153,6 +153,8 @@ class ImportContext:
     skip_tf_import: bool = False
     vault_mount: str = "grafana"
     vault_namespace: str = ""
+    backend: str = "local"
+    backend_config: list[str] = field(default_factory=list)  # ["key=value", ...]
 
     # Mappings built during import
     org_map: dict[int, str] = field(default_factory=dict)  # org_id -> org_name

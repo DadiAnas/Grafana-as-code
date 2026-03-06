@@ -11,8 +11,10 @@ resource "grafana_organization" "orgs" {
 
   # Org membership is managed by SSO group mappings at login time.
   # Ignore member lists so terraform apply doesn't revert SSO-assigned users.
+  # admin_user / create_users are Terraform provider defaults that aren't
+  # returned by `terraform import`, causing perpetual no-op diff.
   lifecycle {
-    ignore_changes = [admins, editors, viewers]
+    ignore_changes = [admins, editors, viewers, admin_user, create_users]
   }
 }
 

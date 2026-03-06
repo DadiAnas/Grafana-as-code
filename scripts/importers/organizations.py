@@ -42,5 +42,11 @@ def import_organizations(ctx: ImportContext) -> None:
         f.write(f"# Organizations: {len(orgs)}\n\n")
         f.write(yaml_dump(yaml_data))
 
+    # Track orgs for terraform import (skip id=1 — Main Org already exists)
+    for org in orgs:
+        if org["id"] != 1:
+            addr = f'module.organizations.grafana_organization.orgs["{org["name"]}"]'
+            ctx.tf_imports.append((addr, str(org["id"])))
+
     print(f"  {Colors.GREEN}✓{Colors.NC} {len(orgs)} organization(s) → envs/{ctx.env_name}/organizations.yaml")
     ctx.imported_count += 1

@@ -80,6 +80,7 @@ help:
 	@echo "  backup         Backup Grafana state via API      ENV=staging"
 	@echo "  import         Import from existing Grafana      ENV=staging AUTH=admin:admin"
 	@echo "                   Optional: NO_TF_IMPORT=true  NO_DASHBOARDS=true"
+	@echo "                   Optional: BACKEND=s3  BACKEND_CONFIG='bucket=x key=y region=z'"
 	@echo "  promote        Promote configs between envs      FROM=staging TO=prod"
 	@echo "  dashboard-diff Human-readable dashboard diff     ENV=staging"
 	@echo "  team-sync      Sync Keycloak groups → teams      ENV=prod GRAFANA_URL=... AUTH=..."
@@ -189,9 +190,9 @@ init:
 			printf 'terraform {\n  backend "%s" {}\n}\n' "$$BTYPE" > $(TF_DIR)/backend.tf; \
 			terraform -chdir=$(TF_DIR) init -backend-config=$(TF_BACKEND) -reconfigure; \
 		else \
-			echo "  Backend: local state"; \
+			echo "  Backend: local ($$BACKEND_FILE)"; \
 			printf 'terraform {\n  backend "local" {}\n}\n' > $(TF_DIR)/backend.tf; \
-			terraform -chdir=$(TF_DIR) init -reconfigure; \
+			terraform -chdir=$(TF_DIR) init -backend-config=$(TF_BACKEND) -reconfigure; \
 		fi; \
 	else \
 		echo "  Backend: local state (no backend file found)"; \
@@ -316,6 +317,8 @@ team-sync:
 AUTH          ?=
 NO_TF_IMPORT  ?=
 NO_DASHBOARDS ?=
+BACKEND_CONFIG ?=
+
 import:
 	@if [ -z "$(GRAFANA_URL)" ] || [ -z "$(AUTH)" ]; then \
 		echo ""; \
@@ -331,6 +334,14 @@ import:
 		echo "    VAULT_MOUNT=grafana     Vault KV mount name (default: grafana)"; \
 		echo "    VAULT_NAMESPACE=ns      Vault Enterprise namespace (default: none)"; \
 		echo ""; \
+		echo "  Backend options (default: local tfstate):"; \
+		echo "    BACKEND=s3              Backend type: local, s3, azurerm, gcs, gitlab"; \
+		echo "    BACKEND_CONFIG='k1=v1 k2=v2'  Space-separated backend key=value pairs"; \
+		echo ""; \
+		echo "  Example (S3 backend):"; \
+		echo "    make import ENV=prod GRAFANA_URL=https://grafana.example.com AUTH=glsa_xxx \\"; \
+		echo "      BACKEND=s3 BACKEND_CONFIG='bucket=my-state key=prod/grafana.tfstate region=us-east-1'"; \
+		echo ""; \
 		exit 1; \
 	fi
 	@python3 scripts/import_from_grafana.py "$(ENV)" \
@@ -338,7 +349,9 @@ import:
 		$(if $(filter true,$(NO_TF_IMPORT)),--no-tf-import,) \
 		$(if $(filter true,$(NO_DASHBOARDS)),--no-dashboards,) \
 		$(if $(VAULT_MOUNT),--vault-mount="$(VAULT_MOUNT)",) \
-		$(if $(VAULT_NAMESPACE),--vault-namespace="$(VAULT_NAMESPACE)",)
+		$(if $(VAULT_NAMESPACE),--vault-namespace="$(VAULT_NAMESPACE)",) \
+		$(if $(BACKEND),--backend="$(BACKEND)",) \
+		$(foreach kv,$(BACKEND_CONFIG),--backend-config=$(kv))
 
 # Promote configuration from one environment to another
 # Usage: make promote FROM=staging TO=prod

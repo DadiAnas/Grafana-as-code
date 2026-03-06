@@ -1,50 +1,24 @@
 # =============================================================================
 # BACKEND CONFIGURATION — dev
 # =============================================================================
-# Remote state backends store terraform.tfstate on a shared backend
-# instead of the local filesystem, enabling team collaboration.
+# File: envs/dev/dev.local.tfbackend
+# The backend type is auto-detected from the filename by "make init".
 #
 # Usage:
 #   make init ENV=dev
-# Or:
-#   terraform init -backend-config=envs/dev/backend.tfbackend
 #
-# Uncomment ONE backend section below (or use BACKEND= when creating the env).
-# For local-only state, you can leave everything commented.
+# To switch backend types, create a new file with the naming convention:
+#   <env>.<backend-type>.tfbackend
+#   e.g. dev.s3.tfbackend, dev.azurerm.tfbackend,
+#        dev.http.tfbackend (GitLab), dev.local.tfbackend
 # =============================================================================
 
-# --- AWS S3 Backend ---
-# Prerequisites: S3 bucket + DynamoDB table for state locking
-# See: https://developer.hashicorp.com/terraform/language/backend/s3
-# bucket         = "my-terraform-state"
-# key            = "dev/grafana/terraform.tfstate"
-# region         = "us-east-1"
-# encrypt        = true
-# dynamodb_table = "terraform-locks"
+# --- Local Backend ---
+# See: https://developer.hashicorp.com/terraform/language/backend/local
+# =============================================================================
 
-# --- Azure Blob Storage ---
-# Prerequisites: Storage account + container
-# See: https://developer.hashicorp.com/terraform/language/backend/azurerm
-# resource_group_name  = "my-rg"
-# storage_account_name = "mytfstate"
-# container_name       = "tfstate"
-# key                  = "dev/grafana/terraform.tfstate"
+# State file is stored per-environment inside the envs/ directory.
+path = "../envs/dev/terraform.tfstate"
 
-# --- Google Cloud Storage ---
-# Prerequisites: GCS bucket with versioning enabled
-# See: https://developer.hashicorp.com/terraform/language/backend/gcs
-# bucket = "my-terraform-state"
-# prefix = "dev/grafana"
-
-# --- GitLab HTTP Backend ---
-# Prerequisites: GitLab project with Terraform state enabled
-# Auth: set TF_HTTP_USERNAME and TF_HTTP_PASSWORD env vars
-#   export TF_HTTP_USERNAME="gitlab-ci-token"  # or your username
-#   export TF_HTTP_PASSWORD="${CI_JOB_TOKEN}"   # or a personal access token
-# See: https://docs.gitlab.com/ee/user/infrastructure/iac/terraform_state.html
-# address        = "https://gitlab.example.com/api/v4/projects/<PROJECT_ID>/terraform/state/dev"
-# lock_address   = "https://gitlab.example.com/api/v4/projects/<PROJECT_ID>/terraform/state/dev/lock"
-# unlock_address = "https://gitlab.example.com/api/v4/projects/<PROJECT_ID>/terraform/state/dev/lock"
-# lock_method    = "POST"
-# unlock_method  = "DELETE"
-# retry_wait_min = 5
+# Workspace directory (optional, uncomment to customise)
+# workspace_dir = "../envs/dev/workspaces"
