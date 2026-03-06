@@ -284,13 +284,32 @@ def import_datasources(ctx: ImportContext) -> None:
         org_datasources = [_process_datasource(ds, org_name, org_id, ctx) for ds in datasources_resp]
 
         # Track terraform imports: grafana_data_source key = "org:uid", import ID = "orgId:uid"
+        # Skip provisioned (readOnly) datasources — they can't be imported as resources
+        # until the user removes them from Grafana's file-based provisioning.
         if not ctx.skip_tf_import:
+            provisioned_names: list[str] = []
             for ds_entry in org_datasources:
+                if ds_entry.pop("_provisioned", False):
+                    provisioned_names.append(ds_entry["name"])
+                    continue
                 tf_key = f"{org_name}:{ds_entry['uid']}"
                 ctx.tf_imports.append((
                     f'module.datasources.grafana_data_source.datasources["{tf_key}"]',
                     f"{org_id}:{ds_entry['uid']}",
                 ))
+            if provisioned_names:
+                print(
+                    f"  {Colors.YELLOW}⚠{Colors.NC} {len(provisioned_names)} provisioned (read-only) datasource(s) "
+                    f"in {org_name} skipped from TF import: {', '.join(provisioned_names)}"
+                )
+                print(
+                    f"    {Colors.DIM}Remove them from Grafana provisioning config, then re-run import "
+                    f"or: terraform import 'module.datasources.grafana_data_source.datasources[\"<org>:<uid>\"]' '<orgId>:<uid>'{Colors.NC}"
+                )
+        else:
+            # Still strip internal flag if skipping TF import
+            for ds_entry in org_datasources:
+                ds_entry.pop("_provisioned", None)
 
         # Always create the dir and file, even if empty
         org_dir = ctx.config_dir / "datasources" / org_name
@@ -348,6 +367,13 @@ def _process_datasource(ds: dict[str, Any], org_name: str, org_id: int, ctx: Imp
         "access": ds.get("access", "proxy"),
         "is_default": ds.get("isDefault", False),
     }
+
+    # Track provisioned (read-only) datasources — they exist in Grafana's
+    # file-based provisioning and cannot be terraform-imported as resources.
+    # We still include them in the YAML so Terraform can manage them once
+    # the user removes them from provisioning.
+    if ds.get("readOnly"):
+        entry["_provisioned"] = True
 
     if ds.get("basicAuth"):
         entry["basic_auth_enabled"] = True
