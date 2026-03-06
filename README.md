@@ -38,9 +38,11 @@ make import ENV=prod \
   AUTH=admin:password
 
 # 3. Verify — should show NO changes
+#    (import already ran `terraform init` for you)
 make plan ENV=prod
 
 # 4. Done. From now on: edit YAML → plan → apply.
+#    If you come back later or switch machines, run `make init` first.
 ```
 
 ### Starting from scratch?
@@ -58,7 +60,7 @@ make init ENV=staging && make plan ENV=staging && make apply ENV=staging
 make dev-up                      # Starts Grafana + Vault + Keycloak via Docker
 make dev-bootstrap               # Seeds Vault and creates dev env
 export VAULT_TOKEN=root
-make plan ENV=dev && make apply ENV=dev
+make init ENV=dev && make plan ENV=dev && make apply ENV=dev
 ```
 
 ---
@@ -72,6 +74,7 @@ Run `make help` for the full list. Here are the commands you'll use 95% of the t
 | **Import** existing Grafana | `make import ENV=prod GRAFANA_URL=... AUTH=...` |
 | Import (YAML only, no TF state) | `make import ... NO_TF_IMPORT=true` |
 | Import (skip dashboards) | `make import ... NO_DASHBOARDS=true` |
+| **Initialize** Terraform | `make init ENV=prod` |
 | **Preview** changes | `make plan ENV=prod` |
 | **Deploy** changes | `make apply ENV=prod` |
 | Create a new environment | `make new-env NAME=staging GRAFANA_URL=...` |
