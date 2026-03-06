@@ -113,12 +113,18 @@ def _generate_tfvars(
         f"# The full URL of your Grafana instance (including protocol and port)\n"
         f'grafana_url = "{grafana_url}"\n'
         f"\n"
+        f'# Direct Grafana auth \u2014 used when use_vault is false.\n'
+        f'# Format: "admin:password" or a service-account/API token (glsa_...).\n'
+        f'grafana_auth = "admin:admin"\n'
+        f"\n"
         f"# Environment name \u2014 used to locate envs/ subdirectory\n"
         f"# Must match: envs/{env_name}/ and envs/{env_name}/dashboards/\n"
         f'environment = "{env_name}"\n'
         f"\n"
-        f"# \u2500\u2500\u2500 Vault Configuration \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n"
-        f"# HashiCorp Vault for secrets management (datasource passwords, SSO secrets)\n"
+        f"# \u2500\u2500\u2500 Vault Configuration (OPTIONAL) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n"
+        f"# Set use_vault = true to enable Vault-based secrets management.\n"
+        f"# When false (default), grafana_auth above is used directly.\n"
+        f"use_vault     = false\n"
         f'vault_address = "{vault_addr}"\n'
         f'vault_mount   = "{vault_mount}"\n'
         f"\n"
@@ -150,9 +156,6 @@ def _generate_tfvars(
         f"\n"
         f"# \u2500\u2500\u2500 Additional Variables \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n"
         f"# Uncomment and set any additional variables your Terraform config needs:\n"
-        f"#\n"
-        f"# # Grafana authentication (alternative to Vault-stored API key)\n"
-        f'# # grafana_auth = "admin:admin"          # Only for local dev!\n'
         f"#\n"
         f"# # Terraform state locking timeout\n"
         f'# # lock_timeout = "5m"\n'

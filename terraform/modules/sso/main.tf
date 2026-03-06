@@ -92,7 +92,7 @@ resource "grafana_sso_settings" "generic_oauth" {
     token_url     = var.sso_config.token_url
     api_url       = var.sso_config.api_url
     client_id     = var.sso_config.client_id
-    client_secret = var.vault_credentials.client_secret
+    client_secret = try(var.vault_credentials.client_secret, try(var.sso_config.client_secret, ""))
 
     enabled           = var.sso_config.enabled
     allow_sign_up     = try(var.sso_config.allow_sign_up, true)

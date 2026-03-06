@@ -10,6 +10,13 @@ variable "grafana_url" {
   type        = string
 }
 
+variable "grafana_auth" {
+  description = "Grafana auth credentials when use_vault is false. Format: 'admin:password' or a service-account token."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
 variable "environment" {
   description = "Environment name — must match a directory under envs/"
   type        = string
@@ -26,6 +33,10 @@ variable "environment" {
 # HashiCorp Vault is used to store sensitive credentials (Grafana auth,
 # datasource passwords, SSO secrets, etc.) instead of in plaintext.
 #
+# Set use_vault = true to enable Vault integration.  When false (default),
+# Grafana auth is taken from var.grafana_auth and all Vault data-sources
+# are skipped — ideal for local development and first-time import.
+#
 # Secret layout (all paths are relative to vault_mount):
 #
 #   <vault_path_grafana_auth>              → Grafana admin credentials
@@ -39,9 +50,16 @@ variable "environment" {
 # Override any of them in your environment's terraform.tfvars if your Vault differs.
 # =============================================================================
 
+variable "use_vault" {
+  description = "Enable Vault integration for secrets management. When false, Grafana auth is taken from grafana_auth and Vault is not contacted."
+  type        = bool
+  default     = false
+}
+
 variable "vault_address" {
   description = "The address of the Vault server (e.g., http://localhost:8200)"
   type        = string
+  default     = ""
 }
 
 variable "vault_token" {

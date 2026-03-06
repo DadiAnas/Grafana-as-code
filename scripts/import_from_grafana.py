@@ -168,6 +168,8 @@ class ImportContext:
     config_dir: Path
     import_dashboards: bool = True
     skip_tf_import: bool = False
+    vault_mount: str = "grafana"
+    vault_namespace: str = ""
 
     # Mappings built during import
     org_map: dict[int, str] = field(default_factory=dict)  # org_id -> org_name
@@ -178,6 +180,15 @@ class ImportContext:
 
     # Terraform import commands: list of (resource_address, import_id)
     tf_imports: list[tuple[str, str]] = field(default_factory=list)
+
+    def vault_path(self, *parts: str) -> str:
+        """Build a full Vault path: [namespace/]mount/parts..."""
+        segments = []
+        if self.vault_namespace:
+            segments.append(self.vault_namespace)
+        segments.append(self.vault_mount)
+        segments.extend(parts)
+        return "/".join(segments)
 
 
 # =============================================================================
@@ -270,7 +281,7 @@ def import_datasources(ctx: ImportContext) -> None:
             )
             datasources_resp = []
 
-        org_datasources = [_process_datasource(ds, org_name, org_id) for ds in datasources_resp]
+        org_datasources = [_process_datasource(ds, org_name, org_id, ctx) for ds in datasources_resp]
 
         # Track terraform imports: grafana_data_source key = "org:uid", import ID = "orgId:uid"
         if not ctx.skip_tf_import:
@@ -300,7 +311,7 @@ def import_datasources(ctx: ImportContext) -> None:
     ctx.imported_count += 1
 
 
-def _process_datasource(ds: dict[str, Any], org_name: str, org_id: int) -> dict[str, Any]:
+def _process_datasource(ds: dict[str, Any], org_name: str, org_id: int, ctx: ImportContext) -> dict[str, Any]:
     """Process a single datasource into YAML format."""
     json_data = ds.get("jsonData", {}).copy()
     secure_fields = ds.get("secureJsonFields", {})
@@ -397,11 +408,10 @@ def _process_datasource(ds: dict[str, Any], org_name: str, org_id: int) -> dict[
             secret_field_names.append(placeholder)
 
     if secret_field_names:
-        entry["use_vault"] = True
+        entry["use_vault"] = False
+        vault_full_path = ctx.vault_path(ctx.env_name, "datasources", entry["name"])
         entry["vault_secret_fields"] = (
-            "Store in Vault at grafana/<env>/datasources/"
-            + entry["name"]
-            + ": "
+            f"{vault_full_path}: "
             + ", ".join(sorted(secret_field_names))
         )
 
@@ -843,9 +853,9 @@ def import_alerting(ctx: ImportContext) -> None:
                 )
                 recv["settings"] = cleaned
             if secrets_found:
+                vault_full_path = ctx.vault_path(ctx.env_name, "alerting", "contact-points", name)
                 recv["vault_secrets"] = (
-                    f"⚠ Fill in Vault at "
-                    f"grafana/{ctx.env_name}/contact_points/{name}: "
+                    f"{vault_full_path}: "
                     + ", ".join(secrets_found)
                 )
             dis_resolve = cp.get("disableResolveMessage")
@@ -1159,7 +1169,8 @@ def import_sso(ctx: ImportContext) -> None:
         f.write("# Imported from Grafana SSO settings\n")
         f.write("#\n")
         f.write("# This file follows the project format expected by modules/sso.\n")
-        f.write("# Client secret is stored in Vault — see vault-setup.\n\n")
+        vault_sso_path = ctx.vault_path(ctx.env_name, "sso", "keycloak")
+        f.write(f"# Client secret Vault path: {vault_sso_path}\n\n")
 
         if enabled_provider is None:
             f.write(yaml_dump({"sso": {"enabled": False}}))
@@ -1323,6 +1334,9 @@ def generate_tfvars(ctx: ImportContext) -> None:
         print(f"  {Colors.DIM}  envs/{ctx.env_name}/terraform.tfvars already exists (skipped){Colors.NC}")
         return
 
+    # Use the same auth the import script used (basic auth or token)
+    auth_value = ctx.client.auth
+
     content = f"""# =============================================================================
 # {ctx.env_name.upper()} ENVIRONMENT - Terraform Variables
 # =============================================================================
@@ -1336,16 +1350,22 @@ def generate_tfvars(ctx: ImportContext) -> None:
 # The URL of your Grafana instance
 grafana_url = "{ctx.grafana_url}"
 
+# Direct Grafana auth — used when use_vault is false.
+# Format: "admin:password" or a service-account/API token (glsa_...).
+grafana_auth = "{auth_value}"
+
 # Environment name — must match a directory under envs/
 environment = "{ctx.env_name}"
 
-# ─── Vault Configuration ───────────────────────────────────────────────────
-# HashiCorp Vault for secrets management (datasource passwords, SSO secrets)
+# ─── Vault Configuration (OPTIONAL) ────────────────────────────────────────
+# Set use_vault = true to enable Vault-based secrets management.
+# When false (default), grafana_auth above is used directly.
+use_vault     = false
 vault_address = "http://localhost:8200"
-vault_mount   = "grafana"
+vault_mount   = "{ctx.vault_mount}"
 
 # Vault Enterprise namespace (leave commented for OSS Vault or root namespace)
-# vault_namespace = "admin/team-grafana"
+# vault_namespace = "{f'{ctx.vault_namespace}' if ctx.vault_namespace else 'admin/team-grafana'}"
 
 # vault_token — set via VAULT_TOKEN env variable for security:
 #   export VAULT_TOKEN="your-vault-token"
@@ -1565,6 +1585,8 @@ Examples:
     parser.add_argument("--auth", required=True, help="API token or user:password")
     parser.add_argument("--no-dashboards", action="store_true", help="Skip dashboard import")
     parser.add_argument("--no-tf-import", action="store_true", help="Skip terraform state import (only generate YAML)")
+    parser.add_argument("--vault-mount", default="grafana", help="Vault KV mount name — used in generated path hints (default: grafana)")
+    parser.add_argument("--vault-namespace", default="", help="Vault Enterprise namespace — prepended to path hints (default: none)")
     parser.add_argument("--output-dir", help="Output directory (default: project root)")
 
     args = parser.parse_args()
@@ -1591,6 +1613,8 @@ Examples:
         config_dir=config_dir,
         import_dashboards=not args.no_dashboards,
         skip_tf_import=args.no_tf_import,
+        vault_mount=args.vault_mount,
+        vault_namespace=args.vault_namespace,
     )
 
     # Print header

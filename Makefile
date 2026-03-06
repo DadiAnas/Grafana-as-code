@@ -326,15 +326,19 @@ import:
 		echo "    - API token:   glsa_xxxxxxxxxx"; \
 		echo ""; \
 		echo "  Optional flags:"; \
-		echo "    NO_TF_IMPORT=true   Skip Terraform state import (YAML only)"; \
-		echo "    NO_DASHBOARDS=true  Skip dashboard JSON export"; \
+		echo "    NO_TF_IMPORT=true       Skip Terraform state import (YAML only)"; \
+		echo "    NO_DASHBOARDS=true      Skip dashboard JSON export"; \
+		echo "    VAULT_MOUNT=grafana     Vault KV mount name (default: grafana)"; \
+		echo "    VAULT_NAMESPACE=ns      Vault Enterprise namespace (default: none)"; \
 		echo ""; \
 		exit 1; \
 	fi
 	@python3 scripts/import_from_grafana.py "$(ENV)" \
 		--grafana-url="$(GRAFANA_URL)" --auth="$(AUTH)" \
 		$(if $(filter true,$(NO_TF_IMPORT)),--no-tf-import,) \
-		$(if $(filter true,$(NO_DASHBOARDS)),--no-dashboards,)
+		$(if $(filter true,$(NO_DASHBOARDS)),--no-dashboards,) \
+		$(if $(VAULT_MOUNT),--vault-mount="$(VAULT_MOUNT)",) \
+		$(if $(VAULT_NAMESPACE),--vault-namespace="$(VAULT_NAMESPACE)",)
 
 # Promote configuration from one environment to another
 # Usage: make promote FROM=staging TO=prod

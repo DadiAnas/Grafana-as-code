@@ -18,26 +18,30 @@ terraform {
 }
 
 # Vault provider for secrets management
+# When use_vault is false the provider is still declared (required by Terraform)
+# but no actual calls are made — all vault data sources use count = 0.
 provider "vault" {
-  address   = var.vault_address
-  token     = var.vault_token != "" ? var.vault_token : null
-  namespace = var.vault_namespace != "" ? var.vault_namespace : null
-  # Or use other auth methods like approle, kubernetes, etc.
+  address   = var.use_vault ? var.vault_address : "http://localhost:8200"
+  token     = var.use_vault && var.vault_token != "" ? var.vault_token : null
+  namespace = var.use_vault && var.vault_namespace != "" ? var.vault_namespace : null
+  skip_child_token = !var.use_vault
 }
 
-# Fetch Grafana credentials from Vault
+# Fetch Grafana credentials from Vault (only when use_vault is true)
 # Path: var.vault_mount / var.vault_path_grafana_auth
 data "vault_kv_secret_v2" "grafana_auth" {
+  count = var.use_vault ? 1 : 0
+
   mount     = var.vault_mount
   name      = replace(var.vault_path_grafana_auth, "{env}", var.environment)
   namespace = var.vault_namespace != "" ? var.vault_namespace : null
 }
 
 # Fetch Keycloak provider credentials from Vault (optional)
-# Only fetched when keycloak management is enabled
+# Only fetched when keycloak management is enabled AND Vault is active
 # Path: var.vault_mount / var.vault_path_keycloak
 data "vault_kv_secret_v2" "keycloak_provider_auth" {
-  count = local.keycloak_config.enabled ? 1 : 0
+  count = var.use_vault && local.keycloak_config.enabled ? 1 : 0
 
   mount     = var.vault_mount
   name      = replace(var.vault_path_keycloak, "{env}", var.environment)
@@ -46,12 +50,12 @@ data "vault_kv_secret_v2" "keycloak_provider_auth" {
 
 # Local values for Keycloak provider auth
 locals {
-  keycloak_auth = local.keycloak_config.enabled ? data.vault_kv_secret_v2.keycloak_provider_auth[0].data : {}
+  keycloak_auth = var.use_vault && local.keycloak_config.enabled ? data.vault_kv_secret_v2.keycloak_provider_auth[0].data : {}
 }
 
 provider "grafana" {
   url  = var.grafana_url
-  auth = data.vault_kv_secret_v2.grafana_auth.data["credentials"]
+  auth = var.use_vault ? data.vault_kv_secret_v2.grafana_auth[0].data["credentials"] : var.grafana_auth
 }
 
 # Keycloak provider - optional, only used if keycloak module is enabled
@@ -83,9 +87,11 @@ module "organizations" {
   organizations = local.organizations_config
 }
 
-# Vault secrets module - fetch all secrets from Vault
+# Vault secrets module - fetch all secrets from Vault (only when use_vault is true)
 module "vault_secrets" {
   source = "./modules/vault"
+
+  count = var.use_vault ? 1 : 0
 
   environment     = var.environment
   vault_mount     = var.vault_mount
@@ -102,6 +108,14 @@ module "vault_secrets" {
   contact_point_names   = local.contact_point_names
   load_sso_secrets      = true
   load_keycloak_secrets = local.keycloak_config.enabled
+}
+
+# Convenience locals — empty maps when Vault is disabled
+locals {
+  vault_ds_creds = var.use_vault ? module.vault_secrets[0].datasource_credentials : {}
+  vault_cp_creds = var.use_vault ? module.vault_secrets[0].contact_point_credentials : {}
+  vault_sso_creds = var.use_vault ? module.vault_secrets[0].sso_credentials : {}
+  vault_kc_creds  = var.use_vault ? module.vault_secrets[0].keycloak_credentials : {}
 }
 
 # Load all modules
@@ -137,9 +151,9 @@ module "datasources" {
 
   datasources       = local.datasources_config
   org_ids           = module.organizations.organization_ids
-  vault_credentials = module.vault_secrets.datasource_credentials
+  vault_credentials = local.vault_ds_creds
 
-  depends_on = [module.organizations, module.vault_secrets]
+  depends_on = [module.organizations]
 }
 
 module "dashboards" {
@@ -163,9 +177,9 @@ module "alerting" {
   notification_policies = local.notification_policies_config
   folder_ids            = module.folders.folder_ids
   org_ids               = module.organizations.organization_ids
-  vault_credentials     = module.vault_secrets.contact_point_credentials
+  vault_credentials     = local.vault_cp_creds
 
-  depends_on = [module.folders, module.datasources, module.vault_secrets, module.organizations]
+  depends_on = [module.folders, module.datasources, module.organizations]
 }
 
 module "service_accounts" {
@@ -183,12 +197,12 @@ module "sso" {
   source = "./modules/sso"
 
   sso_config        = local.sso_config
-  vault_credentials = module.vault_secrets.sso_credentials
+  vault_credentials = local.vault_sso_creds
 
   # Pass org IDs to use numeric IDs instead of names (avoids space issues)
   org_ids = module.organizations.organization_ids
 
-  depends_on = [module.vault_secrets, module.organizations]
+  depends_on = [module.organizations]
 }
 
 # Keycloak Client Module - OPTIONAL
@@ -199,7 +213,7 @@ module "keycloak" {
 
   enabled           = try(local.keycloak_config.enabled, false)
   keycloak_config   = local.keycloak_config
-  vault_credentials = module.vault_secrets.keycloak_credentials
+  vault_credentials = local.vault_kc_creds
 
-  depends_on = [module.vault_secrets]
+  depends_on = [module.organizations]
 }

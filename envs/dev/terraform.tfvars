@@ -16,12 +16,18 @@
 # The full URL of your Grafana instance (including protocol and port)
 grafana_url = "http://localhost:3000"
 
+# Direct Grafana auth — used when use_vault is false.
+# Format: "admin:password" or a service-account/API token (glsa_...).
+grafana_auth = "admin:admin"
+
 # Environment name — used to locate envs/ subdirectory
 # Must match: envs/dev/ and envs/dev/dashboards/
 environment = "dev"
 
-# ─── Vault Configuration ────────────────────────────────────────────
-# HashiCorp Vault for secrets management (datasource passwords, SSO secrets)
+# ─── Vault Configuration (OPTIONAL) ──────────────────────────────────
+# Set use_vault = true to enable Vault-based secrets management.
+# When false (default), grafana_auth above is used directly.
+use_vault     = false
 vault_address = "http://localhost:8200"
 vault_mount   = "grafana"
 
@@ -41,9 +47,6 @@ vault_mount   = "grafana"
 
 # ─── Additional Variables ────────────────────────────────────────────
 # Uncomment and set any additional variables your Terraform config needs:
-#
-# # Grafana authentication (alternative to Vault-stored API key)
-# # grafana_auth = "admin:admin"          # Only for local dev!
 #
 # # Terraform state locking timeout
 # # lock_timeout = "5m"
