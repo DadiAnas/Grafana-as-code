@@ -1,4 +1,4 @@
-# Imported from http://localhost:3000 on 2026-03-06T06:24:51.054383
+# Imported from http://localhost:3000 on 2026-03-06T12:58:38.714162
 
 contactPoints:
 - name: "email receiver"
@@ -50,8 +50,8 @@ contactPoints:
       tlsClientCert: "VAULT_SECRET_REQUIRED"
       tlsClientKey: "VAULT_SECRET_REQUIRED"
       authorizationCredentials: "VAULT_SECRET_REQUIRED"
-    vault_secrets: "\u26A0 Fill in Vault at grafana/dev/contact_points/webhook-npr:\
-      \ tlsClientCert, tlsClientKey, authorizationCredentials"
+    vault_secrets: "grafana/dev/alerting/contact-points/webhook-npr: tlsClientCert,\
+      \ tlsClientKey, authorizationCredentials"
     disableResolveMessage: false
 - name: "empty"
   org: "Main Org."

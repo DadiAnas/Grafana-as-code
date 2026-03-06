@@ -1,4 +1,4 @@
-# Imported from http://localhost:3000 on 2026-03-06T06:24:51.078000
+# Imported from http://localhost:3000 on 2026-03-06T12:58:38.737175
 
 contactPoints:
 - name: "email receiver"
@@ -43,8 +43,8 @@ contactPoints:
       tlsClientCert: "VAULT_SECRET_REQUIRED"
       tlsClientKey: "VAULT_SECRET_REQUIRED"
       authorizationCredentials: "VAULT_SECRET_REQUIRED"
-    vault_secrets: "\u26A0 Fill in Vault at grafana/dev/contact_points/platform-webhook:\
-      \ tlsClientCert, tlsClientKey, authorizationCredentials"
+    vault_secrets: "grafana/dev/alerting/contact-points/platform-webhook: tlsClientCert,\
+      \ tlsClientKey, authorizationCredentials"
     disableResolveMessage: false
 - name: "platform-webhook-npr"
   org: "Platform Team"
@@ -59,8 +59,8 @@ contactPoints:
       tlsClientCert: "VAULT_SECRET_REQUIRED"
       tlsClientKey: "VAULT_SECRET_REQUIRED"
       authorizationCredentials: "VAULT_SECRET_REQUIRED"
-    vault_secrets: "\u26A0 Fill in Vault at grafana/dev/contact_points/platform-webhook-npr:\
-      \ tlsClientCert, tlsClientKey, authorizationCredentials"
+    vault_secrets: "grafana/dev/alerting/contact-points/platform-webhook-npr: tlsClientCert,\
+      \ tlsClientKey, authorizationCredentials"
     disableResolveMessage: false
 - name: "empty"
   org: "Platform Team"

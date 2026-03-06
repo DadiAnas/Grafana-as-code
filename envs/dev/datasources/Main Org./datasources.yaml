@@ -1,4 +1,4 @@
-# Imported from http://localhost:3000 on 2026-03-06T06:24:50.015158
+# Imported from http://localhost:3000 on 2026-03-06T12:58:37.588510
 
 datasources:
 - name: "Elasticsearch"
@@ -50,9 +50,8 @@ datasources:
     timeInterval: "15s"
   http_headers:
     X-Custom-Header: ""
-  use_vault: true
-  vault_secret_fields: "Store in Vault at grafana/<env>/datasources/My Prometheus:\
-    \ httpHeader:X-Custom-Header"
+  use_vault: false
+  vault_secret_fields: "grafana/dev/datasources/My Prometheus: httpHeader:X-Custom-Header"
 - name: "PostgreSQL"
   uid: "postgres"
   type: "grafana-postgresql-datasource"

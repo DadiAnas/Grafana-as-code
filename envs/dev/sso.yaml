@@ -1,7 +1,7 @@
 # Imported from Grafana SSO settings
 #
 # This file follows the project format expected by modules/sso.
-# Client secret is stored in Vault — see vault-setup.
+# Client secret Vault path: grafana/dev/sso/keycloak
 
 sso:
   enabled: true

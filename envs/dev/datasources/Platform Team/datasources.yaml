@@ -1,4 +1,4 @@
-# Imported from http://localhost:3000 on 2026-03-06T06:24:50.028285
+# Imported from http://localhost:3000 on 2026-03-06T12:58:37.626573
 
 datasources:
 - name: "Debug-Prometheus"
@@ -16,9 +16,8 @@ datasources:
     sigV4Auth: false
     timeInterval: "5s"
     timeout: 20
-  use_vault: true
-  vault_secret_fields: "Store in Vault at grafana/<env>/datasources/Debug-Prometheus:\
-    \ basicAuthPassword"
+  use_vault: false
+  vault_secret_fields: "grafana/dev/datasources/Debug-Prometheus: basicAuthPassword"
 - name: "Platform-Loki"
   uid: "platform-loki"
   type: "loki"
