@@ -6,51 +6,117 @@
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit)](https://pre-commit.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Manage your Grafana instance entirely as code using Terraform. Import an existing Grafana setup, or build one from scratch — organizations, folders, dashboards, datasources, teams, service accounts, alerting, and SSO are all defined in simple YAML files that are version-controlled, reviewable, and repeatable.
+Manage your entire Grafana instance as code — organizations, dashboards, datasources, folders, teams, alerting, SSO — all defined in YAML, version-controlled, and deployed with Terraform.
 
 ![Grafana as Code Architecture](docs/images/architecture.png)
 
 ---
 
-## Table of Contents
+## Prerequisites
 
-- [Features](#-features)
-- [Project Structure](#-project-structure)
-- [Prerequisites](#-prerequisites)
-- [Getting Started](#-getting-started)
-- [Import from Grafana](#-import-from-grafana)
-- [Configuration Reference](#-configuration-reference)
-- [Terraform Workflow](#-terraform-workflow)
-- [Environment Management](#-environment-management)
-- [Operations](#-operations)
-- [Vault & Secrets](#-vault--secrets)
-- [CI/CD](#-cicd)
-- [Troubleshooting](#-troubleshooting)
-- [Contributing](#-contributing)
+- **Terraform** >= 1.6.0
+- **Python 3** (used by the import script)
+- **curl** (used by API scripts)
+- **Grafana** instance with admin access (basic auth or service account token)
+- **HashiCorp Vault** for secrets management
+- **Docker** *(optional)* for local development
+- **Keycloak** *(optional)* for SSO
 
 ---
 
-## ✨ Features
+## Quick-Start (5 minutes)
 
-| Category | Capabilities |
+### Already have a Grafana running? Import it.
+
+```bash
+# 1. Export your Vault token (required for Terraform)
+export VAULT_TOKEN="your-token"
+
+# 2. Import everything — YAML files + Terraform state, all in one command
+make import ENV=prod \
+  GRAFANA_URL=https://grafana.example.com \
+  AUTH=admin:password
+
+# 3. Verify — should show NO changes
+make plan ENV=prod
+
+# 4. Done. From now on: edit YAML → plan → apply.
+```
+
+### Starting from scratch?
+
+```bash
+make new-env NAME=staging GRAFANA_URL=https://grafana.example.com
+# Edit the generated YAML files in envs/staging/
+make vault-setup ENV=staging
+make init ENV=staging && make plan ENV=staging && make apply ENV=staging
+```
+
+### Local development?
+
+```bash
+make dev-up                      # Starts Grafana + Vault + Keycloak via Docker
+make dev-bootstrap               # Seeds Vault and creates dev env
+export VAULT_TOKEN=root
+make plan ENV=dev && make apply ENV=dev
+```
+
+---
+
+## Command Cheat Sheet
+
+Run `make help` for the full list. Here are the commands you'll use 95% of the time:
+
+| What you want to do | Command |
+|---------------------|---------|
+| **Import** existing Grafana | `make import ENV=prod GRAFANA_URL=... AUTH=...` |
+| Import (YAML only, no TF state) | `make import ... NO_TF_IMPORT=true` |
+| Import (skip dashboards) | `make import ... NO_DASHBOARDS=true` |
+| **Preview** changes | `make plan ENV=prod` |
+| **Deploy** changes | `make apply ENV=prod` |
+| Create a new environment | `make new-env NAME=staging GRAFANA_URL=...` |
+| Validate YAML schemas | `make validate-config ENV=prod` |
+| Detect drift | `make drift ENV=prod` |
+| Set up Vault secrets | `make vault-setup ENV=prod` |
+| Start local dev stack | `make dev-up` |
+
+> **Tip:** Always `export VAULT_TOKEN=...` before running `plan`, `apply`, or `import`.
+
+---
+
+## Features
+
+| Category | What it does |
 |----------|-------------|
-| **Import** | Auto-generate YAML + dashboard JSON from a running Grafana instance, with automatic Terraform state import |
-| **Multi-Environment** | Base + per-environment configs (`dev`, `staging`, `prod`, …) |
-| **Multi-Organization** | Manage multiple Grafana orgs |
-| **Dashboards** | Version-controlled JSON dashboards, organized by org → folder |
-| **Nested Folders** | Auto-discovered from directory structure with team-based permissions |
-| **Alerting** | Alert rules, 20+ contact point types, notification policies, mute timings |
-| **Datasources** | All datasource types with optional Vault-managed credentials |
-| **SSO** | OAuth2/OIDC with wildcard org/group mappings (Keycloak, Okta, Azure AD, …) |
-| **Team Sync** | Keycloak → Grafana team membership sync (OSS script or Enterprise native) |
-| **Secrets** | HashiCorp Vault integration for all sensitive credentials |
-| **Validation** | YAML schema validation (`make validate-config`) + pre-commit hooks |
-| **CI/CD** | GitHub Actions + GitLab CI pipelines with lint, schema check, plan, apply |
-| **Operations** | Drift detection, backup/restore, environment promotion, dashboard diff |
+| **Import** | One command to import a running Grafana → YAML + Terraform state |
+| **Multi-Environment** | `base/` + `envs/dev|staging|prod/` with override merging |
+| **Multi-Organization** | Per-org subdirectories, all resource types scoped to `orgId` |
+| **Dashboards** | Version-controlled JSON, organized by org → folder |
+| **Nested Folders** | Directory-structure-driven, with team-based permissions |
+| **Alerting** | Alert rules, 20+ contact point types, full notification policy routing trees |
+| **Datasources** | All types, with optional Vault-managed secrets |
+| **SSO** | OAuth2/OIDC: Keycloak, Okta, Azure AD — with wildcard org/group mappings |
+| **Team Sync** | Keycloak → Grafana team membership sync (no Enterprise required) |
+| **Secrets** | HashiCorp Vault integration for all sensitive values |
+| **Validation** | YAML schema validation + pre-commit hooks |
+| **CI/CD** | GitHub Actions / GitLab CI: lint → plan → apply pipeline |
+| **Operations** | Drift detection, backup/restore, env promotion, dashboard diff |
 
 ---
 
-## 📁 Project Structure
+## How It Works
+
+**Day-to-day, you only touch 2 directories:**
+
+| What you do | Where |
+|-------------|-------|
+| Edit shared config (all envs) | `base/` |
+| Edit env-specific config | `envs/<env>/` |
+| Run commands | `make plan ENV=prod` |
+
+Everything under `terraform/`, `scripts/`, and `schemas/` is internal plumbing — you don't need to touch it.
+
+### Project Structure
 
 ```
 grafana-as-code/
@@ -116,7 +182,7 @@ grafana-as-code/
 │       └── keycloak/
 │
 ├── scripts/                          ← Automation
-│   ├── import_from_grafana.py         ← Import from existing Grafana
+│   ├── import_from_grafana.py        ← Import from existing Grafana
 │   ├── validate_config.py            ← YAML schema validation
 │   ├── new_env.py                    ← Create new environment
 │   ├── check_env.py                  ← Validate environment structure
@@ -143,199 +209,25 @@ grafana-as-code/
 └── .github/ / .gitlab-ci.yml        ← CI/CD pipelines
 ```
 
-**Day-to-day, you only interact with 2 directories:**
-
-| What you do | Where |
-|-------------|-------|
-| Edit shared config (all envs) | `base/*.yaml` or `base/<resource>/_default/` |
-| Edit env-specific config | `envs/<env>/<Org Name>/` subdirectories |
-| Run commands | `make plan ENV=prod` |
-
-Everything else (`terraform/`, `scripts/`, `modules/`) is internal plumbing.
-
----
-
-## 📋 Prerequisites
-
-- **Terraform** >= 1.6.0
-- **Python 3** (used by the import script)
-- **curl** (used by API scripts)
-- **Grafana** instance with admin access (basic auth or service account token)
-- **HashiCorp Vault** for secrets management
-- **Docker** *(optional)* for local development
-- **Keycloak** *(optional)* for SSO
-
----
-
-## 🚀 Getting Started
-
-### Option A: Import from an Existing Grafana *(recommended)*
-
-The fastest way to adopt Grafana-as-Code is to import your existing Grafana configuration.
-
-```bash
-# 1. Import everything from your Grafana instance
-#    This generates YAML configs AND imports existing resources into Terraform state
-export VAULT_TOKEN="your-token"
-make import ENV=prod \
-  GRAFANA_URL=https://grafana.example.com \
-  AUTH=admin:password
-
-# 2. Review the generated files
-ls envs/prod/
-ls envs/prod/dashboards/
-
-# 3. Set up Vault secrets (datasource passwords, SSO client secrets, etc.)
-make vault-setup ENV=prod
-
-# 4. Plan and apply (init is handled by import)
-make plan  ENV=prod    # ← Review the plan carefully
-make apply ENV=prod
-```
-
-> See the [Import from Grafana](#-import-from-grafana) section for full details.
-
-### Option B: Build from Scratch
-
-```bash
-# 1. Scaffold a new environment
-make new-env NAME=staging \
-  GRAFANA_URL=https://grafana.example.com \
-  DATASOURCES=prometheus,loki,postgres \
-  BACKEND=s3
-
-# 2. Edit the generated YAML files
-vim envs/staging/datasources.yaml
-vim envs/staging/teams.yaml
-
-# 3. Add dashboards
-cp my-dashboard.json envs/staging/dashboards/MainOrg/infrastructure/
-
-# 4. Set up Vault, then deploy
-make vault-setup ENV=staging
-make init  ENV=staging
-make plan  ENV=staging
-make apply ENV=staging
-```
-
-> **Tip:** Edit `envs/staging/datasources/<Org>/datasources.yaml`, `envs/staging/teams/<Org>/teams.yaml`, etc. Files are organized per-org subdirectory.
-
-### Option C: Local Development
-
-```bash
-# 1. Start Grafana + Vault + Keycloak locally
-make dev-up
-
-# 2. Bootstrap dev environment
-make dev-bootstrap
-
-# 3. Deploy
-export VAULT_TOKEN=root
-make init ENV=dev && make plan ENV=dev && make apply ENV=dev
-```
-
----
-
-## 📥 Import from Grafana
-
-The import script (`scripts/import_from_grafana.py`) connects to a running Grafana instance and auto-generates all the YAML configuration files and dashboard JSON needed to manage it with Terraform.
-
-After generating YAML files, it automatically runs `terraform import` for every discovered resource (datasources, folders, teams, service accounts, contact points, notification policies, alert rule groups, and dashboards) so that `terraform plan` shows no drift for existing resources.
-
-> **Note:** `VAULT_TOKEN` must be exported before running `make import` — Terraform needs it to read secrets during the import phase.
-
-### What Gets Imported
-
-| Resource | Output | Notes |
-|----------|--------|-------|
-| Organizations | `envs/<env>/organizations.yaml` | All orgs with ID mappings |
-| Folders | `envs/<env>/folders/<Org>/folders.yaml` | Per-org; UIDs slugified from titles |
-| Dashboards | `envs/<env>/dashboards/<Org>/<folder>/` | JSON files, stripped of `id` and `version` |
-| Datasources | `envs/<env>/datasources/<Org>/datasources.yaml` | Per-org; secrets must be added to Vault |
-| Teams | `envs/<env>/teams/<Org>/teams.yaml` | Per-org |
-| Service Accounts | `envs/<env>/service_accounts/<Org>/service_accounts.yaml` | Per-org; tokens must be re-created |
-| Alert Rules | `envs/<env>/alerting/<Org>/alert_rules.yaml` | Per-org; grouped by folder + rule group |
-| Contact Points | `envs/<env>/alerting/<Org>/contact_points.yaml` | Per-org; all notifier types |
-| Notification Policies | `envs/<env>/alerting/<Org>/notification_policies.yaml` | Per-org; full routing tree |
-| SSO Settings | `envs/<env>/sso.yaml` | OAuth config with group→org mappings |
-| Terraform Variables | `envs/<env>/terraform.tfvars` | Grafana URL, Vault config |
-
-### Usage
-
-```bash
-# Basic import
-make import ENV=prod \
-  GRAFANA_URL=https://grafana.example.com \
-  AUTH=admin:password
-
-# Using an API token instead of basic auth
-make import ENV=prod \
-  GRAFANA_URL=https://grafana.example.com \
-  AUTH=glsa_xxxxxxxxxxxxx
-
-# Skip dashboards (faster, config-only import)
-python3 scripts/import_from_grafana.py prod \
-  --grafana-url=https://grafana.example.com \
-  --auth=admin:password \
-  --no-dashboards
-
-# Generate YAML only — skip terraform state import
-make import ENV=prod \
-  GRAFANA_URL=https://grafana.example.com \
-  AUTH=admin:password
-# Then pass --no-tf-import via direct script invocation:
-python3 scripts/import_from_grafana.py prod \
-  --grafana-url=https://grafana.example.com \
-  --auth=admin:password \
-  --no-tf-import
-```
-
-### Command Options
-
-| Option | Description |
-|--------|-------------|
-| `<env-name>` | *(required)* Target environment name |
-| `--grafana-url=<url>` | *(required)* Grafana instance URL |
-| `--auth=<credentials>` | *(required)* `user:password` or API token |
-| `--no-dashboards` | Skip dashboard JSON export |
-| `--no-tf-import` | Skip automatic Terraform state import (only generate YAML) |
-| `--output-dir=<path>` | Custom output directory (default: project root) |
-
-### Post-Import Steps
-
-1. **Review all generated YAML files** — adjust names, roles, and settings as needed
-2. **Set up Vault secrets** — datasource passwords, SSO client secrets, etc. are not exported
-3. **Run `make plan`** — the import already ran `terraform init` and `terraform import`, so plan should show minimal/no changes
-4. **Apply** — `make apply` converges any remaining cosmetic drift (e.g. dashboard commit messages)
-
----
-
-## 📖 Configuration Reference
-
 ### Merge Behavior
 
-All resources follow a **base + environment override** pattern. Environment-specific configs override base configs that have the same merge key.
-
-```
-base/datasources/_default/datasources.yaml   →  Foundation (applied everywhere)
-envs/staging/datasources/<Org>/datasources.yaml  →  Overrides for staging only
-```
+Environment files **override** base files that share the same merge key:
 
 | Resource | Merge Key |
 |----------|-----------|
 | Organizations | `name` |
 | Folders | `orgId:uid` |
+| Datasources | `orgId:uid` |
 | Teams | `name/orgId` |
 | Service Accounts | `orgId:name` |
-| Datasources | `orgId:uid` |
 | Alert Rules | `orgId:folder-name` |
 | Contact Points | `orgId:name` |
 | Notification Policies | `orgId` |
-| Dashboards | `filepath` (env overrides base) |
+| Dashboards | `filepath` |
 
 ### Multi-Organization Support
 
-All resources are organized in **per-org subdirectories** within each environment. This eliminates Terraform `for_each` duplicate key errors and makes the relationship between resources and organizations explicit:
+All resources are organized in **per-org subdirectories** within each environment:
 
 ```
 envs/prod/
@@ -347,7 +239,7 @@ envs/prod/
     Platform Team/alert_rules.yaml
 ```
 
-Each resource uses `orgId` (numeric) instead of `org` (name string) when importable from Grafana:
+Each resource uses `orgId` (numeric) rather than org name:
 
 ```yaml
 # envs/prod/datasources/Main Org./datasources.yaml
@@ -359,23 +251,89 @@ datasources:
     url: "http://prometheus:9090"
 ```
 
+---
+
+## Import from Grafana
+
+The `make import` command connects to a running Grafana, generates all YAML + dashboard JSON, and imports every resource into Terraform state — so `make plan` shows no changes afterward.
+
+> **Note:** `export VAULT_TOKEN=...` before running `make import` — Terraform needs it during state import.
+
+### What Gets Imported
+
+| Resource | Output |
+|----------|--------|
+| Organizations | `envs/<env>/organizations.yaml` |
+| Folders | `envs/<env>/folders/<Org>/folders.yaml` |
+| Dashboards | `envs/<env>/dashboards/<Org>/<folder>/*.json` |
+| Datasources | `envs/<env>/datasources/<Org>/datasources.yaml` |
+| Teams | `envs/<env>/teams/<Org>/teams.yaml` |
+| Service Accounts | `envs/<env>/service_accounts/<Org>/service_accounts.yaml` |
+| Alert Rules | `envs/<env>/alerting/<Org>/alert_rules.yaml` |
+| Contact Points | `envs/<env>/alerting/<Org>/contact_points.yaml` |
+| Notification Policies | `envs/<env>/alerting/<Org>/notification_policies.yaml` |
+| SSO | `envs/<env>/sso.yaml` |
+| Terraform Variables | `envs/<env>/terraform.tfvars` |
+
+### Usage
+
+```bash
+# Basic import (YAML + Terraform state)
+make import ENV=prod \
+  GRAFANA_URL=https://grafana.example.com \
+  AUTH=admin:password
+
+# Using an API token
+make import ENV=prod \
+  GRAFANA_URL=https://grafana.example.com \
+  AUTH=glsa_xxxxxxxxxxxxx
+
+# YAML only — skip terraform state import
+make import ENV=prod \
+  GRAFANA_URL=https://grafana.example.com \
+  AUTH=admin:password \
+  NO_TF_IMPORT=true
+
+# Skip dashboard JSON export (faster, config-only)
+make import ENV=prod \
+  GRAFANA_URL=https://grafana.example.com \
+  AUTH=admin:password \
+  NO_DASHBOARDS=true
+```
+
+### After Importing
+
+1. **Review** the YAML files — adjust names, roles, settings as needed
+2. **Set up Vault** — `make vault-setup ENV=<env>` (datasource passwords aren't exported)
+3. **Plan** — `make plan ENV=<env>` should show no changes
+4. **Apply** — `make apply ENV=<env>` to converge any cosmetic drift
+
+---
+
+## Configuration Reference
+
+Full YAML reference with all fields and examples: **[docs/configuration-reference.md](docs/configuration-reference.md)**
+
+Quick examples of the most common configs:
+
 ### Organizations
 
 ```yaml
 # base/organizations.yaml
 organizations:
-  - name: "Engineering"
-  - name: "Business Intelligence"
+  - name: "Main Organization"
+    id: 1
+  - name: "Platform Team"
 ```
 
-### Folders & Dashboards
+### Folders
 
 ```yaml
-# base/folders.yaml
+# envs/prod/folders/Main Organization/folders.yaml
 folders:
   - title: "Infrastructure"
     uid: "infrastructure"
-    org: "Engineering"
+    orgId: 1
     permissions:
       - team: "SRE"
         permission: "Edit"
@@ -383,24 +341,18 @@ folders:
         permission: "View"
 ```
 
-Dashboard JSON files go into:
-```
-base/dashboards/<Org>/<folder-uid>/my-dashboard.json         # All environments
-envs/<env>/dashboards/<Org>/<folder-uid>/my-dashboard.json   # Specific environment
-```
-
 ### Datasources
 
 ```yaml
-# envs/prod/datasources/Main Org./datasources.yaml
+# envs/prod/datasources/Main Organization/datasources.yaml
 datasources:
   - name: "Prometheus"
     type: "prometheus"
     uid: "prometheus"
     url: "http://prometheus:9090"
-    orgId: 1              # numeric org ID
+    orgId: 1
     is_default: true
-    use_vault: true       # Load secrets from Vault
+    use_vault: true       # Secrets loaded from Vault
 ```
 
 ### SSO / OAuth2
@@ -416,13 +368,11 @@ sso:
   client_id: "grafana"
 
   groups:
-    # Named group → specific org
     - name: "sre-team"
       org_mappings:
         - orgId: 1
           role: "Admin"
 
-    # Wildcard: all groups → all orgs
     - name: "*"
       wildcard_group: true
       org_mappings:
@@ -430,22 +380,22 @@ sso:
           role: "Viewer"
 ```
 
+> For **alerting**, **teams**, **service accounts**, and more — see the full [Configuration Reference](docs/configuration-reference.md).
+
 ---
 
-## ⚙️ Terraform Workflow
+## Terraform Workflow
 
 ```bash
-make init  ENV=<env>               # Initialize Terraform
-make plan  ENV=<env>               # Preview changes
-make apply ENV=<env>               # Deploy
-make destroy ENV=<env>             # Tear down (with confirmation)
+make init  ENV=<env>     # Initialize Terraform
+make plan  ENV=<env>     # Preview changes
+make apply ENV=<env>     # Deploy
+make destroy ENV=<env>   # Tear down (asks for confirmation)
 ```
-
-All `terraform` commands run via `terraform -chdir=terraform` — you always execute `make` from the project root.
 
 ---
 
-## 🌍 Environment Management
+## Environment Management
 
 ![Grafana as Code Environments](docs/images/environments.png)
 
@@ -472,98 +422,83 @@ make dry-run NAME=staging
 
 ---
 
-## 🔧 Operations
+## Operations
 
 | Command | Description |
 |---------|-------------|
-| `make drift ENV=staging` | Detect changes made outside Terraform |
-| `make backup ENV=prod` | Snapshot Grafana's live state via API |
+| `make drift ENV=<env>` | Detect changes made outside Terraform |
+| `make backup ENV=<env>` | Snapshot Grafana's live state via API |
 | `make promote FROM=staging TO=prod` | Diff and copy configs between environments |
-| `make dashboard-diff ENV=staging` | Human-readable dashboard change summary |
-| `make team-sync ENV=prod GRAFANA_URL=... AUTH=... KEYCLOAK_URL=... KEYCLOAK_USER=... KEYCLOAK_PASS=...` | Sync Keycloak → Grafana teams |
+| `make dashboard-diff ENV=<env>` | Human-readable dashboard change summary |
+| `make team-sync ENV=<env> ...` | Sync Keycloak → Grafana teams |
 
 ---
 
-## 🔐 Vault & Secrets
+## Vault & Secrets
 
 ```bash
 export VAULT_ADDR='http://127.0.0.1:8200'
 export VAULT_TOKEN='your-root-token'
 
-make vault-setup ENV=staging       # Create secrets
-make vault-verify ENV=staging      # Verify secrets exist
+make vault-setup  ENV=<env>    # Create secrets
+make vault-verify ENV=<env>    # Verify secrets exist
 ```
 
 Datasources with `use_vault: true` automatically load credentials from Vault.
 
 ---
 
-## 🔄 CI/CD
+## CI/CD
 
 ![Grafana as Code CI/CD Merge Workflow](docs/images/merge-workflow.png)
 
 ### GitHub Actions
 
-1. **On PR** — `fmt`, `validate`, YAML lint, **schema validation**, `tflint`, `terraform plan` posted as PR comment
-2. **On merge** — `terraform apply` with GitHub Environment protection
+1. **On PR** — `fmt`, `validate`, YAML lint, schema validation, `terraform plan` as PR comment
+2. **On merge** — `terraform apply` with environment protection
 3. **On schedule** — Drift detection, creates GitHub Issue if changes found
 
 ### GitLab CI
 
-1. **validate** — `fmt`, `validate`, YAML lint, **schema validation**, `tfsec` security scan
-2. **plan** — Per-environment plans with artifacts
-3. **apply** — Manual or auto-apply per environment
+1. **validate** — `fmt`, `validate`, YAML lint, schema validation, `tfsec`
+2. **plan** — Per-environment plans
+3. **apply** — Manual or auto-apply per env
 4. **drift** — Scheduled pipeline
 
 ### Local Validation
 
 ```bash
-# Install pre-commit hooks (one-time setup)
-make pre-commit-install
-
-# Now every git commit automatically runs:
-#   → trailing whitespace / end-of-file fixes
-#   → YAML lint (base/ and envs/ only)
-#   → YAML schema validation (schemas/*.schema.yaml)
-
-# Run all checks manually without committing
-make pre-commit-run
-
-# Validate YAML schemas only
-make validate-config             # all environments
-make validate-config ENV=prod    # single environment
+make pre-commit-install    # One-time setup
+make pre-commit-run        # Run all checks manually
+make validate-config       # Schema-validate all YAML
+make validate-config ENV=prod  # Single environment
 ```
 
 ---
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
 | Issue | Solution |
 |-------|----------|
-| `for_each` duplicate key error | Resources use per-org subdirs (`envs/<env>/<resource>/<Org>/`). Ensure each org subdir has a unique name matching the Grafana org name |
-| Permission denied | Ensure Grafana credentials have `Admin` role |
-| Vault secret not found | Run `make vault-verify ENV=<env>` then `make vault-setup ENV=<env>` |
-| Dashboard import fails | Validate JSON syntax; check folder UID matches directory name |
-| SSO wildcard `*` not working | Use `wildcard_group: true` flag for `name: "*"` groups |
-| Where did `*.tf` files go? | They're in `terraform/`. The Makefile handles `-chdir` automatically |
-| Missing per-org dirs after import | Run `make import ENV=<env>` again — all org dirs are now always created even if empty |
-| Terraform import fails with Vault error | Export `VAULT_TOKEN` before running `make import` — Terraform needs Vault access during the state import phase |
-| Resources already in state | The import script detects and silently skips resources already present in Terraform state |
+| `VAULT_TOKEN` errors | Export it: `export VAULT_TOKEN=root` (local) or your real token |
+| `for_each` duplicate key | Ensure each org subdir has a unique name matching the Grafana org |
+| `terraform plan` shows drift after import | Run `make apply` once — cosmetic drift (dashboard `message` etc.) is normal |
+| Permission denied | Grafana credentials need `Admin` role |
+| Vault secret not found | `make vault-verify ENV=<env>` then `make vault-setup ENV=<env>` |
+| Resources already in state | The import script detects and silently skips them |
+| Dashboard import fails | Check JSON syntax and that folder UID matches the directory name |
+| SSO wildcard not working | Use `wildcard_group: true` for `name: "*"` groups |
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/my-feature`)
-3. Install pre-commit hooks: `make pre-commit-install`
-4. Make changes and commit — hooks run automatically
-5. Push to branch (`git push origin feature/my-feature`)
-6. Open a Pull Request
+1. Fork, create feature branch, `make pre-commit-install`
+2. Make changes, commit (hooks run automatically)
+3. Push, open PR
 
-> Pre-commit hooks check YAML syntax, style, and schema validation before every commit.
-> To skip for a one-off commit: `git commit --no-verify`
+> Skip hooks for a one-off: `git commit --no-verify`
 
-## 📄 License
+## License
 
-MIT License — See [LICENSE](LICENSE) for details.
+MIT — see [LICENSE](LICENSE).

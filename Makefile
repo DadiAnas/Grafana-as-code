@@ -73,6 +73,7 @@ help:
 	@echo "  drift          Detect out-of-band changes        ENV=staging"
 	@echo "  backup         Backup Grafana state via API      ENV=staging"
 	@echo "  import         Import from existing Grafana      ENV=staging AUTH=admin:admin"
+	@echo "                   Optional: NO_TF_IMPORT=true  NO_DASHBOARDS=true"
 	@echo "  promote        Promote configs between envs      FROM=staging TO=prod"
 	@echo "  dashboard-diff Human-readable dashboard diff     ENV=staging"
 	@echo "  team-sync      Sync Keycloak groups → teams      ENV=prod GRAFANA_URL=... AUTH=..."
@@ -286,7 +287,11 @@ team-sync:
 
 # Import from existing Grafana instance
 # Usage: make import ENV=prod GRAFANA_URL=https://grafana.example.com AUTH=admin:admin
-AUTH ?=
+#        make import ENV=prod GRAFANA_URL=... AUTH=... NO_TF_IMPORT=true
+#        make import ENV=prod GRAFANA_URL=... AUTH=... NO_DASHBOARDS=true
+AUTH          ?=
+NO_TF_IMPORT  ?=
+NO_DASHBOARDS ?=
 import:
 	@if [ -z "$(GRAFANA_URL)" ] || [ -z "$(AUTH)" ]; then \
 		echo ""; \
@@ -296,9 +301,16 @@ import:
 		echo "    - Basic auth:  admin:password"; \
 		echo "    - API token:   glsa_xxxxxxxxxx"; \
 		echo ""; \
+		echo "  Optional flags:"; \
+		echo "    NO_TF_IMPORT=true   Skip Terraform state import (YAML only)"; \
+		echo "    NO_DASHBOARDS=true  Skip dashboard JSON export"; \
+		echo ""; \
 		exit 1; \
 	fi
-	@python3 scripts/import_from_grafana.py "$(ENV)" --grafana-url="$(GRAFANA_URL)" --auth="$(AUTH)"
+	@python3 scripts/import_from_grafana.py "$(ENV)" \
+		--grafana-url="$(GRAFANA_URL)" --auth="$(AUTH)" \
+		$(if $(filter true,$(NO_TF_IMPORT)),--no-tf-import,) \
+		$(if $(filter true,$(NO_DASHBOARDS)),--no-dashboards,)
 
 # Promote configuration from one environment to another
 # Usage: make promote FROM=staging TO=prod
