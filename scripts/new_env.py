@@ -890,10 +890,22 @@ _NOTIFICATION_POLICIES_TMPL = """\
 # Override shared notification policies for THIS environment only.
 # Matching is by organization.
 #
-# Policies define HOW alerts are routed to contact points:
-#   - receiver: the default contact point
-#   - group_by: labels to group alerts by
-#   - routes: child policies with label matchers
+# Policies define HOW alerts are routed to contact points.
+#
+# Root policy fields:
+#   receiver:               Default contact point for this org
+#   group_by:               Labels to group alerts by (use ['...'] for all)
+#   group_wait:             Wait before first notification (default: 30s)
+#   group_interval:         Wait between subsequent notifications (default: 5m)
+#   repeat_interval:        Wait before re-sending (default: 4h)
+#
+# Nested route fields (in addition to the above):
+#   matchers:               Prometheus-style: ["severity = critical"]
+#   object_matchers:        Grafana-style: [["label", "op", "value"]]
+#   continue:               Keep matching sibling routes (default: false)
+#   mute_time_intervals:    Suppress notifications during named intervals
+#   active_time_intervals:  Only notify during intervals (Grafana 12.1+)
+#   routes:                 Further nested child policies
 # =============================================================================
 
 policies: []
@@ -908,26 +920,33 @@ policies: []
   #   group_interval: "5m"
   #   repeat_interval: "4h"
   #   routes:
-  #     # Critical alerts \u2192 PagerDuty
+  #     # Critical alerts \u2192 PagerDuty (with object_matchers)
   #     - receiver: "@@ENV@@-pagerduty"
-  #       matchers:
-  #         - "severity = critical"
+  #       object_matchers:
+  #         - ["severity", "=", "critical"]
   #       continue: false
   #       group_wait: "10s"                    # Alert faster for critical
   #
-  #     # Warning alerts \u2192 Slack
+  #     # Warning alerts \u2192 Slack (with prometheus-style matchers)
   #     - receiver: "@@ENV@@-slack"
   #       matchers:
   #         - "severity = warning"
   #       continue: true                       # Also send to default receiver
   #       repeat_interval: "1h"
   #
-  #     # Mute notifications for specific labels
-  #     # - receiver: "@@ENV@@-email-alerts"
-  #     #   matchers:
-  #     #     - "alertname = Watchdog"
-  #     #   mute_time_intervals:
-  #     #     - "weekends"
+  #     # Mute notifications during weekends
+  #     - receiver: "@@ENV@@-email-alerts"
+  #       object_matchers:
+  #         - ["alertname", "=", "Watchdog"]
+  #       mute_time_intervals:
+  #         - "weekends"
+  #
+  #     # Only notify during business hours (Grafana 12.1+)
+  #     - receiver: "@@ENV@@-slack"
+  #       object_matchers:
+  #         - ["team", "=", "business"]
+  #       active_time_intervals:
+  #         - "business-hours"
 """
 
 

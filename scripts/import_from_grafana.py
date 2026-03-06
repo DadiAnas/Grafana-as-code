@@ -22,6 +22,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+import subprocess
+
 import requests
 import yaml
 
@@ -165,6 +167,7 @@ class ImportContext:
     output_dir: Path
     config_dir: Path
     import_dashboards: bool = True
+    skip_tf_import: bool = False
 
     # Mappings built during import
     org_map: dict[int, str] = field(default_factory=dict)  # org_id -> org_name
@@ -172,6 +175,9 @@ class ImportContext:
     folder_uid_map: dict[str, str] = field(default_factory=dict)  # old_uid -> slug_uid
 
     imported_count: int = 0
+
+    # Terraform import commands: list of (resource_address, import_id)
+    tf_imports: list[tuple[str, str]] = field(default_factory=list)
 
 
 # =============================================================================
@@ -266,6 +272,15 @@ def import_datasources(ctx: ImportContext) -> None:
 
         org_datasources = [_process_datasource(ds, org_name, org_id) for ds in datasources_resp]
 
+        # Track terraform imports: grafana_data_source key = "org:uid", import ID = "orgId:uid"
+        if not ctx.skip_tf_import:
+            for ds_entry in org_datasources:
+                tf_key = f"{org_name}:{ds_entry['uid']}"
+                ctx.tf_imports.append((
+                    f'module.datasources.grafana_data_source.datasources["{tf_key}"]',
+                    f"{org_id}:{ds_entry['uid']}",
+                ))
+
         # Always create the dir and file, even if empty
         org_dir = ctx.config_dir / "datasources" / org_name
         org_dir.mkdir(parents=True, exist_ok=True)
@@ -317,6 +332,7 @@ def _process_datasource(ds: dict[str, Any], org_name: str, org_id: int) -> dict[
         "uid": ds.get("uid", ds["name"].lower().replace(" ", "-")),
         "type": ds["type"],
         "url": ds.get("url", ""),
+        "org": org_name,
         "orgId": org_id,
         "access": ds.get("access", "proxy"),
         "is_default": ds.get("isDefault", False),
@@ -463,6 +479,7 @@ def import_folders(ctx: ImportContext) -> None:
                 "title": folder["title"],
                 "uid": new_uid,
                 "_comment_original_uid": old_uid,
+                "org": org_name,
                 "orgId": org_id,
             }
 
@@ -490,6 +507,24 @@ def import_folders(ctx: ImportContext) -> None:
             folder_entry["permissions"] = permissions
             all_folders.append(folder_entry)
             total_folders += 1
+
+            # Track terraform imports for folders
+            if not ctx.skip_tf_import:
+                # Folder key: "OrgName/uid" (top-level) or "OrgName/parent/child" (subfolder)
+                if parent_new:
+                    tf_key = f"{org_name}/{parent_new}/{new_uid}"
+                else:
+                    tf_key = f"{org_name}/{new_uid}"
+                # Import ID uses the ORIGINAL uid (what Grafana knows)
+                ctx.tf_imports.append((
+                    f'module.folders.grafana_folder.{"subfolders" if parent_new else "folders"}["{tf_key}"]',
+                    f"{org_id}:{old_uid}",
+                ))
+                # Folder permissions — TF creates one for every folder, even with no explicit perms
+                ctx.tf_imports.append((
+                    f'module.folders.grafana_folder_permission.permissions["{tf_key}"]',
+                    f"{org_id}:{old_uid}",
+                ))
 
     ctx.client.current_org_id = None
 
@@ -520,7 +555,7 @@ def import_folders(ctx: ImportContext) -> None:
     # Write per-org folder files — always create dir+file for every org
     folders_by_org: dict[str, list[dict[str, Any]]] = {}
     for folder_entry in all_folders:
-        org = ctx.org_map.get(folder_entry.get("orgId"), "__no_org__")
+        org = folder_entry.get("org", "__no_org__")
         folders_by_org.setdefault(org, []).append(folder_entry)
 
     # Ensure every org gets a directory, even with no folders
@@ -567,6 +602,7 @@ def import_teams(ctx: ImportContext) -> None:
         for team in teams:
             team_entry: dict[str, Any] = {
                 "name": team["name"],
+                "org": org_name,
                 "orgId": org_id,
                 "members": [],
             }
@@ -583,12 +619,22 @@ def import_teams(ctx: ImportContext) -> None:
 
             all_teams.append(team_entry)
 
+            # Track terraform import: grafana_team key = "name/org", import ID = "orgId:numericId"
+            if not ctx.skip_tf_import:
+                team_numeric_id = team.get("id")
+                if team_numeric_id:
+                    tf_key = f"{team['name']}/{org_name}"
+                    ctx.tf_imports.append((
+                        f'module.teams.grafana_team.teams["{tf_key}"]',
+                        f"{org_id}:{team_numeric_id}",
+                    ))
+
     ctx.client.current_org_id = None
 
     # Write per-org team files — always create dir+file for every org
     teams_by_org: dict[str, list[dict[str, Any]]] = {}
     for team_entry in all_teams:
-        org = ctx.org_map.get(team_entry.get("orgId"), "__no_org__")
+        org = team_entry.get("org", "__no_org__")
         teams_by_org.setdefault(org, []).append(team_entry)
 
     for org_id in ctx.org_ids:
@@ -633,16 +679,27 @@ def import_service_accounts(ctx: ImportContext) -> None:
                 "name": sa["name"],
                 "role": sa.get("role", "Viewer"),
                 "is_disabled": sa.get("isDisabled", False),
+                "org": org_name,
                 "orgId": org_id,
             }
             all_service_accounts.append(sa_entry)
+
+            # Track terraform import: grafana_service_account key = "org:name", import ID = "orgId:numericId"
+            if not ctx.skip_tf_import:
+                sa_numeric_id = sa.get("id")
+                if sa_numeric_id:
+                    tf_key = f"{org_name}:{sa['name']}"
+                    ctx.tf_imports.append((
+                        f'module.service_accounts.grafana_service_account.service_accounts["{tf_key}"]',
+                        f"{org_id}:{sa_numeric_id}",
+                    ))
 
     ctx.client.current_org_id = None
 
     # Write per-org service account files — always create dir+file for every org
     sa_by_org: dict[str, list[dict[str, Any]]] = {}
     for sa_entry in all_service_accounts:
-        org = ctx.org_map.get(sa_entry.get("orgId"), "__no_org__")
+        org = sa_entry.get("org", "__no_org__")
         sa_by_org.setdefault(org, []).append(sa_entry)
 
     for org_id in ctx.org_ids:
@@ -748,15 +805,34 @@ def import_alerting(ctx: ImportContext) -> None:
         org_name = ctx.org_map[org_id]
 
         contact_points = ctx.client.get("/api/v1/provisioning/contact-points") or []
-        if not contact_points:
-            continue
+
+        # The provisioning API only returns contact points with integrations.
+        # Contact points with NO integrations (e.g. "empty") only appear in
+        # the alertmanager config. We merge them so Terraform can manage them.
+        am_config = ctx.client.get("/api/alertmanager/grafana/config/api/v1/alerts") or {}
+        am_receivers = am_config.get("alertmanager_config", {}).get("receivers", [])
+        provisioned_names = {cp["name"] for cp in contact_points}
+        for am_recv in am_receivers:
+            if am_recv["name"] not in provisioned_names:
+                # Contact point with no integrations — still needs to be tracked
+                contact_points.append({
+                    "name": am_recv["name"],
+                    "type": "__empty__",
+                    "settings": {},
+                    "_no_integrations": True,
+                })
 
         # Group by name
         grouped: dict[str, dict[str, Any]] = {}
         for cp in contact_points:
             name = cp["name"]
+            # Skip building receivers for contact points with no integrations
+            if cp.get("_no_integrations"):
+                if name not in grouped:
+                    grouped[name] = {"name": name, "org": org_name, "orgId": org_id, "receivers": []}
+                continue
             if name not in grouped:
-                grouped[name] = {"name": name, "orgId": org_id, "receivers": []}
+                grouped[name] = {"name": name, "org": org_name, "orgId": org_id, "receivers": []}
 
             recv: dict[str, Any] = {"type": cp["type"]}
             settings = cp.get("settings", {})
@@ -778,19 +854,23 @@ def import_alerting(ctx: ImportContext) -> None:
             grouped[name]["receivers"].append(recv)
             total_cp += 1
 
+        # Track terraform imports: contact points (only those with receivers)
+        if not ctx.skip_tf_import:
+            for cp_entry in grouped.values():
+                if cp_entry.get("receivers"):  # Only CPs with integrations exist in TF
+                    tf_key = f"{org_name}:{cp_entry['name']}"
+                    ctx.tf_imports.append((
+                        f'module.alerting.grafana_contact_point.contact_points["{tf_key}"]',
+                        f"{org_id}:{cp_entry['name']}",
+                    ))
+
         # Always create the org dir and write contact points (even if empty)
         org_dir = alerting_dir / org_name
         org_dir.mkdir(parents=True, exist_ok=True)
-        if grouped:
-            output_file = org_dir / "contact_points.yaml"
-            with open(output_file, "w") as f:
-                f.write(f"# Imported from {ctx.grafana_url} on {datetime.now().isoformat()}\n\n")
-                f.write(yaml_dump({"contactPoints": list(grouped.values())}))
-        else:
-            output_file = org_dir / "contact_points.yaml"
-            with open(output_file, "w") as f:
-                f.write(f"# Imported from {ctx.grafana_url} on {datetime.now().isoformat()}\n\n")
-                f.write(yaml_dump({"contactPoints": []}))
+        output_file = org_dir / "contact_points.yaml"
+        with open(output_file, "w") as f:
+            f.write(f"# Imported from {ctx.grafana_url} on {datetime.now().isoformat()}\n\n")
+            f.write(yaml_dump({"contactPoints": list(grouped.values()) if grouped else []}))
 
     ctx.client.current_org_id = None
 
@@ -809,8 +889,6 @@ def import_alerting(ctx: ImportContext) -> None:
         org_name = ctx.org_map[org_id]
 
         rules = ctx.client.get("/api/v1/provisioning/alert-rules") or []
-        if not rules:
-            continue
 
         groups: dict[str, dict[str, Any]] = {}
         for rule in rules:
@@ -823,6 +901,7 @@ def import_alerting(ctx: ImportContext) -> None:
                 groups[key] = {
                     "name": group_name,
                     "folder": folder,
+                    "org": org_name,
                     "orgId": org_id,
                     "interval": "1m",
                     "rules": [],
@@ -840,6 +919,23 @@ def import_alerting(ctx: ImportContext) -> None:
             }
             groups[key]["rules"].append(r_data)
             total_ar += 1
+
+        # Track terraform imports for rule groups
+        if not ctx.skip_tf_import:
+            for group_entry in groups.values():
+                # TF key: "org:folder_uid-group_name" (uses slugified folder uid)
+                tf_key = f"{org_name}:{group_entry['folder']}-{group_entry['name']}"
+                # Import ID: "orgId:original_folder_uid:group_name"
+                # We need the original folder UID for Grafana — reverse-lookup from slug
+                original_folder_uid = group_entry['folder']
+                for old_uid, slug in ctx.folder_uid_map.items():
+                    if slug == group_entry['folder']:
+                        original_folder_uid = old_uid
+                        break
+                ctx.tf_imports.append((
+                    f'module.alerting.grafana_rule_group.rule_groups["{tf_key}"]',
+                    f"{org_id}:{original_folder_uid}:{group_entry['name']}",
+                ))
 
         # Always create org dir and write alert_rules (even if empty)
         org_dir = alerting_dir / org_name
@@ -869,7 +965,14 @@ def import_alerting(ctx: ImportContext) -> None:
         policy = ctx.client.get("/api/v1/provisioning/policies")
         policy_entry = None
         if policy and policy.get("receiver"):
-            policy_entry = _process_notification_policy(policy, org_id)
+            policy_entry = _process_notification_policy(policy, org_name, org_id)
+
+        # Track terraform import: notification policy key = "org_name", import ID = "orgId:policy"
+        if not ctx.skip_tf_import and policy_entry:
+            ctx.tf_imports.append((
+                f'module.alerting.grafana_notification_policy.policy["{org_name}"]',
+                f"{org_id}:policy",
+            ))
 
         # Always write the file (with or without content)
         org_dir = alerting_dir / org_name
@@ -895,9 +998,16 @@ def import_alerting(ctx: ImportContext) -> None:
     ctx.imported_count += 1
 
 
-def _process_notification_policy(policy: dict[str, Any], org_id: int) -> dict[str, Any]:
-    """Process a notification policy into YAML format."""
+def _process_notification_policy(policy: dict[str, Any], org_name: str, org_id: int) -> dict[str, Any]:
+    """Process a notification policy into YAML format.
+
+    Captures all Grafana provisioning API fields:
+      receiver, group_by, group_wait, group_interval, repeat_interval,
+      matchers (prometheus-style), object_matchers (grafana-style),
+      mute_time_intervals, active_time_intervals, continue, routes.
+    """
     entry: dict[str, Any] = {
+        "org": org_name,
         "orgId": org_id,
         "receiver": policy.get("receiver", "grafana-default-email"),
     }
@@ -910,8 +1020,14 @@ def _process_notification_policy(policy: dict[str, Any], org_id: int) -> dict[st
         entry["group_interval"] = policy["group_interval"]
     if policy.get("repeat_interval"):
         entry["repeat_interval"] = policy["repeat_interval"]
+    if policy.get("matchers"):
+        entry["matchers"] = policy["matchers"]
+    if policy.get("object_matchers"):
+        entry["object_matchers"] = policy["object_matchers"]
     if policy.get("mute_time_intervals"):
-        entry["mute_timings"] = policy["mute_time_intervals"]
+        entry["mute_time_intervals"] = policy["mute_time_intervals"]
+    if policy.get("active_time_intervals"):
+        entry["active_time_intervals"] = policy["active_time_intervals"]
 
     if policy.get("routes"):
         entry["routes"] = [_process_route(r) for r in policy["routes"]]
@@ -920,11 +1036,21 @@ def _process_notification_policy(policy: dict[str, Any], org_id: int) -> dict[st
 
 
 def _process_route(route: dict[str, Any]) -> dict[str, Any]:
-    """Process a notification policy route recursively."""
-    entry: dict[str, Any] = {"receiver": route.get("receiver")}
+    """Process a notification policy route recursively.
 
+    Captures all Grafana provisioning API fields for nested routes:
+      receiver, group_by, group_wait, group_interval, repeat_interval,
+      matchers, object_matchers, mute_time_intervals, active_time_intervals,
+      continue, routes (recursive).
+    """
+    entry: dict[str, Any] = {}
+
+    if route.get("receiver"):
+        entry["receiver"] = route["receiver"]
     if route.get("group_by"):
         entry["group_by"] = route["group_by"]
+    if route.get("matchers"):
+        entry["matchers"] = route["matchers"]
     if route.get("object_matchers"):
         entry["object_matchers"] = route["object_matchers"]
     if route.get("continue") is not None:
@@ -936,7 +1062,9 @@ def _process_route(route: dict[str, Any]) -> dict[str, Any]:
     if route.get("repeat_interval"):
         entry["repeat_interval"] = route["repeat_interval"]
     if route.get("mute_time_intervals"):
-        entry["mute_timings"] = route["mute_time_intervals"]
+        entry["mute_time_intervals"] = route["mute_time_intervals"]
+    if route.get("active_time_intervals"):
+        entry["active_time_intervals"] = route["active_time_intervals"]
 
     if route.get("routes"):
         entry["routes"] = [_process_route(r) for r in route["routes"]]
@@ -958,8 +1086,20 @@ def import_dashboards(ctx: ImportContext) -> None:
         ctx.client.current_org_id = org_id
         org_name = ctx.org_map[org_id]
 
+        # Always create the org directory (consistent with other resources)
+        # Include "general/" — Grafana creates it by default for every org
+        org_dash_dir = dash_dir / org_name
+        org_dash_dir.mkdir(parents=True, exist_ok=True)
+        general_dir = org_dash_dir / "general"
+        general_dir.mkdir(parents=True, exist_ok=True)
+        for d in (org_dash_dir, general_dir):
+            gitkeep = d / ".gitkeep"
+            if not gitkeep.exists():
+                gitkeep.touch()
+
         search_results = ctx.client.get("/api/search?type=dash-db&limit=5000") or []
         if not search_results:
+            print(f"  {Colors.DIM}  0 dashboards for {org_name} (empty directory created){Colors.NC}")
             continue
 
         for dash in search_results:
@@ -982,6 +1122,17 @@ def import_dashboards(ctx: ImportContext) -> None:
                 output_file = folder_path / f"{safe_title}.json"
                 with open(output_file, "w") as f:
                     json.dump(dashboard, f, indent=2)
+
+                # Track terraform import: dashboard key = "org-folder-filename.json"
+                # (TF module replaces "/" with "-" in the file path key)
+                # Import ID = "orgId:dashboard_uid"
+                if not ctx.skip_tf_import:
+                    dashboard_uid = dashboard.get("uid", uid)
+                    tf_key = f"{org_name}-{slug_folder_uid}-{safe_title}.json"
+                    ctx.tf_imports.append((
+                        f'module.dashboards.grafana_dashboard.dashboards["{tf_key}"]',
+                        f"{org_id}:{dashboard_uid}",
+                    ))
 
                 print(f"  {Colors.GREEN}✓{Colors.NC} {org_name}/{slug_folder_uid}/{safe_title}.json")
 
@@ -1272,16 +1423,110 @@ def print_summary(ctx: ImportContext) -> None:
                     org_dash_count = len(list(org_dash_dir.rglob("*.json")))
                     print(f"      {org_name}: {org_dash_count} dashboards")
 
+    if ctx.tf_imports:
+        print(f"\n  Terraform state imports: {len(ctx.tf_imports)} resource(s)")
+
     print("")
     print(f"  {Colors.YELLOW}⚠  Review and adjust the generated YAML files before applying!{Colors.NC}")
     print("  Some values (SSO, secrets, Keycloak) need manual configuration.")
     print("")
     print("  Next steps:")
-    print(f"    1. Review envs/{ctx.env_name}/*.yaml")
-    print(f"    2. Review envs/{ctx.env_name}/terraform.tfvars")
+    if ctx.skip_tf_import:
+        print(f"    1. Review envs/{ctx.env_name}/*.yaml")
+        print(f"    2. Review envs/{ctx.env_name}/terraform.tfvars")
+    else:
+        print(f"    1. Review envs/{ctx.env_name}/*.yaml")
+        print(f"    2. Review envs/{ctx.env_name}/terraform.tfvars")
     print(f"    3. Set up Vault secrets: make vault-setup ENV={ctx.env_name}")
     print(f"    4. Run: make init ENV={ctx.env_name} && make plan ENV={ctx.env_name}")
     print("")
+
+
+# =============================================================================
+# Terraform State Import
+# =============================================================================
+def run_terraform_imports(ctx: ImportContext) -> None:
+    """Run terraform import for all tracked resources.
+
+    After generating YAML configs, this brings existing Grafana resources into
+    the Terraform state so that ``terraform plan`` shows no drift for resources
+    that already exist.
+
+    The function:
+      1. Runs ``terraform init`` (with backend-config when available).
+      2. Iterates ``ctx.tf_imports`` and runs ``terraform import`` for each.
+      3. Silently skips resources already present in state.
+    """
+    if not ctx.tf_imports:
+        print(f"\n  {Colors.DIM}No resources to import into Terraform state.{Colors.NC}")
+        return
+
+    print(f"\n{Colors.BLUE}[TF]{Colors.NC} Importing {len(ctx.tf_imports)} resource(s) into Terraform state...")
+
+    # Resolve paths
+    tf_dir = ctx.output_dir / "terraform"
+    var_file = f"../envs/{ctx.env_name}/terraform.tfvars"
+    backend_config = f"../envs/{ctx.env_name}/backend.tfbackend"
+
+    if not tf_dir.is_dir():
+        print(f"  {Colors.RED}✗ Terraform directory not found: {tf_dir}{Colors.NC}")
+        return
+
+    # Step 1: terraform init
+    print(f"  {Colors.DIM}Running terraform init...{Colors.NC}")
+    init_cmd = ["terraform", "init", "-input=false"]
+    backend_file = ctx.output_dir / "envs" / ctx.env_name / "backend.tfbackend"
+    if backend_file.exists():
+        init_cmd += [f"-backend-config={backend_config}", "-reconfigure"]
+
+    result = subprocess.run(
+        init_cmd,
+        cwd=str(tf_dir),
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        print(f"  {Colors.RED}✗ terraform init failed:{Colors.NC}")
+        for line in result.stderr.strip().splitlines()[-5:]:
+            print(f"    {line}")
+        return
+
+    print(f"  {Colors.GREEN}✓{Colors.NC} terraform init OK")
+
+    # Step 2: Import each resource
+    imported = 0
+    skipped = 0
+    failed = 0
+
+    for address, import_id in ctx.tf_imports:
+        result = subprocess.run(
+            ["terraform", "import", f"-var-file={var_file}", "-input=false", address, import_id],
+            cwd=str(tf_dir),
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode == 0:
+            imported += 1
+            print(f"  {Colors.GREEN}✓{Colors.NC} {address}")
+        elif "Resource already managed" in result.stderr or "already exists" in result.stderr.lower():
+            skipped += 1
+            print(f"  {Colors.DIM}  ● {address} (already in state){Colors.NC}")
+        else:
+            failed += 1
+            # Extract a meaningful error message
+            err_lines = [l for l in result.stderr.strip().splitlines() if l.strip() and "Error:" in l]
+            err_msg = err_lines[0].strip() if err_lines else result.stderr.strip().splitlines()[-1] if result.stderr.strip() else "unknown error"
+            print(f"  {Colors.YELLOW}⚠{Colors.NC} {address} — {err_msg}")
+
+    # Summary
+    parts = []
+    if imported:
+        parts.append(f"{Colors.GREEN}{imported} imported{Colors.NC}")
+    if skipped:
+        parts.append(f"{Colors.DIM}{skipped} already in state{Colors.NC}")
+    if failed:
+        parts.append(f"{Colors.YELLOW}{failed} failed{Colors.NC}")
+    print(f"\n  Terraform import: {', '.join(parts)}")
 
 
 # =============================================================================
@@ -1302,6 +1547,7 @@ Examples:
     parser.add_argument("--grafana-url", required=True, help="Grafana instance URL")
     parser.add_argument("--auth", required=True, help="API token or user:password")
     parser.add_argument("--no-dashboards", action="store_true", help="Skip dashboard import")
+    parser.add_argument("--no-tf-import", action="store_true", help="Skip terraform state import (only generate YAML)")
     parser.add_argument("--output-dir", help="Output directory (default: project root)")
 
     args = parser.parse_args()
@@ -1327,6 +1573,7 @@ Examples:
         output_dir=output_dir,
         config_dir=config_dir,
         import_dashboards=not args.no_dashboards,
+        skip_tf_import=args.no_tf_import,
     )
 
     # Print header
@@ -1356,6 +1603,10 @@ Examples:
     import_dashboards(ctx)
     import_sso(ctx)
     generate_tfvars(ctx)
+
+    # Import existing resources into Terraform state
+    if not ctx.skip_tf_import:
+        run_terraform_imports(ctx)
 
     # Print summary
     print_summary(ctx)
