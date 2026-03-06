@@ -175,6 +175,7 @@ class ImportContext:
     org_map: dict[int, str] = field(default_factory=dict)  # org_id -> org_name
     org_ids: list[int] = field(default_factory=list)
     folder_uid_map: dict[str, str] = field(default_factory=dict)  # old_uid -> slug_uid
+    folder_path_map: dict[str, str] = field(default_factory=dict)  # old_uid -> nested dir path (e.g. "parent-slug/child-slug")
 
     imported_count: int = 0
 
@@ -444,22 +445,42 @@ def _process_datasource(ds: dict[str, Any], org_name: str, org_id: int, ctx: Imp
     return entry
 
 
+def _fetch_all_folders(client: GrafanaClient) -> list[dict[str, Any]]:
+    """Fetch ALL folders (including nested subfolders) for the current org.
+
+    Grafana's /api/folders only returns top-level folders.
+    We use /api/search?type=dash-folder to get all folders, then normalise
+    the response so each entry has 'uid', 'title', and 'parentUid'.
+    """
+    search_resp = client.get("/api/search?type=dash-folder&limit=5000")
+    if not search_resp:
+        return []
+
+    folders: list[dict[str, Any]] = []
+    for item in search_resp:
+        folders.append({
+            "uid": item["uid"],
+            "title": item["title"],
+            # search uses 'folderUid' for parent; /api/folders uses 'parentUid'
+            "parentUid": item.get("folderUid", ""),
+        })
+    return folders
+
+
 def import_folders(ctx: ImportContext) -> None:
     """Import folders from all organizations."""
     print(f"{Colors.BLUE}[3/8]{Colors.NC} Importing folders...")
 
-    # Phase 1: Build global UID mapping
+    # Phase 1: Build global UID mapping and folder path map
     for org_id in ctx.org_ids:
         ctx.client.current_org_id = org_id
-        folders_resp = ctx.client.get("/api/folders?limit=1000")
-        if folders_resp is None:
+        folders = _fetch_all_folders(ctx.client)
+        if not folders and ctx.client.get("/api/folders?limit=1") is None:
             print(
                 f"  {Colors.YELLOW}⚠{Colors.NC} API request failed for org id={org_id} — "
                 "skipping folder UID mapping for this org (check auth/connectivity)",
                 file=sys.stderr,
             )
-            folders_resp = []
-        folders = folders_resp
 
         used_slugs: set[str] = set()
         top_level = [f for f in folders if not f.get("parentUid")]
@@ -476,6 +497,21 @@ def import_folders(ctx: ImportContext) -> None:
             used_slugs.add(slug)
             ctx.folder_uid_map[old_uid] = slug
 
+        # Build parent lookup for this org: old_uid -> parentUid
+        parent_lookup = {f["uid"]: f.get("parentUid", "") for f in folders}
+
+        # Resolve full nested directory path for each folder
+        def _resolve_path(uid: str) -> str:
+            """Recursively build nested path: parent-slug/.../child-slug."""
+            slug = ctx.folder_uid_map.get(uid, uid)
+            parent_uid = parent_lookup.get(uid, "")
+            if parent_uid:
+                return f"{_resolve_path(parent_uid)}/{slug}"
+            return slug
+
+        for folder in folders:
+            ctx.folder_path_map[folder["uid"]] = _resolve_path(folder["uid"])
+
     ctx.client.current_org_id = None
 
     # Phase 2: Generate folders.yaml
@@ -486,15 +522,7 @@ def import_folders(ctx: ImportContext) -> None:
         ctx.client.current_org_id = org_id
         org_name = ctx.org_map[org_id]
 
-        folders_resp = ctx.client.get("/api/folders?limit=1000")
-        if folders_resp is None:
-            print(
-                f"  {Colors.YELLOW}⚠{Colors.NC} API request failed for org {org_name} (id={org_id}) — "
-                "skipping folders for this org (check auth/connectivity)",
-                file=sys.stderr,
-            )
-            folders_resp = []
-        folders = folders_resp
+        folders = _fetch_all_folders(ctx.client)
         if not folders:
             continue
 
@@ -546,14 +574,14 @@ def import_folders(ctx: ImportContext) -> None:
 
             # Track terraform imports for folders
             if not ctx.skip_tf_import:
-                # Folder key: "OrgName/uid" (top-level) or "OrgName/parent/child" (subfolder)
-                if parent_new:
-                    tf_key = f"{org_name}/{parent_new}/{new_uid}"
-                else:
-                    tf_key = f"{org_name}/{new_uid}"
+                # TF key = "OrgName/nested/path" matching the directory structure
+                # the folder module parses: depth 2 = top-level, depth > 2 = subfolder
+                dir_path = ctx.folder_path_map.get(old_uid, new_uid)
+                tf_key = f"{org_name}/{dir_path}"
+                is_subfolder = bool(parent_new)
                 # Import ID uses the ORIGINAL uid (what Grafana knows)
                 ctx.tf_imports.append((
-                    f'module.folders.grafana_folder.{"subfolders" if parent_new else "folders"}["{tf_key}"]',
+                    f'module.folders.grafana_folder.{"subfolders" if is_subfolder else "folders"}["{tf_key}"]',
                     f"{org_id}:{old_uid}",
                 ))
                 # Folder permissions — TF creates one for every folder, even with no explicit perms
@@ -564,23 +592,16 @@ def import_folders(ctx: ImportContext) -> None:
 
     ctx.client.current_org_id = None
 
-    # Phase 3: Create dashboard directories
+    # Phase 3: Create dashboard directories (nested for subfolders)
     dash_base = ctx.output_dir / "envs" / ctx.env_name / "dashboards"
     for org_id in ctx.org_ids:
         ctx.client.current_org_id = org_id
         org_name = ctx.org_map[org_id]
 
-        folders_resp = ctx.client.get("/api/folders?limit=1000")
-        if folders_resp is None:
-            print(
-                f"  {Colors.YELLOW}⚠{Colors.NC} API request failed for org {org_name} (id={org_id}) — "
-                "skipping dashboard directory creation for this org (check auth/connectivity)",
-                file=sys.stderr,
-            )
-            folders_resp = []
-        for folder in folders_resp:
-            slug_uid = ctx.folder_uid_map.get(folder["uid"], folder["uid"])
-            folder_path = dash_base / org_name / slug_uid
+        folders = _fetch_all_folders(ctx.client)
+        for folder in folders:
+            dir_path = ctx.folder_path_map.get(folder["uid"], ctx.folder_uid_map.get(folder["uid"], folder["uid"]))
+            folder_path = dash_base / org_name / dir_path
             folder_path.mkdir(parents=True, exist_ok=True)
             gitkeep = folder_path / ".gitkeep"
             if not gitkeep.exists():
@@ -1143,10 +1164,11 @@ def import_dashboards(ctx: ImportContext) -> None:
             folder_uid = dash.get("folderUid", "general") or "general"
             title = dash.get("title", "unknown")
 
-            slug_folder_uid = ctx.folder_uid_map.get(folder_uid, folder_uid)
+            # Use nested path for subfolders (e.g. "parent-slug/child-slug")
+            slug_folder_path = ctx.folder_path_map.get(folder_uid, ctx.folder_uid_map.get(folder_uid, folder_uid))
             safe_title = safe_filename(title)
 
-            folder_path = dash_dir / org_name / slug_folder_uid
+            folder_path = dash_dir / org_name / slug_folder_path
             folder_path.mkdir(parents=True, exist_ok=True)
 
             dash_data = ctx.client.get(f"/api/dashboards/uid/{uid}")
@@ -1164,13 +1186,13 @@ def import_dashboards(ctx: ImportContext) -> None:
                 # Import ID = "orgId:dashboard_uid"
                 if not ctx.skip_tf_import:
                     dashboard_uid = dashboard.get("uid", uid)
-                    tf_key = f"{org_name}-{slug_folder_uid}-{safe_title}.json"
+                    tf_key = f"{org_name}-{slug_folder_path.replace('/', '-')}-{safe_title}.json"
                     ctx.tf_imports.append((
                         f'module.dashboards.grafana_dashboard.dashboards["{tf_key}"]',
                         f"{org_id}:{dashboard_uid}",
                     ))
 
-                print(f"  {Colors.GREEN}✓{Colors.NC} {org_name}/{slug_folder_uid}/{safe_title}.json")
+                print(f"  {Colors.GREEN}✓{Colors.NC} {org_name}/{slug_folder_path}/{safe_title}.json")
 
     ctx.client.current_org_id = None
     print(f"  {Colors.GREEN}✓{Colors.NC} Exported dashboards to envs/{ctx.env_name}/dashboards/")
