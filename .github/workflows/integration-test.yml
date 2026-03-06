@@ -185,7 +185,7 @@ jobs:
       # Step 3: Terraform Init → Plan → Apply
       # ─────────────────────────────────────────────────────────────────
       - name: "Step 3: Terraform Init"
-        run: terraform -chdir=terraform init -backend=false
+        run: terraform -chdir=terraform init -reconfigure
 
       - name: "Step 3: Terraform Plan"
         run: |
