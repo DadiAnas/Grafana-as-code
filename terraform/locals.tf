@@ -38,17 +38,21 @@ locals {
   env_folder_files    = toset(fileset("${local.env_path}/folders", "*/folders.yaml"))
 
   shared_folders_all = flatten([
-    for f in local.shared_folder_files :
-    try(yamldecode(file("${local.base_path}/folders/${f}")).folders, [])
+    for f in local.shared_folder_files : [
+      for folder in try(yamldecode(file("${local.base_path}/folders/${f}")).folders, []) :
+      merge(folder, dirname(f) != "_default" && try(folder.org, null) == null ? { org = dirname(f) } : {})
+    ]
   ])
   env_folders_all = flatten([
-    for f in local.env_folder_files :
-    try(yamldecode(file("${local.env_path}/folders/${f}")).folders, [])
+    for f in local.env_folder_files : [
+      for folder in try(yamldecode(file("${local.env_path}/folders/${f}")).folders, []) :
+      merge(folder, dirname(f) != "_default" && try(folder.org, null) == null ? { org = dirname(f) } : {})
+    ]
   ])
 
-  # Create maps by orgId:uid for merging (env overrides base; supports both orgId and org name)
-  shared_folder_map = { for f in local.shared_folders_all : "${coalesce(try(tostring(f.orgId), null), try(f.org, "_"))}:${f.uid}" => f }
-  env_folder_map    = { for f in local.env_folders_all : "${coalesce(try(tostring(f.orgId), null), try(f.org, "_"))}:${f.uid}" => f }
+  # Create maps by org:uid for merging (env overrides base; org derived from dir name when missing)
+  shared_folder_map = { for f in local.shared_folders_all : "${coalesce(try(f.org, null), try(tostring(f.orgId), "_"))}:${f.uid}" => f }
+  env_folder_map    = { for f in local.env_folders_all : "${coalesce(try(f.org, null), try(tostring(f.orgId), "_"))}:${f.uid}" => f }
   merged_folder_map = merge(local.shared_folder_map, local.env_folder_map)
 
   folders_config = {
@@ -63,17 +67,21 @@ locals {
   env_team_files    = toset(fileset("${local.env_path}/teams", "*/teams.yaml"))
 
   shared_teams_all = flatten([
-    for f in local.shared_team_files :
-    try(yamldecode(file("${local.base_path}/teams/${f}")).teams, [])
+    for f in local.shared_team_files : [
+      for team in try(yamldecode(file("${local.base_path}/teams/${f}")).teams, []) :
+      merge(team, dirname(f) != "_default" && try(team.org, null) == null ? { org = dirname(f) } : {})
+    ]
   ])
   env_teams_all = flatten([
-    for f in local.env_team_files :
-    try(yamldecode(file("${local.env_path}/teams/${f}")).teams, [])
+    for f in local.env_team_files : [
+      for team in try(yamldecode(file("${local.env_path}/teams/${f}")).teams, []) :
+      merge(team, dirname(f) != "_default" && try(team.org, null) == null ? { org = dirname(f) } : {})
+    ]
   ])
 
-  # Create maps by orgId/name for merging (env overrides base)
-  shared_team_map = { for t in local.shared_teams_all : "${t.name}/${coalesce(try(tostring(t.orgId), null), try(t.org, "_"))}" => t }
-  env_team_map    = { for t in local.env_teams_all : "${t.name}/${coalesce(try(tostring(t.orgId), null), try(t.org, "_"))}" => t }
+  # Create maps by name/org for merging (env overrides base; org derived from dir name when missing)
+  shared_team_map = { for t in local.shared_teams_all : "${t.name}/${coalesce(try(t.org, null), try(tostring(t.orgId), "_"))}" => t }
+  env_team_map    = { for t in local.env_teams_all : "${t.name}/${coalesce(try(t.org, null), try(tostring(t.orgId), "_"))}" => t }
   merged_team_map = merge(local.shared_team_map, local.env_team_map)
 
   teams_config = {
@@ -88,17 +96,21 @@ locals {
   env_sa_files    = toset(fileset("${local.env_path}/service_accounts", "*/service_accounts.yaml"))
 
   shared_service_accounts_all = flatten([
-    for f in local.shared_sa_files :
-    try(yamldecode(file("${local.base_path}/service_accounts/${f}")).service_accounts, [])
+    for f in local.shared_sa_files : [
+      for sa in try(yamldecode(file("${local.base_path}/service_accounts/${f}")).service_accounts, []) :
+      merge(sa, dirname(f) != "_default" && try(sa.org, null) == null ? { org = dirname(f) } : {})
+    ]
   ])
   env_service_accounts_all = flatten([
-    for f in local.env_sa_files :
-    try(yamldecode(file("${local.env_path}/service_accounts/${f}")).service_accounts, [])
+    for f in local.env_sa_files : [
+      for sa in try(yamldecode(file("${local.env_path}/service_accounts/${f}")).service_accounts, []) :
+      merge(sa, dirname(f) != "_default" && try(sa.org, null) == null ? { org = dirname(f) } : {})
+    ]
   ])
 
-  # Create maps by orgId:name for merging (env overrides base)
-  shared_sa_map = { for sa in local.shared_service_accounts_all : "${coalesce(try(tostring(sa.orgId), null), try(sa.org, "_"))}:${sa.name}" => sa }
-  env_sa_map    = { for sa in local.env_service_accounts_all : "${coalesce(try(tostring(sa.orgId), null), try(sa.org, "_"))}:${sa.name}" => sa }
+  # Create maps by org:name for merging (env overrides base; org derived from dir name when missing)
+  shared_sa_map = { for sa in local.shared_service_accounts_all : "${coalesce(try(sa.org, null), try(tostring(sa.orgId), "_"))}:${sa.name}" => sa }
+  env_sa_map    = { for sa in local.env_service_accounts_all : "${coalesce(try(sa.org, null), try(tostring(sa.orgId), "_"))}:${sa.name}" => sa }
   merged_sa_map = merge(local.shared_sa_map, local.env_sa_map)
 
   service_accounts_config = {
@@ -113,17 +125,21 @@ locals {
   env_ds_files    = toset(fileset("${local.env_path}/datasources", "*/datasources.yaml"))
 
   shared_datasources_all = flatten([
-    for f in local.shared_ds_files :
-    try(yamldecode(file("${local.base_path}/datasources/${f}")).datasources, [])
+    for f in local.shared_ds_files : [
+      for ds in try(yamldecode(file("${local.base_path}/datasources/${f}")).datasources, []) :
+      merge(ds, dirname(f) != "_default" && try(ds.org, null) == null ? { org = dirname(f) } : {})
+    ]
   ])
   env_datasources_all = flatten([
-    for f in local.env_ds_files :
-    try(yamldecode(file("${local.env_path}/datasources/${f}")).datasources, [])
+    for f in local.env_ds_files : [
+      for ds in try(yamldecode(file("${local.env_path}/datasources/${f}")).datasources, []) :
+      merge(ds, dirname(f) != "_default" && try(ds.org, null) == null ? { org = dirname(f) } : {})
+    ]
   ])
 
-  # Create maps by orgId:uid for merging (env overrides base)
-  shared_ds_map = { for ds in local.shared_datasources_all : "${coalesce(try(tostring(ds.orgId), null), try(ds.org, "_"))}:${ds.uid}" => ds }
-  env_ds_map    = { for ds in local.env_datasources_all : "${coalesce(try(tostring(ds.orgId), null), try(ds.org, "_"))}:${ds.uid}" => ds }
+  # Create maps by org:uid for merging (env overrides base; org derived from dir name when missing)
+  shared_ds_map = { for ds in local.shared_datasources_all : "${coalesce(try(ds.org, null), try(tostring(ds.orgId), "_"))}:${ds.uid}" => ds }
+  env_ds_map    = { for ds in local.env_datasources_all : "${coalesce(try(ds.org, null), try(tostring(ds.orgId), "_"))}:${ds.uid}" => ds }
   merged_ds_map = merge(local.shared_ds_map, local.env_ds_map)
 
   datasources_config = {
@@ -138,16 +154,20 @@ locals {
   env_ar_files    = toset(fileset("${local.env_path}/alerting", "*/alert_rules.yaml"))
 
   shared_alert_rules_all = flatten([
-    for f in local.shared_ar_files :
-    try(yamldecode(file("${local.base_path}/alerting/${f}")).groups, [])
+    for f in local.shared_ar_files : [
+      for g in try(yamldecode(file("${local.base_path}/alerting/${f}")).groups, []) :
+      merge(g, dirname(f) != "_default" && try(g.org, null) == null ? { org = dirname(f) } : {})
+    ]
   ])
   env_alert_rules_all = flatten([
-    for f in local.env_ar_files :
-    try(yamldecode(file("${local.env_path}/alerting/${f}")).groups, [])
+    for f in local.env_ar_files : [
+      for g in try(yamldecode(file("${local.env_path}/alerting/${f}")).groups, []) :
+      merge(g, dirname(f) != "_default" && try(g.org, null) == null ? { org = dirname(f) } : {})
+    ]
   ])
 
-  shared_ar_map = { for g in local.shared_alert_rules_all : "${coalesce(try(tostring(g.orgId), null), try(g.org, "_"))}:${g.folder}-${g.name}" => g }
-  env_ar_map    = { for g in local.env_alert_rules_all : "${coalesce(try(tostring(g.orgId), null), try(g.org, "_"))}:${g.folder}-${g.name}" => g }
+  shared_ar_map = { for g in local.shared_alert_rules_all : "${coalesce(try(g.org, null), try(tostring(g.orgId), "_"))}:${g.folder}-${g.name}" => g }
+  env_ar_map    = { for g in local.env_alert_rules_all : "${coalesce(try(g.org, null), try(tostring(g.orgId), "_"))}:${g.folder}-${g.name}" => g }
   merged_ar_map = merge(local.shared_ar_map, local.env_ar_map)
 
   alert_rules_config = {
@@ -162,16 +182,20 @@ locals {
   env_cp_files    = toset(fileset("${local.env_path}/alerting", "*/contact_points.yaml"))
 
   shared_contact_points_all = flatten([
-    for f in local.shared_cp_files :
-    try(yamldecode(file("${local.base_path}/alerting/${f}")).contactPoints, [])
+    for f in local.shared_cp_files : [
+      for cp in try(yamldecode(file("${local.base_path}/alerting/${f}")).contactPoints, []) :
+      merge(cp, dirname(f) != "_default" && try(cp.org, null) == null ? { org = dirname(f) } : {})
+    ]
   ])
   env_contact_points_all = flatten([
-    for f in local.env_cp_files :
-    try(yamldecode(file("${local.env_path}/alerting/${f}")).contactPoints, [])
+    for f in local.env_cp_files : [
+      for cp in try(yamldecode(file("${local.env_path}/alerting/${f}")).contactPoints, []) :
+      merge(cp, dirname(f) != "_default" && try(cp.org, null) == null ? { org = dirname(f) } : {})
+    ]
   ])
 
-  shared_cp_map = { for cp in local.shared_contact_points_all : "${coalesce(try(tostring(cp.orgId), null), try(cp.org, "_"))}:${cp.name}" => cp }
-  env_cp_map    = { for cp in local.env_contact_points_all : "${coalesce(try(tostring(cp.orgId), null), try(cp.org, "_"))}:${cp.name}" => cp }
+  shared_cp_map = { for cp in local.shared_contact_points_all : "${coalesce(try(cp.org, null), try(tostring(cp.orgId), "_"))}:${cp.name}" => cp }
+  env_cp_map    = { for cp in local.env_contact_points_all : "${coalesce(try(cp.org, null), try(tostring(cp.orgId), "_"))}:${cp.name}" => cp }
   merged_cp_map = merge(local.shared_cp_map, local.env_cp_map)
 
   contact_points_config = {
@@ -186,12 +210,16 @@ locals {
   env_np_files    = toset(fileset("${local.env_path}/alerting", "*/notification_policies.yaml"))
 
   shared_notification_policies_all = flatten([
-    for f in local.shared_np_files :
-    try(yamldecode(file("${local.base_path}/alerting/${f}")).policies, [])
+    for f in local.shared_np_files : [
+      for np in try(yamldecode(file("${local.base_path}/alerting/${f}")).policies, []) :
+      merge(np, dirname(f) != "_default" && try(np.org, null) == null ? { org = dirname(f) } : {})
+    ]
   ])
   env_notification_policies_all = flatten([
-    for f in local.env_np_files :
-    try(yamldecode(file("${local.env_path}/alerting/${f}")).policies, [])
+    for f in local.env_np_files : [
+      for np in try(yamldecode(file("${local.env_path}/alerting/${f}")).policies, []) :
+      merge(np, dirname(f) != "_default" && try(np.org, null) == null ? { org = dirname(f) } : {})
+    ]
   ])
 
   shared_np_map = { for np in local.shared_notification_policies_all : coalesce(try(np.org, null), try(tostring(np.orgId), "unknown")) => np }

@@ -1,4 +1,8 @@
 # Schema for: alerting/<Org>/notification_policies.yaml
+#
+# Full Grafana notification policy provisioning format.
+# Reference: https://grafana.com/docs/grafana/latest/alerting/set-up/provision-alerting-resources/file-provisioning/#import-notification-policies
+# Terraform: https://registry.terraform.io/providers/grafana/grafana/latest/docs/resources/notification_policy
 policies: list(include('policy'), required=False)
 
 ---
@@ -10,4 +14,29 @@ policy:
   group_wait: str(required=False)
   group_interval: str(required=False)
   repeat_interval: str(required=False)
-  routes: list(any(), required=False)
+  # Prometheus-style matchers: ["severity = critical", "alertname =~ CPU.*"]
+  matchers: list(str(), required=False)
+  # Grafana object_matchers: [["label", "operator", "value"], ...]
+  object_matchers: list(list(str()), required=False)
+  # Mute timing names (suppress notifications during these intervals)
+  mute_time_intervals: list(str(), required=False)
+  # Active time interval names (only send during these intervals; Grafana 12.1+)
+  active_time_intervals: list(str(), required=False)
+  # Whether to continue matching subsequent sibling policies
+  continue: bool(required=False)
+  # Nested child policies (recursive)
+  routes: list(include('route'), required=False)
+
+---
+route:
+  receiver: str(required=False)
+  group_by: list(str(), required=False)
+  group_wait: str(required=False)
+  group_interval: str(required=False)
+  repeat_interval: str(required=False)
+  matchers: list(str(), required=False)
+  object_matchers: list(list(str()), required=False)
+  mute_time_intervals: list(str(), required=False)
+  active_time_intervals: list(str(), required=False)
+  continue: bool(required=False)
+  routes: list(include('route'), required=False)

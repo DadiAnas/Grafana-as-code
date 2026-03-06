@@ -24,24 +24,28 @@ locals {
 
   # Parse base (shared) dashboards
   shared_dashboards = {
-    for file in local.shared_dashboard_files :
-    replace(file, "/", "-") => {
-      folder_uid    = dirname(file)
-      file_path     = "${var.base_dashboards_path}/${file}"
-      dashboard_uid = replace(basename(file), ".json", "")
-      source        = "base"
-    }
+    for k, v in {
+      for file in local.shared_dashboard_files :
+      replace(file, "/", "-") => {
+        folder_uid    = dirname(file)
+        file_path     = "${var.base_dashboards_path}/${file}"
+        dashboard_uid = replace(basename(file), ".json", "")
+        source        = "base"
+      }...
+    } : k => v[length(v) - 1]
   }
 
   # Parse environment-specific dashboards
   env_dashboards = {
-    for file in local.env_dashboard_files :
-    replace(file, "/", "-") => {
-      folder_uid    = dirname(file)
-      file_path     = "${var.env_dashboards_path}/${file}"
-      dashboard_uid = replace(basename(file), ".json", "")
-      source        = var.environment
-    }
+    for k, v in {
+      for file in local.env_dashboard_files :
+      replace(file, "/", "-") => {
+        folder_uid    = dirname(file)
+        file_path     = "${var.env_dashboards_path}/${file}"
+        dashboard_uid = replace(basename(file), ".json", "")
+        source        = var.environment
+      }...
+    } : k => v[length(v) - 1]
   }
 
   # Merge: environment-specific dashboards override base ones

@@ -1,8 +1,7 @@
 # Create organizations (skip id=1 which is the default org)
 resource "grafana_organization" "orgs" {
   for_each = {
-    for org in var.organizations.organizations : org.name => org
-    if try(org.id, null) != 1
+    for k, v in { for org in var.organizations.organizations : org.name => org... if try(org.id, null) != 1 } : k => v[length(v) - 1]
   }
 
   name    = each.value.name

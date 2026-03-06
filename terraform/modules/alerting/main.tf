@@ -9,24 +9,32 @@ locals {
   # Helper function to resolve org name or ID to numeric ID
   # Priority: org (name lookup) > orgId (numeric fallback) > default to 1
   # Org names are stable across environments; numeric IDs are not.
+  # Keys use coalesce(org_name, tostring(orgId)) — fully static at plan time.
   resolve_org_id = {
-    for cp in try(var.contact_points.contactPoints, []) : "${coalesce(try(cp.org, null), try(tostring(cp.orgId), "_"))}:${cp.name}" => (
-      # If org name is provided, look it up in org_ids map (preferred — stable across envs)
-      try(cp.org, null) != null && try(var.org_ids[cp.org], null) != null ? var.org_ids[cp.org] :
-      # Fallback: if orgId is provided and is a number, use it directly
-      try(tonumber(cp.orgId), null) != null ? tonumber(cp.orgId) :
-      # Default to org 1 (Main Organization)
-      1
-    )
+    for k, v in {
+      for cp in try(var.contact_points.contactPoints, []) : "${coalesce(try(cp.org, null), try(tostring(cp.orgId), "_"))}:${cp.name}" => (
+        # If org name is provided, look it up in org_ids map (preferred — stable across envs)
+        try(cp.org, null) != null && try(var.org_ids[cp.org], null) != null ? var.org_ids[cp.org] :
+        # Fallback: if orgId is provided and is a number, use it directly
+        try(tonumber(cp.orgId), null) != null ? tonumber(cp.orgId) :
+        # Default to org 1 (Main Organization)
+        1
+      )...
+    } : k => v[length(v) - 1]
   }
 
   # Create map for contact points - group by org:name to handle same name across orgs
+  # Contact points with no receivers/integrations (e.g. Grafana's built-in "empty")
+  # are excluded — Terraform requires at least one integration block.
   contact_points_by_name = {
-    for cp in try(var.contact_points.contactPoints, []) : "${coalesce(try(cp.org, null), try(tostring(cp.orgId), "_"))}:${cp.name}" => {
-      name      = cp.name
-      org_id    = local.resolve_org_id["${coalesce(try(cp.org, null), try(tostring(cp.orgId), "_"))}:${cp.name}"]
-      receivers = cp.receivers
-    }
+    for k, v in {
+      for cp in try(var.contact_points.contactPoints, []) : "${coalesce(try(cp.org, null), try(tostring(cp.orgId), "_"))}:${cp.name}" => {
+        name      = cp.name
+        org_id    = local.resolve_org_id["${coalesce(try(cp.org, null), try(tostring(cp.orgId), "_"))}:${cp.name}"]
+        receivers = cp.receivers
+      }...
+      if length(try(cp.receivers, [])) > 0
+    } : k => v[length(v) - 1]
   }
 }
 
@@ -412,44 +420,46 @@ locals {
   # Convert groups to rule_groups map
   # Key: "org:folder-groupname", Value: list of rules with org metadata
   rule_groups = {
-    for group in local.alert_groups :
-    "${try(group.org, "_")}:${group.folder}-${group.name}" => {
-      org              = try(group.org, null)
-      orgId            = try(group.orgId, null)
-      folder           = group.folder
-      name             = group.name
-      interval_seconds = try(tonumber(trimsuffix(group.interval, "m")) * 60, try(tonumber(trimsuffix(group.interval, "s")), 60))
-      # Resolve org ID: priority is org (name lookup) > orgId (numeric fallback) > null
-      # Org names are stable across environments; numeric IDs are not.
-      resolved_org_id = (
-        try(group.org, null) != null && try(var.org_ids[group.org], null) != null ? var.org_ids[group.org] :
-        try(tonumber(group.orgId), null) != null ? tonumber(group.orgId) :
-        null
-      )
-      rules = [
-        for rule in try(group.rules, []) : {
-          name                  = try(rule.title, rule.name)
-          uid                   = try(rule.uid, null)
-          condition             = rule.condition
-          for                   = try(rule.for, "5m")
-          annotations           = try(rule.annotations, {})
-          labels                = try(rule.labels, {})
-          no_data_state         = try(rule.noDataState, try(rule.no_data_state, "NoData"))
-          exec_err_state        = try(rule.execErrState, try(rule.exec_err_state, "Error"))
-          is_paused             = try(rule.isPaused, try(rule.is_paused, false))
-          notification_settings = try(rule.notification_settings, try(rule.notificationSettings, null))
-          data = [
-            for d in rule.data : {
-              ref_id              = try(d.refId, d.ref_id)
-              datasource_uid      = try(d.datasourceUid, d.datasource_uid)
-              query_type          = try(d.queryType, try(d.query_type, null))
-              model               = d.model
-              relative_time_range = try(d.relativeTimeRange, try(d.relative_time_range, { from = 600, to = 0 }))
-            }
-          ]
-        }
-      ]
-    }
+    for k, v in {
+      for group in local.alert_groups :
+      "${coalesce(try(group.org, null), try(tostring(group.orgId), "_"))}:${group.folder}-${group.name}" => {
+        org              = try(group.org, null)
+        orgId            = try(group.orgId, null)
+        folder           = group.folder
+        name             = group.name
+        interval_seconds = try(tonumber(trimsuffix(group.interval, "m")) * 60, try(tonumber(trimsuffix(group.interval, "s")), 60))
+        # Resolve org ID: priority is org (name lookup) > orgId (numeric fallback) > null
+        # Org names are stable across environments; numeric IDs are not.
+        resolved_org_id = (
+          try(group.org, null) != null && try(var.org_ids[group.org], null) != null ? var.org_ids[group.org] :
+          try(tonumber(group.orgId), null) != null ? tonumber(group.orgId) :
+          null
+        )
+        rules = [
+          for rule in try(group.rules, []) : {
+            name                  = try(rule.title, rule.name)
+            uid                   = try(rule.uid, null)
+            condition             = rule.condition
+            for                   = try(rule.for, "5m")
+            annotations           = try(rule.annotations, {})
+            labels                = try(rule.labels, {})
+            no_data_state         = try(rule.noDataState, try(rule.no_data_state, "NoData"))
+            exec_err_state        = try(rule.execErrState, try(rule.exec_err_state, "Error"))
+            is_paused             = try(rule.isPaused, try(rule.is_paused, false))
+            notification_settings = try(rule.notification_settings, try(rule.notificationSettings, null))
+            data = [
+              for d in rule.data : {
+                ref_id              = try(d.refId, d.ref_id)
+                datasource_uid      = try(d.datasourceUid, d.datasource_uid)
+                query_type          = try(d.queryType, try(d.query_type, null))
+                model               = d.model
+                relative_time_range = try(d.relativeTimeRange, try(d.relative_time_range, { from = 600, to = 0 }))
+              }
+            ]
+          }
+        ]
+      }...
+    } : k => v[length(v) - 1]
   }
 }
 
@@ -518,40 +528,42 @@ resource "grafana_rule_group" "rule_groups" {
 locals {
   # Helper function to resolve org name or ID to numeric ID for notification policies
   resolve_np_org_id = {
-    for np in try(var.notification_policies.policies, []) : (
-      # Use org name if provided, otherwise use orgId, fallback to index
-      try(np.org, try(tostring(np.orgId), "unknown"))
-      ) => (
-      # If org name is provided, look it up in org_ids map (preferred — stable across envs)
-      try(np.org, null) != null && try(var.org_ids[np.org], null) != null ? var.org_ids[np.org] :
-      # Fallback: if orgId is provided and is a number, use it directly
-      try(tonumber(np.orgId), null) != null ? tonumber(np.orgId) :
-      # Default to org 1 (Main Organization)
-      1
-    )
+    for k, v in {
+      for np in try(var.notification_policies.policies, []) : (
+        # Use org name if provided, otherwise use orgId as string, fallback to index
+        coalesce(try(np.org, null), try(tostring(np.orgId), "unknown"))
+        ) => (
+        # If org name is provided, look it up in org_ids map (preferred — stable across envs)
+        try(np.org, null) != null && try(var.org_ids[np.org], null) != null ? var.org_ids[np.org] :
+        # Fallback: if orgId is provided and is a number, use it directly
+        try(tonumber(np.orgId), null) != null ? tonumber(np.orgId) :
+        # Default to org 1 (Main Organization)
+        1
+      )...
+    } : k => v[length(v) - 1]
   }
 
   # Create map for notification policies
   # Keys must be known at plan time, so we use the Org Name (or static Org ID from config)
   # We do NOT resolve to the dynamic Grafana Org ID for the map key
   notification_policies_map = {
-    for np in try(var.notification_policies.policies, []) : (
-      # Use org name if provided (static string from YAML)
-      try(np.org, null) != null ? np.org :
-      # If orgId is provided, use it (static string/number from YAML)
-      try(tostring(np.orgId), "default")
-      ) => merge(np, {
-        # meaningful_id is used for the key
-        meaningful_id = try(np.org, try(tostring(np.orgId), "default"))
+    for k, v in {
+      for np in try(var.notification_policies.policies, []) : (
+        # Use org name if provided, or orgId as string (static from YAML)
+        coalesce(try(np.org, null), try(tostring(np.orgId), "default"))
+        ) => merge(np, {
+          # meaningful_id is used for the key
+          meaningful_id = coalesce(try(np.org, null), try(tostring(np.orgId), "default"))
 
-        # resolved_org_id is used for the resource attribute (can be dynamic)
-        # Priority: org name lookup (stable) > orgId numeric (fallback) > default 1
-        resolved_org_id = (
-          try(np.org, null) != null && try(var.org_ids[np.org], null) != null ? var.org_ids[np.org] :
-          try(tonumber(np.orgId), null) != null ? tonumber(np.orgId) :
-          1
-        )
-    })
+          # resolved_org_id is used for the resource attribute (can be dynamic)
+          # Priority: org name lookup (stable) > orgId numeric (fallback) > default 1
+          resolved_org_id = (
+            try(np.org, null) != null && try(var.org_ids[np.org], null) != null ? var.org_ids[np.org] :
+            try(tonumber(np.orgId), null) != null ? tonumber(np.orgId) :
+            1
+          )
+      })...
+    } : k => v[length(v) - 1]
   }
 }
 
@@ -565,7 +577,7 @@ resource "grafana_notification_policy" "policy" {
   group_interval  = try(each.value.group_interval, "5m")
   repeat_interval = try(each.value.repeat_interval, "4h")
 
-  # Nested policies (routes)
+  # Nested policies (routes) — Level 1
   dynamic "policy" {
     for_each = try(each.value.routes, [])
     content {
@@ -575,7 +587,8 @@ resource "grafana_notification_policy" "policy" {
       group_interval  = try(policy.value.group_interval, null)
       repeat_interval = try(policy.value.repeat_interval, null)
       continue        = try(policy.value.continue, false)
-      mute_timings    = try(policy.value.mute_timings, [])
+      mute_timings    = try(coalesce(try(policy.value.mute_time_intervals, null), try(policy.value.mute_timings, null)), [])
+      active_timings  = try(coalesce(try(policy.value.active_time_intervals, null), try(policy.value.active_timings, null)), [])
 
       # Grafana native object_matchers format: [[label, operator, value], ...]
       dynamic "matcher" {
@@ -587,7 +600,17 @@ resource "grafana_notification_policy" "policy" {
         }
       }
 
-      # Recursively nested policies (level 2)
+      # Prometheus-style matchers: ["label op value", ...] → parsed into matcher blocks
+      dynamic "matcher" {
+        for_each = try(policy.value.matchers, [])
+        content {
+          label = trimspace(element(regex("^([a-zA-Z_:][a-zA-Z0-9_:]*)\\s*(=~|!~|!=|=)\\s*(.*)", matcher.value), 0))
+          match = trimspace(element(regex("^([a-zA-Z_:][a-zA-Z0-9_:]*)\\s*(=~|!~|!=|=)\\s*(.*)", matcher.value), 1))
+          value = trimspace(element(regex("^([a-zA-Z_:][a-zA-Z0-9_:]*)\\s*(=~|!~|!=|=)\\s*(.*)", matcher.value), 2))
+        }
+      }
+
+      # Recursively nested policies — Level 2
       dynamic "policy" {
         for_each = try(policy.value.routes, [])
         content {
@@ -597,7 +620,8 @@ resource "grafana_notification_policy" "policy" {
           group_interval  = try(policy.value.group_interval, null)
           repeat_interval = try(policy.value.repeat_interval, null)
           continue        = try(policy.value.continue, false)
-          mute_timings    = try(policy.value.mute_timings, [])
+          mute_timings    = try(coalesce(try(policy.value.mute_time_intervals, null), try(policy.value.mute_timings, null)), [])
+          active_timings  = try(coalesce(try(policy.value.active_time_intervals, null), try(policy.value.active_timings, null)), [])
 
           # Grafana native object_matchers format
           dynamic "matcher" {
@@ -606,6 +630,82 @@ resource "grafana_notification_policy" "policy" {
               label = matcher.value[0]
               match = matcher.value[1]
               value = matcher.value[2]
+            }
+          }
+
+          # Prometheus-style matchers
+          dynamic "matcher" {
+            for_each = try(policy.value.matchers, [])
+            content {
+              label = trimspace(element(regex("^([a-zA-Z_:][a-zA-Z0-9_:]*)\\s*(=~|!~|!=|=)\\s*(.*)", matcher.value), 0))
+              match = trimspace(element(regex("^([a-zA-Z_:][a-zA-Z0-9_:]*)\\s*(=~|!~|!=|=)\\s*(.*)", matcher.value), 1))
+              value = trimspace(element(regex("^([a-zA-Z_:][a-zA-Z0-9_:]*)\\s*(=~|!~|!=|=)\\s*(.*)", matcher.value), 2))
+            }
+          }
+
+          # Recursively nested policies — Level 3
+          dynamic "policy" {
+            for_each = try(policy.value.routes, [])
+            content {
+              contact_point   = try(policy.value.receiver, null)
+              group_by        = try(policy.value.group_by, [])
+              group_wait      = try(policy.value.group_wait, null)
+              group_interval  = try(policy.value.group_interval, null)
+              repeat_interval = try(policy.value.repeat_interval, null)
+              continue        = try(policy.value.continue, false)
+              mute_timings    = try(coalesce(try(policy.value.mute_time_intervals, null), try(policy.value.mute_timings, null)), [])
+              active_timings  = try(coalesce(try(policy.value.active_time_intervals, null), try(policy.value.active_timings, null)), [])
+
+              dynamic "matcher" {
+                for_each = try(policy.value.object_matchers, [])
+                content {
+                  label = matcher.value[0]
+                  match = matcher.value[1]
+                  value = matcher.value[2]
+                }
+              }
+
+              dynamic "matcher" {
+                for_each = try(policy.value.matchers, [])
+                content {
+                  label = trimspace(element(regex("^([a-zA-Z_:][a-zA-Z0-9_:]*)\\s*(=~|!~|!=|=)\\s*(.*)", matcher.value), 0))
+                  match = trimspace(element(regex("^([a-zA-Z_:][a-zA-Z0-9_:]*)\\s*(=~|!~|!=|=)\\s*(.*)", matcher.value), 1))
+                  value = trimspace(element(regex("^([a-zA-Z_:][a-zA-Z0-9_:]*)\\s*(=~|!~|!=|=)\\s*(.*)", matcher.value), 2))
+                }
+              }
+
+              # Recursively nested policies — Level 4
+              dynamic "policy" {
+                for_each = try(policy.value.routes, [])
+                content {
+                  contact_point   = try(policy.value.receiver, null)
+                  group_by        = try(policy.value.group_by, [])
+                  group_wait      = try(policy.value.group_wait, null)
+                  group_interval  = try(policy.value.group_interval, null)
+                  repeat_interval = try(policy.value.repeat_interval, null)
+                  continue        = try(policy.value.continue, false)
+                  mute_timings    = try(coalesce(try(policy.value.mute_time_intervals, null), try(policy.value.mute_timings, null)), [])
+                  active_timings  = try(coalesce(try(policy.value.active_time_intervals, null), try(policy.value.active_timings, null)), [])
+
+                  dynamic "matcher" {
+                    for_each = try(policy.value.object_matchers, [])
+                    content {
+                      label = matcher.value[0]
+                      match = matcher.value[1]
+                      value = matcher.value[2]
+                    }
+                  }
+
+                  dynamic "matcher" {
+                    for_each = try(policy.value.matchers, [])
+                    content {
+                      label = trimspace(element(regex("^([a-zA-Z_:][a-zA-Z0-9_:]*)\\s*(=~|!~|!=|=)\\s*(.*)", matcher.value), 0))
+                      match = trimspace(element(regex("^([a-zA-Z_:][a-zA-Z0-9_:]*)\\s*(=~|!~|!=|=)\\s*(.*)", matcher.value), 1))
+                      value = trimspace(element(regex("^([a-zA-Z_:][a-zA-Z0-9_:]*)\\s*(=~|!~|!=|=)\\s*(.*)", matcher.value), 2))
+                    }
+                  }
+                }
+              }
             }
           }
         }
@@ -622,8 +722,10 @@ resource "grafana_notification_policy" "policy" {
 
 locals {
   mute_timings_map = {
-    for mt in try(var.mute_timings.mute_timings, []) :
-    "${coalesce(try(mt.org, null), try(tostring(mt.orgId), "_"))}-${mt.name}" => mt
+    for k, v in {
+      for mt in try(var.mute_timings.mute_timings, []) :
+      "${coalesce(try(mt.org, null), try(tostring(mt.orgId), "_"))}-${mt.name}" => mt...
+    } : k => v[length(v) - 1]
   }
 }
 

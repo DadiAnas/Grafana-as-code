@@ -1,5 +1,5 @@
 resource "grafana_team" "teams" {
-  for_each = { for team in var.teams.teams : "${team.name}/${try(team.org, "Main Org.")}" => team }
+  for_each = { for k, v in { for team in var.teams.teams : "${team.name}/${try(team.org, "Main Org.")}" => team... } : k => v[length(v) - 1] }
 
   name   = each.value.name
   email  = try(each.value.email, null)
@@ -29,8 +29,7 @@ resource "grafana_team" "teams" {
 # --- Enterprise/Cloud path ---
 resource "grafana_team_external_group" "team_sync" {
   for_each = var.enable_team_sync ? {
-    for team in var.teams.teams : "${team.name}/${try(team.org, "Main Org.")}" => team
-    if try(length(team.external_groups), 0) > 0
+    for k, v in { for team in var.teams.teams : "${team.name}/${try(team.org, "Main Org.")}" => team... if try(length(team.external_groups), 0) > 0 } : k => v[length(v) - 1]
   } : {}
 
   team_id = grafana_team.teams[each.key].id
