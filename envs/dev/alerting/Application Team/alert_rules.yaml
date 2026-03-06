@@ -1,10 +1,11 @@
-# Imported from http://localhost:3000 on 2026-03-05T05:09:08.358076
+# Imported from http://localhost:3000 on 2026-03-06T06:24:51.106549
 
 apiVersion: 1
 groups:
 - name: "API"
   folder: "app-api"
-  orgId: 4
+  org: "Application Team"
+  orgId: 2
   interval: "1m"
   rules:
   - title: "API Response Time High"

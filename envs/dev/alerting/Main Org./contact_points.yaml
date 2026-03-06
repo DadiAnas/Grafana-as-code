@@ -1,14 +1,17 @@
-# Imported from http://localhost:3000 on 2026-03-05T05:09:08.335735
+# Imported from http://localhost:3000 on 2026-03-06T06:24:51.054383
 
 contactPoints:
 - name: "email receiver"
+  org: "Main Org."
   orgId: 1
   receivers:
   - type: "email"
     settings:
       addresses: "<example@email.com>"
+      singleEmail: false
     disableResolveMessage: false
 - name: "email-npr"
+  org: "Main Org."
   orgId: 1
   receivers:
   - type: "email"
@@ -22,6 +25,7 @@ contactPoints:
       subject: "[NPR] [{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}"
     disableResolveMessage: false
 - name: "grafana-default-email"
+  org: "Main Org."
   orgId: 1
   receivers:
   - type: "email"
@@ -30,6 +34,7 @@ contactPoints:
       singleEmail: false
     disableResolveMessage: false
 - name: "webhook-npr"
+  org: "Main Org."
   orgId: 1
   receivers:
   - type: "webhook"
@@ -40,11 +45,15 @@ contactPoints:
         Content-Type: "application/json"
       httpMethod: "POST"
       maxAlerts: 0
+      password: "[REDACTED]"
       url: "https://api.npr.example.com/alerts"
-      password: "VAULT_SECRET_REQUIRED"
       tlsClientCert: "VAULT_SECRET_REQUIRED"
       tlsClientKey: "VAULT_SECRET_REQUIRED"
       authorizationCredentials: "VAULT_SECRET_REQUIRED"
     vault_secrets: "\u26A0 Fill in Vault at grafana/dev/contact_points/webhook-npr:\
-      \ password, tlsClientCert, tlsClientKey, authorizationCredentials"
+      \ tlsClientCert, tlsClientKey, authorizationCredentials"
     disableResolveMessage: false
+- name: "empty"
+  org: "Main Org."
+  orgId: 1
+  receivers: []

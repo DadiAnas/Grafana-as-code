@@ -1,9 +1,10 @@
-# Imported from http://localhost:3000 on 2026-03-05T05:09:08.379471
+# Imported from http://localhost:3000 on 2026-03-06T06:24:51.136156
 
 apiVersion: 1
 groups:
 - name: "Applications"
   folder: "alerts"
+  org: "Main Org."
   orgId: 1
   interval: "1m"
   rules:
@@ -117,6 +118,7 @@ groups:
         type: "threshold"
 - name: "Infrastructure"
   folder: "alerts"
+  org: "Main Org."
   orgId: 1
   interval: "1m"
   rules:
@@ -281,6 +283,62 @@ groups:
             - 90
             type: "gt"
         expression: "B"
+        intervalMs: 1000
+        maxDataPoints: 43200
+        refId: "C"
+        type: "threshold"
+- name: "1m"
+  folder: "pepo-2"
+  org: "Main Org."
+  orgId: 1
+  interval: "1m"
+  rules:
+  - title: "testo-alert"
+    condition: "C"
+    for: "1m"
+    annotations:
+      description: "sdsdfsd"
+      runbook_url: "sdf"
+      summary: "sdfsdfs"
+    labels: {}
+    noDataState: "NoData"
+    execErrState: "Error"
+    data:
+    - refId: "A"
+      queryType: ""
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: "bff609y5g3ksgb"
+      model:
+        instant: true
+        intervalMs: 1000
+        maxDataPoints: 43200
+        refId: "A"
+    - refId: "C"
+      queryType: ""
+      relativeTimeRange:
+        from: 0
+        to: 0
+      datasourceUid: "__expr__"
+      model:
+        conditions:
+        - evaluator:
+            params:
+            - 0
+            type: "gt"
+          operator:
+            type: "and"
+          query:
+            params: []
+          reducer:
+            params: []
+            type: "last"
+          type: "query"
+        datasource:
+          type: "__expr__"
+          uid: "__expr__"
+        expression: "A"
         intervalMs: 1000
         maxDataPoints: 43200
         refId: "C"

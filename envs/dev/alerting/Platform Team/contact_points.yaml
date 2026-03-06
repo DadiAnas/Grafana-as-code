@@ -1,15 +1,18 @@
-# Imported from http://localhost:3000 on 2026-03-05T05:09:08.343677
+# Imported from http://localhost:3000 on 2026-03-06T06:24:51.078000
 
 contactPoints:
 - name: "email receiver"
-  orgId: 2
+  org: "Platform Team"
+  orgId: 5
   receivers:
   - type: "email"
     settings:
       addresses: "<example@email.com>"
+      singleEmail: false
     disableResolveMessage: false
 - name: "grafana-default-email"
-  orgId: 2
+  org: "Platform Team"
+  orgId: 5
   receivers:
   - type: "email"
     settings:
@@ -17,7 +20,8 @@ contactPoints:
       singleEmail: false
     disableResolveMessage: false
 - name: "platform-email-npr"
-  orgId: 2
+  org: "Platform Team"
+  orgId: 5
   receivers:
   - type: "email"
     settings:
@@ -27,32 +31,38 @@ contactPoints:
         \ }}"
     disableResolveMessage: false
 - name: "platform-webhook"
-  orgId: 2
+  org: "Platform Team"
+  orgId: 5
   receivers:
   - type: "webhook"
     settings:
       httpMethod: "POST"
       maxAlerts: 0
+      password: "[REDACTED]"
       url: "https://api.platform.example.com/alerts"
-      password: "VAULT_SECRET_REQUIRED"
       tlsClientCert: "VAULT_SECRET_REQUIRED"
       tlsClientKey: "VAULT_SECRET_REQUIRED"
       authorizationCredentials: "VAULT_SECRET_REQUIRED"
     vault_secrets: "\u26A0 Fill in Vault at grafana/dev/contact_points/platform-webhook:\
-      \ password, tlsClientCert, tlsClientKey, authorizationCredentials"
+      \ tlsClientCert, tlsClientKey, authorizationCredentials"
     disableResolveMessage: false
 - name: "platform-webhook-npr"
-  orgId: 2
+  org: "Platform Team"
+  orgId: 5
   receivers:
   - type: "webhook"
     settings:
       httpMethod: "POST"
       maxAlerts: 0
+      password: "[REDACTED]"
       url: "https://hooks.platform.example.com/npr/alerts"
-      password: "VAULT_SECRET_REQUIRED"
       tlsClientCert: "VAULT_SECRET_REQUIRED"
       tlsClientKey: "VAULT_SECRET_REQUIRED"
       authorizationCredentials: "VAULT_SECRET_REQUIRED"
     vault_secrets: "\u26A0 Fill in Vault at grafana/dev/contact_points/platform-webhook-npr:\
-      \ password, tlsClientCert, tlsClientKey, authorizationCredentials"
+      \ tlsClientCert, tlsClientKey, authorizationCredentials"
     disableResolveMessage: false
+- name: "empty"
+  org: "Platform Team"
+  orgId: 5
+  receivers: []

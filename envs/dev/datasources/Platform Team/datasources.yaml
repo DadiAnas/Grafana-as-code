@@ -1,11 +1,12 @@
-# Imported from http://localhost:3000 on 2026-03-05T05:09:07.787781
+# Imported from http://localhost:3000 on 2026-03-06T06:24:50.028285
 
 datasources:
 - name: "Debug-Prometheus"
   uid: "debug-prometheus"
   type: "prometheus"
   url: "http://prometheus-debug-npr.example.com:9090"
-  orgId: 2
+  org: "Platform Team"
+  orgId: 5
   access: "proxy"
   is_default: false
   basic_auth_enabled: true
@@ -22,18 +23,20 @@ datasources:
   uid: "platform-loki"
   type: "loki"
   url: "http://loki.platform.local:3100"
-  orgId: 2
+  org: "Platform Team"
+  orgId: 5
   access: "proxy"
-  is_default: false
+  is_default: true
   json_data:
     maxLines: 1000
 - name: "Platform-Prometheus"
   uid: "platform-prometheus"
   type: "prometheus"
   url: "http://prometheus.platform.local:9090"
-  orgId: 2
+  org: "Platform Team"
+  orgId: 5
   access: "proxy"
-  is_default: true
+  is_default: false
   json_data:
     httpMethod: "POST"
     timeInterval: "15s"

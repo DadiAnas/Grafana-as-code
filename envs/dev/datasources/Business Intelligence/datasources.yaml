@@ -1,11 +1,12 @@
-# Imported from http://localhost:3000 on 2026-03-05T05:09:07.723307
+# Imported from http://localhost:3000 on 2026-03-06T06:24:49.991873
 
 datasources:
 - name: "BI-PostgreSQL"
   uid: "bi-postgres"
   type: "grafana-postgresql-datasource"
   url: "postgres.bi.local:5432"
-  orgId: 5
+  org: "Business Intelligence"
+  orgId: 3
   access: "proxy"
   is_default: true
   json_data:

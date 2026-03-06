@@ -1,11 +1,12 @@
-# Imported from http://localhost:3000 on 2026-03-05T05:09:07.695704
+# Imported from http://localhost:3000 on 2026-03-06T06:24:49.981732
 
 datasources:
 - name: "App-Prometheus"
   uid: "app-prometheus"
   type: "prometheus"
   url: "http://prometheus.apps.local:9090"
-  orgId: 4
+  org: "Application Team"
+  orgId: 2
   access: "proxy"
   is_default: true
   json_data:

@@ -1,7 +1,8 @@
-# Imported from http://localhost:3000 on 2026-03-05T05:09:08.351362
+# Imported from http://localhost:3000 on 2026-03-06T06:24:51.096829
 
 contactPoints:
 - name: "bi-email"
+  org: "Public"
   orgId: 6
   receivers:
   - type: "email"
@@ -10,13 +11,7 @@ contactPoints:
       singleEmail: false
     disableResolveMessage: false
 - name: "email receiver"
-  orgId: 6
-  receivers:
-  - type: "email"
-    settings:
-      addresses: "<example@email.com>"
-    disableResolveMessage: false
-- name: "grafana-default-email"
+  org: "Public"
   orgId: 6
   receivers:
   - type: "email"
@@ -24,3 +19,16 @@ contactPoints:
       addresses: "<example@email.com>"
       singleEmail: false
     disableResolveMessage: false
+- name: "grafana-default-email"
+  org: "Public"
+  orgId: 6
+  receivers:
+  - type: "email"
+    settings:
+      addresses: "<example@email.com>"
+      singleEmail: false
+    disableResolveMessage: false
+- name: "empty"
+  org: "Public"
+  orgId: 6
+  receivers: []

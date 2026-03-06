@@ -1,10 +1,11 @@
-# Imported from http://localhost:3000 on 2026-03-05T05:09:07.817095
+# Imported from http://localhost:3000 on 2026-03-06T06:24:50.041041
 
 datasources:
 - name: "Public-Metrics"
   uid: "public-prometheus"
   type: "prometheus"
   url: "http://prometheus.public.local:9090"
+  org: "Public"
   orgId: 6
   access: "proxy"
   is_default: true

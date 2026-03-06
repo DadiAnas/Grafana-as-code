@@ -1,10 +1,11 @@
-# Imported from http://localhost:3000 on 2026-03-05T05:09:08.422964
+# Imported from http://localhost:3000 on 2026-03-06T06:24:51.201623
 #
 # Notification Policies define how alerts are routed to contact points.
 # Format follows Grafana's provisioning API structure.
 
 policies:
-- orgId: 1
+- org: "Main Org."
+  orgId: 1
   receiver: "grafana-default-email"
   group_by:
   - "grafana_folder"

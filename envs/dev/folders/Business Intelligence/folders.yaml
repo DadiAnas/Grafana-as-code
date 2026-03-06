@@ -1,4 +1,4 @@
-# Imported from http://localhost:3000 on 2026-03-05T05:09:08.182747
+# Imported from http://localhost:3000 on 2026-03-06T06:24:50.776718
 # NOTE: Folder UIDs have been slugified from the original random Grafana UIDs
 #       for better readability in both YAML config and directory structure.
 
@@ -6,32 +6,38 @@ folders:
 - title: "2general"
   uid: "2general"
   _comment_original_uid: "2general"
-  orgId: 5
+  org: "Business Intelligence"
+  orgId: 3
   permissions:
   - role: "Viewer"
     permission: "View"
 - title: "Bi Customers"
   uid: "bi-customers"
   _comment_original_uid: "bi-customers"
-  orgId: 5
+  org: "Business Intelligence"
+  orgId: 3
   permissions: []
 - title: "Bi Kpis"
   uid: "bi-kpis"
   _comment_original_uid: "bi-kpis"
-  orgId: 5
+  org: "Business Intelligence"
+  orgId: 3
   permissions: []
 - title: "Bi Revenue"
   uid: "bi-revenue"
   _comment_original_uid: "bi-revenue"
-  orgId: 5
+  org: "Business Intelligence"
+  orgId: 3
   permissions: []
 - title: "Subfolder"
   uid: "subfolder"
   _comment_original_uid: "subfolder"
-  orgId: 5
+  org: "Business Intelligence"
+  orgId: 3
   permissions: []
 - title: "Subfolder2"
   uid: "subfolder2"
   _comment_original_uid: "subfolder2"
-  orgId: 5
+  org: "Business Intelligence"
+  orgId: 3
   permissions: []
