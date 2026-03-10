@@ -1,0 +1,57 @@
+# Imported from http://localhost:3000 on 2026-03-10T04:27:34.507254
+
+contactPoints:
+- name: "email receiver"
+  org: "Main Org."
+  orgId: 1
+  receivers:
+  - type: "email"
+    settings:
+      addresses: "<example@email.com>"
+      singleEmail: false
+    disableResolveMessage: false
+- name: "email-npr"
+  org: "Main Org."
+  orgId: 1
+  receivers:
+  - type: "email"
+    settings:
+      addresses: "oncall-npr@example.com;platform-npr@example.com"
+      message: "Environment: NPR {{ range .Alerts }} Alert: {{ .Labels.alertname }}\
+        \ Status: {{ .Status }} Severity: {{ .Labels.severity }} Summary: {{ .Annotations.summary\
+        \ }} Description: {{ .Annotations.description }} {{ if .Annotations.runbook_url\
+        \ }}Runbook: {{ .Annotations.runbook_url }}{{ end }} {{ end }}"
+      singleEmail: true
+      subject: "[NPR] [{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}"
+    disableResolveMessage: false
+- name: "grafana-default-email"
+  org: "Main Org."
+  orgId: 1
+  receivers:
+  - type: "email"
+    settings:
+      addresses: "<example@email.com>"
+      singleEmail: false
+    disableResolveMessage: false
+- name: "webhook-npr"
+  org: "Main Org."
+  orgId: 1
+  receivers:
+  - type: "webhook"
+    settings:
+      authorizationCredentials: "VAULT_SECRET_REQUIRED:testo/main-org/alerting/contact-points/webhook-npr:authorizationCredentials"
+      authorization_credentials: "VAULT_SECRET_REQUIRED:testo/main-org/alerting/contact-points/webhook-npr:authorization_credentials"
+      authorization_scheme: "Bearer"
+      headers:
+        Content-Type: "application/json"
+      httpMethod: "POST"
+      maxAlerts: 0
+      password: "VAULT_SECRET_REQUIRED:testo/main-org/alerting/contact-points/webhook-npr:password"
+      tlsClientCert: "VAULT_SECRET_REQUIRED:testo/main-org/alerting/contact-points/webhook-npr:tlsClientCert"
+      tlsClientKey: "VAULT_SECRET_REQUIRED:testo/main-org/alerting/contact-points/webhook-npr:tlsClientKey"
+      url: "https://api.npr.example.com/alerts"
+    disableResolveMessage: false
+- name: "empty"
+  org: "Main Org."
+  orgId: 1
+  receivers: []

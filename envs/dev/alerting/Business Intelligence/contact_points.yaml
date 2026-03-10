@@ -1,24 +1,6 @@
-# Imported from http://localhost:3000 on 2026-03-06T20:58:01.030471
+# Imported from http://localhost:3000 on 2026-03-10T04:31:49.545886
 
 contactPoints:
-- name: "email receiver"
-  org: "Business Intelligence"
-  orgId: 3
-  receivers:
-  - type: "email"
-    settings:
-      addresses: "<example@email.com>"
-      singleEmail: false
-    disableResolveMessage: false
-- name: "grafana-default-email"
-  org: "Business Intelligence"
-  orgId: 3
-  receivers:
-  - type: "email"
-    settings:
-      addresses: "<example@email.com>"
-      singleEmail: false
-    disableResolveMessage: false
 - name: "empty"
   org: "Business Intelligence"
   orgId: 3

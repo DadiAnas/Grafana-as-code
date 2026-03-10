@@ -10,6 +10,14 @@ from typing import Any
 from .common import Colors, GrafanaClient, ImportContext, yaml_dump
 
 
+def _vault_sentinel(vault_path: str, key: str) -> str:
+    """Build a VAULT_SECRET_REQUIRED sentinel value.
+
+    Format: VAULT_SECRET_REQUIRED:<path-relative-to-mount>:<key>
+    """
+    return f"VAULT_SECRET_REQUIRED:{vault_path}:{key}"
+
+
 def import_datasources(ctx: ImportContext) -> None:
     """Import datasources from all organizations."""
     print(f"{Colors.BLUE}[2/8]{Colors.NC} Importing datasources...")
@@ -133,10 +141,12 @@ def _process_datasource(ds: dict[str, Any], org_name: str, org_id: int, ctx: Imp
     if json_data:
         entry["json_data"] = json_data
 
-    if http_headers:
-        entry["http_headers"] = http_headers
-
     # ── Detect secrets requiring Vault ───────────────────────────────────────
+    # Build vault path relative to mount: <env>/<org-slug>/datasources/<ds-slug>
+    org_slug = re.sub(r'[^a-zA-Z0-9_-]+', '-', org_name).strip('-').lower()
+    ds_slug = re.sub(r'[^a-zA-Z0-9_-]+', '-', entry['name']).strip('-').lower()
+    vault_path = f"{ctx.env_name}/{org_slug}/datasources/{ds_slug}"
+
     secret_field_names: list[str] = sorted(secure_fields.keys())
 
     if ds.get("basicAuth") and "basicAuthPassword" not in secret_field_names:
@@ -157,22 +167,30 @@ def _process_datasource(ds: dict[str, Any], org_name: str, org_id: int, ctx: Imp
         "privateKey", "tlsClientKey", "tlsClientCert", "tlsCACert",
         "sigV4SecretKey", "oauthClientSecret",
     }
+
+    def _is_redacted(v: Any) -> bool:
+        return v == "" or v is None or (isinstance(v, str) and v.startswith("changeme_"))
+
     for k, v in (json_data or {}).items():
-        if k in _KNOWN_SECRET_JSON_KEYS and (v == "" or v is None):
+        if k in _KNOWN_SECRET_JSON_KEYS and _is_redacted(v):
             if k not in secret_field_names:
                 secret_field_names.append(k)
 
-    for header_name, header_val in http_headers.items():
-        placeholder = f"httpHeader:{header_name}"
-        if header_val == "" and placeholder not in secret_field_names:
-            secret_field_names.append(placeholder)
-
+    # Create secure_json_data with vault sentinels for detected secrets
     if secret_field_names:
-        entry["use_vault"] = False
-        vault_full_path = ctx.vault_path(ctx.env_name, "datasources", entry["name"])
-        entry["vault_secret_fields"] = (
-            f"{vault_full_path}: "
-            + ", ".join(sorted(secret_field_names))
-        )
+        secure_json_data: dict[str, str] = {}
+        for field in sorted(secret_field_names):
+            # Skip http header fields — they go into http_headers
+            if field.startswith("httpHeader:"):
+                header_name = field.split(":", 1)[1]
+                http_headers[header_name] = _vault_sentinel(vault_path, field)
+            else:
+                secure_json_data[field] = _vault_sentinel(vault_path, field)
+
+        if secure_json_data:
+            entry["secure_json_data"] = secure_json_data
+
+    if http_headers:
+        entry["http_headers"] = http_headers
 
     return entry

@@ -1,0 +1,34 @@
+# Imported from http://localhost:3000 on 2026-03-10T04:27:33.690633
+# Organizations: 6
+
+organizations:
+- name: "Application Team"
+  id: 2
+  admins: []
+  editors: []
+  viewers: []
+- name: "Business Intelligence"
+  id: 3
+  admins: []
+  editors: []
+  viewers: []
+- name: "Development"
+  id: 4
+  admins: []
+  editors: []
+  viewers: []
+- name: "Main Org."
+  id: 1
+  admins: []
+  editors: []
+  viewers: []
+- name: "Platform Team"
+  id: 5
+  admins: []
+  editors: []
+  viewers: []
+- name: "Public"
+  id: 6
+  admins: []
+  editors: []
+  viewers: []

@@ -37,17 +37,16 @@ variable "environment" {
 # Grafana auth is taken from var.grafana_auth and all Vault data-sources
 # are skipped — ideal for local development and first-time import.
 #
-# Secret layout (all paths are relative to vault_mount):
+# Secret paths are now defined INLINE in YAML configs using the sentinel:
+#   VAULT_SECRET_REQUIRED:<vault-path>:<key>
 #
-#   <vault_path_grafana_auth>              → Grafana admin credentials
-#   <vault_path_datasources>/<ds-name>    → per-datasource credentials
-#   <vault_path_contact_points>/<cp-name> → per-contact-point secrets
-#   <vault_path_sso>                      → SSO / Keycloak OIDC creds
-#   <vault_path_keycloak>                 → Keycloak provider auth
-#   <vault_path_service_accounts>/<name>  → per-service-account tokens
+# The system automatically:
+#   1. Scans all YAML configs for sentinel values
+#   2. Fetches the secret from Vault at <vault_mount>/<vault-path>
+#   3. Replaces the sentinel with the actual secret value
 #
-# All path variables default to the conventional layout used by import_from_grafana.py.
-# Override any of them in your environment's terraform.tfvars if your Vault differs.
+# Provider-level auth (Grafana + Keycloak) still uses dedicated path variables
+# because they are needed before config scanning happens.
 # =============================================================================
 
 variable "use_vault" {
@@ -82,9 +81,9 @@ variable "vault_namespace" {
 }
 
 # ---------------------------------------------------------------------------
-# Vault secret path prefixes
-# Each variable is the path suffix appended after vault_mount.
-# You can use the literal string {env} which will be replaced by var.environment.
+# Provider-level Vault paths (needed before config scanning)
+# These are for Grafana and Keycloak PROVIDER authentication only.
+# All other secrets use the VAULT_SECRET_REQUIRED sentinel in YAML configs.
 # ---------------------------------------------------------------------------
 
 variable "vault_path_grafana_auth" {
@@ -93,34 +92,10 @@ variable "vault_path_grafana_auth" {
   default     = "{env}/grafana/auth"
 }
 
-variable "vault_path_datasources" {
-  description = "Vault path prefix for per-datasource credential secrets. The datasource name is appended."
-  type        = string
-  default     = "{env}/datasources"
-}
-
-variable "vault_path_contact_points" {
-  description = "Vault path prefix for alerting contact-point credential secrets. The contact point name is appended."
-  type        = string
-  default     = "{env}/alerting/contact-points"
-}
-
-variable "vault_path_sso" {
-  description = "Vault path (within the mount) for SSO / Keycloak OIDC credentials."
-  type        = string
-  default     = "{env}/sso/keycloak"
-}
-
 variable "vault_path_keycloak" {
   description = "Vault path (within the mount) for Keycloak provider-auth credentials."
   type        = string
   default     = "{env}/keycloak/client"
-}
-
-variable "vault_path_service_accounts" {
-  description = "Vault path prefix for per-service-account credential secrets. The service account name is appended."
-  type        = string
-  default     = "{env}/service-accounts"
 }
 
 # =============================================================================

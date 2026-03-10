@@ -112,18 +112,13 @@
 # =============================================================================
 
 locals {
-  # Merge Vault credentials with datasource configuration
-  # Use composite key "org:uid" to handle same UID across different orgs
+  # Datasource configs with unique keys for for_each
   # Keys use coalesce(org_name, tostring(orgId)) — fully static at plan time.
+  # Secrets are already resolved in the config (VAULT_SECRET_REQUIRED sentinels
+  # are replaced with actual values before this module receives data).
   datasources_with_credentials = {
     for k, v in {
-      for ds in var.datasources.datasources : "${coalesce(try(ds.org, null), try(tostring(ds.orgId), "_"))}:${ds.uid}" => merge(ds, {
-        # If use_vault is true, merge Vault secrets into secure_json_data
-        secure_json_data = try(ds.use_vault, false) ? merge(
-          try(ds.secure_json_data, {}),
-          try(var.vault_credentials[ds.name], {})
-        ) : try(ds.secure_json_data, {})
-      })...
+      for ds in var.datasources.datasources : "${coalesce(try(ds.org, null), try(tostring(ds.orgId), "_"))}:${ds.uid}" => ds...
     } : k => v[length(v) - 1]
   }
 }

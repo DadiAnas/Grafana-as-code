@@ -251,21 +251,33 @@ locals {
   keycloak_config = merge(local.shared_keycloak.keycloak, local.env_keycloak.keycloak)
 
   # =============================================================================
-  # Vault integration - Extract names for secret fetching
+  # Vault integration — Universal secret discovery & resolution
   # =============================================================================
-  # Extract datasource names that need Vault credentials
-  datasource_names = toset([
-    for ds in local.datasources_config.datasources : ds.name
-    if try(ds.use_vault, false)
-  ])
+  # Sentinel pattern: "VAULT_SECRET_REQUIRED:<vault-path>:<key>"
+  #
+  # Strategy:
+  #   1. Encode ALL config data as JSON
+  #   2. Use regex to find all VAULT_SECRET_REQUIRED sentinels
+  #   3. Build a set of unique Vault paths for the vault module
+  #   4. After secrets are fetched, resolve sentinels in each config
+  # =============================================================================
 
-  # Extract contact point names that need Vault credentials
-  # Now using Grafana native format with contactPoints and receivers
-  contact_point_names = toset(flatten([
-    for cp in try(local.contact_points_config.contactPoints, []) : [
-      for receiver in try(cp.receivers, []) : cp.name
-      if try(receiver.settings.authorization_credentials, null) != null &&
-      can(regex("vault:", try(receiver.settings.authorization_credentials, "")))
-    ]
-  ]))
+  # Step 1: Serialize all configs to JSON for sentinel scanning
+  _all_configs_json = jsonencode({
+    datasources    = local.datasources_config
+    contact_points = local.contact_points_config
+    sso            = local.sso_config
+    keycloak       = local.keycloak_config
+  })
+
+  # Step 2: Extract all unique vault paths from sentinel values
+  # Regex captures the <path> from "VAULT_SECRET_REQUIRED:<path>:<key>"
+  # The key may contain colons (e.g., httpHeader:X-Custom-Header)
+  _vault_sentinel_matches = var.use_vault ? toset(regexall(
+    "VAULT_SECRET_REQUIRED:([^:\"]+):[^\"]+",
+    local._all_configs_json
+  )) : toset([])
+
+  # Flatten the regex result (regexall returns list of lists) into a set of paths
+  vault_discovered_paths = toset([for match in local._vault_sentinel_matches : match[0]])
 }

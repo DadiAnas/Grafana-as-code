@@ -1,4 +1,4 @@
-# Imported from http://localhost:3000 on 2026-03-06T20:58:00.774278
+# Imported from http://localhost:3000 on 2026-03-10T04:31:49.333051
 # NOTE: Folder UIDs have been slugified from the original random Grafana UIDs
 #       for better readability in both YAML config and directory structure.
 
@@ -57,10 +57,10 @@ folders:
   org: "Main Org."
   orgId: 1
   permissions:
-  - role: "Editor"
-    permission: "Edit"
   - role: "Viewer"
     permission: "View"
+  - role: "Editor"
+    permission: "Edit"
 - title: "Slos"
   uid: "slos"
   _comment_original_uid: "slos"

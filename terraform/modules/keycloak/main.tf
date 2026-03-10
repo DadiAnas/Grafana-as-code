@@ -39,8 +39,8 @@ resource "keycloak_openid_client" "grafana" {
   # Token settings
   access_token_lifespan = var.keycloak_config.access_token_lifespan
 
-  # Use Vault secret if provided, otherwise let Keycloak generate
-  client_secret = try(var.vault_credentials["client_secret"], null)
+  # Client secret — let Keycloak generate it
+  client_secret = null
 
   login_theme = "keycloak"
 }

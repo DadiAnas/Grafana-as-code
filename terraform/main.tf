@@ -4,7 +4,7 @@ terraform {
   required_providers {
     grafana = {
       source  = "grafana/grafana"
-      version = "~> 4.25"
+      version = "~> 4.27"
     }
     vault = {
       source  = "hashicorp/vault"
@@ -87,35 +87,138 @@ module "organizations" {
   organizations = local.organizations_config
 }
 
-# Vault secrets module - fetch all secrets from Vault (only when use_vault is true)
+# =============================================================================
+# Vault secrets module — Universal secret fetcher
+# =============================================================================
+# Fetches ALL secrets discovered by scanning YAML configs for the sentinel
+# pattern: VAULT_SECRET_REQUIRED:<vault-path>:<key>
+#
+# The vault_discovered_paths local (in locals.tf) automatically finds all
+# unique Vault paths referenced across all config files.
+# =============================================================================
 module "vault_secrets" {
   source = "./modules/vault"
 
   count = var.use_vault ? 1 : 0
 
-  environment     = var.environment
-  vault_mount     = var.vault_mount
-  vault_namespace = var.vault_namespace
-
-  # Configurable path prefixes (override in terraform.tfvars when Vault layout differs)
-  vault_path_datasources      = var.vault_path_datasources
-  vault_path_contact_points   = var.vault_path_contact_points
-  vault_path_sso              = var.vault_path_sso
-  vault_path_keycloak         = var.vault_path_keycloak
-  vault_path_service_accounts = var.vault_path_service_accounts
-
-  datasource_names      = local.datasource_names
-  contact_point_names   = local.contact_point_names
-  load_sso_secrets      = true
-  load_keycloak_secrets = local.keycloak_config.enabled
+  vault_mount        = var.vault_mount
+  vault_namespace    = var.vault_namespace
+  vault_secret_paths = local.vault_discovered_paths
 }
 
-# Convenience locals — empty maps when Vault is disabled
+# =============================================================================
+# Vault secret resolution
+# =============================================================================
+# When use_vault is true, this resolves all VAULT_SECRET_REQUIRED sentinels
+# in config values by looking up the fetched secrets.
+#
+# The helper local `_vault_secrets` provides a flat map:
+#   { "path" => { "key" => "secret_value", ... }, ... }
+#
+# Each module receives its config with sentinels already resolved.
+# =============================================================================
 locals {
-  vault_ds_creds  = var.use_vault ? module.vault_secrets[0].datasource_credentials : {}
-  vault_cp_creds  = var.use_vault ? module.vault_secrets[0].contact_point_credentials : {}
-  vault_sso_creds = var.use_vault ? module.vault_secrets[0].sso_credentials : {}
-  vault_kc_creds  = var.use_vault ? module.vault_secrets[0].keycloak_credentials : {}
+  # All fetched secrets: { vault_path => { key => value } }
+  _vault_secrets = var.use_vault ? module.vault_secrets[0].secrets : {}
+
+  # Helper function: resolve a single string value
+  # If the value matches VAULT_SECRET_REQUIRED:<path>:<key>, look it up in _vault_secrets
+  # Otherwise return the value as-is.
+  # Note: This is used inline via try() in the resolved config sections below.
+}
+
+# =============================================================================
+# Resolved configurations — sentinels are replaced with actual Vault values
+# =============================================================================
+# For each resource config, we walk through the data and replace any string
+# matching "VAULT_SECRET_REQUIRED:<path>:<key>" with the corresponding
+# Vault secret value.
+#
+# Terraform's HCL doesn't support recursive functions, so we resolve at the
+# specific nesting levels where secrets appear in each resource type.
+# =============================================================================
+
+locals {
+  # ── Datasources: resolve secure_json_data and top-level secret fields ─────
+  resolved_datasources_config = {
+    datasources = [
+      for ds in local.datasources_config.datasources : merge(ds, {
+        # Resolve secure_json_data values
+        secure_json_data = {
+          for k, v in try(ds.secure_json_data, {}) :
+          k => (
+            var.use_vault && can(regex("^VAULT_SECRET_REQUIRED:", v))
+            ? try(
+              local._vault_secrets[regex("VAULT_SECRET_REQUIRED:([^:]+):", v)[0]][regex("VAULT_SECRET_REQUIRED:[^:]+:(.+)$", v)[0]],
+              v
+            )
+            : v
+          )
+        }
+        # Resolve http_headers values (some may be sensitive)
+        http_headers = {
+          for k, v in try(ds.http_headers, {}) :
+          k => (
+            var.use_vault && can(regex("^VAULT_SECRET_REQUIRED:", v))
+            ? try(
+              local._vault_secrets[regex("VAULT_SECRET_REQUIRED:([^:]+):", v)[0]][regex("VAULT_SECRET_REQUIRED:[^:]+:(.+)$", v)[0]],
+              v
+            )
+            : v
+          )
+        }
+      })
+    ]
+  }
+
+  # ── Contact Points: resolve settings values within each receiver ──────────
+  resolved_contact_points_config = {
+    contactPoints = [
+      for cp in try(local.contact_points_config.contactPoints, []) : merge(cp, {
+        receivers = [
+          for recv in try(cp.receivers, []) : merge(recv, {
+            settings = {
+              for k, v in try(recv.settings, {}) :
+              k => (
+                var.use_vault && try(tostring(v), "") != "" && can(regex("^VAULT_SECRET_REQUIRED:", tostring(v)))
+                ? try(
+                  local._vault_secrets[regex("VAULT_SECRET_REQUIRED:([^:]+):", tostring(v))[0]][regex("VAULT_SECRET_REQUIRED:[^:]+:(.+)$", tostring(v))[0]],
+                  v
+                )
+                : v
+              )
+            }
+          })
+        ]
+      })
+    ]
+  }
+
+  # ── SSO: resolve top-level secret fields (e.g. client_secret) ─────────────
+  resolved_sso_config = {
+    for k, v in local.sso_config :
+    k => (
+      var.use_vault && try(tostring(v), "") != "" && can(regex("^VAULT_SECRET_REQUIRED:", try(tostring(v), "")))
+      ? try(
+        local._vault_secrets[regex("VAULT_SECRET_REQUIRED:([^:]+):", tostring(v))[0]][regex("VAULT_SECRET_REQUIRED:[^:]+:(.+)$", tostring(v))[0]],
+        v
+      )
+      : v
+    )
+  }
+
+  # ── Keycloak: resolve top-level secret fields ─────────────────────────────
+  resolved_keycloak_config = {
+    for k, v in local.keycloak_config :
+    k => (
+      var.use_vault && try(tostring(v), "") != "" && can(regex("^VAULT_SECRET_REQUIRED:", try(tostring(v), "")))
+      ? try(
+        local._vault_secrets[regex("VAULT_SECRET_REQUIRED:([^:]+):", tostring(v))[0]][regex("VAULT_SECRET_REQUIRED:[^:]+:(.+)$", tostring(v))[0]],
+        v
+      )
+      : v
+    )
+  }
 }
 
 # Load all modules
@@ -149,9 +252,8 @@ module "folders" {
 module "datasources" {
   source = "./modules/datasources"
 
-  datasources       = local.datasources_config
-  org_ids           = module.organizations.organization_ids
-  vault_credentials = local.vault_ds_creds
+  datasources = local.resolved_datasources_config
+  org_ids     = module.organizations.organization_ids
 
   depends_on = [module.organizations]
 }
@@ -173,11 +275,10 @@ module "alerting" {
   source = "./modules/alerting"
 
   alert_rules           = local.alert_rules_config
-  contact_points        = local.contact_points_config
+  contact_points        = local.resolved_contact_points_config
   notification_policies = local.notification_policies_config
   folder_ids            = module.folders.folder_ids
   org_ids               = module.organizations.organization_ids
-  vault_credentials     = local.vault_cp_creds
 
   depends_on = [module.folders, module.datasources, module.organizations]
 }
@@ -196,8 +297,7 @@ module "service_accounts" {
 module "sso" {
   source = "./modules/sso"
 
-  sso_config        = local.sso_config
-  vault_credentials = local.vault_sso_creds
+  sso_config = local.resolved_sso_config
 
   # Pass org IDs to use numeric IDs instead of names (avoids space issues)
   org_ids = module.organizations.organization_ids
@@ -211,9 +311,8 @@ module "sso" {
 module "keycloak" {
   source = "./modules/keycloak"
 
-  enabled           = try(local.keycloak_config.enabled, false)
-  keycloak_config   = local.keycloak_config
-  vault_credentials = local.vault_kc_creds
+  enabled         = try(local.keycloak_config.enabled, false)
+  keycloak_config = local.keycloak_config
 
   depends_on = [module.organizations]
 }

@@ -21,6 +21,7 @@ stages:
   - validate
   - plan
   - apply
+  - vault-refresh
   - drift
   - cleanup
 
@@ -185,6 +186,49 @@ default:
     - if: $CI_PIPELINE_SOURCE == "schedule"
   allow_failure: true
 
+# Vault-refresh template — force-replace resources with Vault secrets
+# Runs after apply when Vault secret values have been updated outside Terraform.
+.vault-refresh-template:
+  stage: vault-refresh
+  image: python:3.12-slim
+  before_script:
+    - pip install PyYAML --quiet
+    - |
+      # Install Terraform
+      apt-get update -qq && apt-get install -y -qq wget unzip > /dev/null 2>&1
+      wget -q https://releases.hashicorp.com/terraform/${TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip
+      unzip -q terraform_${TF_VERSION}_linux_amd64.zip -d /usr/local/bin/
+      rm terraform_${TF_VERSION}_linux_amd64.zip
+    - cd ${TF_ROOT}
+    - |
+      tf_auto_init() {
+        local env="$1"
+        local bf=$(ls envs/${env}/${env}.*.tfbackend 2>/dev/null | head -1)
+        if [ -z "$bf" ]; then bf=$(ls envs/${env}/backend.tfbackend 2>/dev/null | head -1); fi
+        if [ -n "$bf" ]; then
+          local btype=$(echo "$bf" | sed -n 's/.*\.\(.*\)\.tfbackend$/\1/p')
+          if [ -n "$btype" ] && [ "$btype" != "local" ]; then
+            printf 'terraform {\n  backend "%s" {}\n}\n' "$btype" > terraform/backend.tf
+            terraform -chdir=terraform init -backend-config="../${bf}" -reconfigure
+          else
+            terraform -chdir=terraform init -reconfigure
+          fi
+        else
+          terraform -chdir=terraform init -reconfigure
+        fi
+      }
+  script:
+    - |
+      echo "═══════════════════════════════════════════════"
+      echo "  Vault Secret Refresh: ${ENV_NAME}"
+      echo "═══════════════════════════════════════════════"
+    - tf_auto_init "${ENV_NAME}"
+    - python3 scripts/vault/vault_refresh.py "${ENV_NAME}" --apply --auto-approve
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: manual
+  allow_failure: true
+
 # =============================================================================
 # STAGE 1: VALIDATE
 # =============================================================================
@@ -302,6 +346,16 @@ drift:myenv:
   variables:
     ENV_NAME: myenv
 
+vault-refresh:myenv:
+  extends: .vault-refresh-template
+  variables:
+    ENV_NAME: myenv
+  needs:
+    - job: apply:myenv
+      optional: true
+  environment:
+    name: myenv
+
 # ─── Add more environments below ─────────────────────────────────────────
 # Copy and adapt the blocks above. Example for "staging":
 #
@@ -336,3 +390,13 @@ drift:myenv:
 #   extends: .drift-template
 #   variables:
 #     ENV_NAME: staging
+#
+# vault-refresh:staging:
+#   extends: .vault-refresh-template
+#   variables:
+#     ENV_NAME: staging
+#   needs:
+#     - job: apply:staging
+#       optional: true
+#   environment:
+#     name: staging

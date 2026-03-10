@@ -34,29 +34,48 @@ _CP_SECRET_FIELDS: dict[str, list[str]] = {
     "sensugo":      ["apiKey"],
 }
 
-_VAULT_PLACEHOLDER = "VAULT_SECRET_REQUIRED"
+
+def _vault_sentinel(vault_path: str, key: str) -> str:
+    """Build a VAULT_SECRET_REQUIRED sentinel value.
+
+    Format: VAULT_SECRET_REQUIRED:<path-relative-to-mount>:<key>
+    The vault_path should NOT include the mount prefix (e.g. 'grafana/').
+    """
+    return f"VAULT_SECRET_REQUIRED:{vault_path}:{key}"
 
 
 def _redact_contact_point_secrets(
     recv_type: str,
     settings: dict,
-    env_name: str,
-    cp_name: str,
+    vault_path: str,
 ) -> tuple[dict, list[str]]:
-    """Scrub known-sensitive fields from contact point settings."""
+    """Scrub known-sensitive fields and replace with vault sentinels.
+
+    Grafana returns '' for unset secrets, '[REDACTED]' for set ones.
+    Both are replaced with VAULT_SECRET_REQUIRED sentinels.
+    """
     secret_fields = _CP_SECRET_FIELDS.get(recv_type, [])
     cleaned = dict(settings)
     found: list[str] = []
 
+    _REDACTED_VALUES = {"", "[REDACTED]"}
+
+    def _is_redacted(v: Any) -> bool:
+        if v in _REDACTED_VALUES or v is None:
+            return True
+        if isinstance(v, str) and v.startswith("changeme_"):
+            return True
+        return False
+
     for field in secret_fields:
         val = cleaned.get(field)
-        if val == "" or val is None:
-            cleaned[field] = _VAULT_PLACEHOLDER
+        if _is_redacted(val):
+            cleaned[field] = _vault_sentinel(vault_path, field)
             found.append(field)
 
     for k, v in list(cleaned.items()):
-        if k not in secret_fields and v == "" and not k.startswith("#"):
-            cleaned[k] = _VAULT_PLACEHOLDER
+        if k not in secret_fields and isinstance(v, str) and v in _REDACTED_VALUES and not k.startswith("#"):
+            cleaned[k] = _vault_sentinel(vault_path, k)
             found.append(k)
 
     return cleaned, found
@@ -167,16 +186,16 @@ def import_alerting(ctx: ImportContext) -> None:
             settings = cp.get("settings", {})
             secrets_found: list[str] = []
             if settings:
+                # Build vault path relative to mount: <env>/<org-slug>/alerting/contact-points/<cp-slug>
+                import re
+                org_slug = re.sub(r'[^a-zA-Z0-9_-]+', '-', org_name).strip('-').lower()
+                cp_slug = re.sub(r'[^a-zA-Z0-9_-]+', '-', name).strip('-').lower()
+                vault_path = f"{ctx.env_name}/{org_slug}/alerting/contact-points/{cp_slug}"
                 cleaned, secrets_found = _redact_contact_point_secrets(
-                    cp["type"], settings, env_name=ctx.env_name, cp_name=name
+                    cp["type"], settings, vault_path=vault_path
                 )
                 recv["settings"] = cleaned
-            if secrets_found:
-                vault_full_path = ctx.vault_path(ctx.env_name, "alerting", "contact-points", name)
-                recv["vault_secrets"] = (
-                    f"{vault_full_path}: "
-                    + ", ".join(secrets_found)
-                )
+
             dis_resolve = cp.get("disableResolveMessage")
             if dis_resolve is not None:
                 recv["disableResolveMessage"] = dis_resolve

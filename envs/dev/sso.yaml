@@ -1,7 +1,8 @@
 # Imported from Grafana SSO settings
 #
 # This file follows the project format expected by modules/sso.
-# Client secret Vault path: grafana/dev/sso/keycloak
+# For secrets, use: VAULT_SECRET_REQUIRED:<path>:<key>
+# Example: client_secret: "VAULT_SECRET_REQUIRED:dev/sso/keycloak:client_secret"
 
 sso:
   enabled: true
@@ -25,47 +26,6 @@ sso:
     org_mappings:
     - orgId: 1
       role: "Admin"
-    - orgId: 2
-      role: "Admin"
-    - orgId: 4
-      role: "Admin"
-    - orgId: 5
-      role: "Admin"
-    - orgId: 6
-      role: "Viewer"
-    - orgId: 3
-      role: "Editor"
-  - name: "grafana-platform-team"
-    org_mappings:
-    - orgId: 2
-      role: "Admin"
-  - name: "grafana-app-team"
-    org_mappings:
-    - orgId: 4
-      role: "Admin"
-  - name: "grafana-bi-team"
-    org_mappings:
-    - orgId: 5
-      role: "Admin"
-  - name: "grafana-developers"
-    org_mappings:
-    - orgId: 3
-      role: "Editor"
-  - name: "grafana-viewers"
-    org_mappings:
-    - orgId: 1
-      role: "Viewer"
-    - orgId: 6
-      role: "Viewer"
-  - name: "grafaba-viewers"
-    org_mappings:
-    - orgId: "*"
-      role: "Viewer"
-  - name: "*"
-    wildcard_group: true
-    org_mappings:
-    - orgId: 1
-      role: "Viewer"
   teams_url: "https://auth.dev.com/realms/grafana-realm/protocol/openid-connect/userinfo"
   team_ids_attribute_path: "groups[*]"
   signout_redirect_url: "https://auth.dev.com/realms/grafana-realm/protocol/openid-connect/logout"

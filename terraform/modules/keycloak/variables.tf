@@ -9,7 +9,7 @@ variable "enabled" {
 }
 
 variable "keycloak_config" {
-  description = "Keycloak client configuration"
+  description = "Keycloak client configuration (with VAULT_SECRET_REQUIRED sentinels already resolved)"
   type = object({
     realm_id    = optional(string, "master")
     client_id   = optional(string, "grafana")
@@ -58,11 +58,4 @@ variable "keycloak_config" {
     client_id = "grafana"
     root_url  = "http://localhost:3000"
   }
-}
-
-variable "vault_credentials" {
-  description = "Keycloak client secret from Vault (optional, will be generated if not provided)"
-  type        = map(string)
-  default     = {}
-  sensitive   = true
 }

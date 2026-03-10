@@ -1,0 +1,33 @@
+# Imported from http://localhost:3000 on 2026-03-10T04:27:34.377210
+
+teams:
+- name: "Data Team"
+  org: "Main Org."
+  orgId: 1
+  members: []
+  email: "data@example.com"
+- name: "Frontend Team"
+  org: "Main Org."
+  orgId: 1
+  members: []
+  email: "frontend@example.com"
+- name: "Platform Team"
+  org: "Main Org."
+  orgId: 1
+  members: []
+  email: "platform@example.com"
+- name: "QA Team"
+  org: "Main Org."
+  orgId: 1
+  members: []
+  email: "qa-team-npr@example.com"
+- name: "SRE Team"
+  org: "Main Org."
+  orgId: 1
+  members: []
+  email: "sre@example.com"
+- name: "grafana-viewers"
+  org: "Main Org."
+  orgId: 1
+  members: []
+  email: "grafana-viewers@example.com"

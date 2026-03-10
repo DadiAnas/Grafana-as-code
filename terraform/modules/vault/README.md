@@ -1,47 +1,75 @@
-## Requirements
+# Vault Secrets Module
 
-| Name | Version |
-|------|---------|
-| <a name="requirement_vault"></a> [vault](#requirement\_vault) | ~> 4.0 |
+This module fetches secrets from HashiCorp Vault for use by Grafana Terraform resources.
 
-## Providers
+## How It Works — Sentinel Pattern
 
-| Name | Version |
-|------|---------|
-| <a name="provider_vault"></a> [vault](#provider\_vault) | ~> 4.0 |
+All secrets are declared **inline** in YAML config files using the sentinel value format:
 
-## Modules
+```
+VAULT_SECRET_REQUIRED:<vault-path>:<key>
+```
 
-No modules.
+Where:
+- `<vault-path>` is the path within the Vault KV mount (e.g., `dev/alerting/contact-points/webhook-npr`)
+- `<key>` is the key within that secret (e.g., `authorizationCredentials`)
 
-## Resources
+### Example
 
-| Name | Type |
-|------|------|
-| [vault_kv_secret_v2.contact_points](https://registry.terraform.io/providers/hashicorp/vault/latest/docs/data-sources/kv_secret_v2) | data source |
-| [vault_kv_secret_v2.datasources](https://registry.terraform.io/providers/hashicorp/vault/latest/docs/data-sources/kv_secret_v2) | data source |
-| [vault_kv_secret_v2.service_accounts](https://registry.terraform.io/providers/hashicorp/vault/latest/docs/data-sources/kv_secret_v2) | data source |
-| [vault_kv_secret_v2.keycloak](https://registry.terraform.io/providers/hashicorp/vault/latest/docs/data-sources/kv_secret_v2) | data source |
-| [vault_kv_secret_v2.sso](https://registry.terraform.io/providers/hashicorp/vault/latest/docs/data-sources/kv_secret_v2) | data source |
+```yaml
+# contact_points.yaml
+- name: "webhook-npr"
+  receivers:
+  - type: "webhook"
+    settings:
+      authorization_credentials: "VAULT_SECRET_REQUIRED:dev/alerting/contact-points/webhook-npr:authorizationCredentials"
+      tlsClientCert: "VAULT_SECRET_REQUIRED:dev/alerting/contact-points/webhook-npr:tlsClientCert"
 
-## Inputs
+# datasources.yaml
+- name: "PostgreSQL"
+  secure_json_data:
+    password: "VAULT_SECRET_REQUIRED:dev/datasources/PostgreSQL:password"
+```
 
-| Name | Description | Type | Default | Required |
-|------|-------------|------|---------|:--------:|
-| <a name="input_contact_point_names"></a> [contact\_point\_names](#input\_contact\_point\_names) | Set of contact point names to fetch credentials for | `set(string)` | `[]` | no |
-| <a name="input_datasource_names"></a> [datasource\_names](#input\_datasource\_names) | Set of datasource names to fetch credentials for | `set(string)` | `[]` | no |
-| <a name="input_environment"></a> [environment](#input\_environment) | Environment name (npr, preprod, prod) | `string` | n/a | yes |
-| <a name="input_load_keycloak_secrets"></a> [load\_keycloak\_secrets](#input\_load\_keycloak\_secrets) | Whether to load Keycloak client secrets (for managing Keycloak client) | `bool` | `false` | no |
-| <a name="input_load_sso_secrets"></a> [load\_sso\_secrets](#input\_load\_sso\_secrets) | Whether to load SSO/Keycloak secrets | `bool` | `true` | no |
-| <a name="input_service_account_names"></a> [service\_account\_names](#input\_service\_account\_names) | Set of service account names to fetch credentials for | `set(string)` | `[]` | no |
-| <a name="input_vault_mount"></a> [vault\_mount](#input\_vault\_mount) | The KV v2 secrets engine mount path | `string` | `"grafana"` | no |
+## Automatic Discovery
+
+The root module (`locals.tf`) automatically:
+
+1. Serializes all YAML configs to JSON
+2. Scans for all `VAULT_SECRET_REQUIRED` sentinel values
+3. Extracts unique Vault paths
+4. Passes them to this module for fetching
+
+No manual configuration of paths or resource names is needed.
+
+## Setup with `make vault-setup`
+
+The `scripts/vault/setup_secrets.py` script performs the reverse operation:
+
+1. Scans all YAML files for `VAULT_SECRET_REQUIRED` sentinels
+2. Groups by Vault path
+3. Creates placeholder secrets in Vault
+
+```bash
+# Create placeholder secrets for an environment
+make vault-setup ENV=dev
+
+# Then update the actual values
+vault kv put grafana/dev/alerting/contact-points/webhook-npr \
+  authorizationCredentials="real-value" \
+  tlsClientCert="real-cert"
+```
+
+## Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `vault_mount` | KV v2 mount path | `grafana` |
+| `vault_namespace` | Vault Enterprise namespace | `""` |
+| `vault_secret_paths` | Set of paths to fetch (auto-discovered) | `[]` |
 
 ## Outputs
 
-| Name | Description |
-|------|-------------|
-| <a name="output_contact_point_credentials"></a> [contact\_point\_credentials](#output\_contact\_point\_credentials) | Map of contact point names to their credentials |
-| <a name="output_datasource_credentials"></a> [datasource\_credentials](#output\_datasource\_credentials) | Map of datasource names to their credentials |
-| <a name="output_keycloak_credentials"></a> [keycloak\_credentials](#output\_keycloak\_credentials) | Keycloak client credentials (for managing Keycloak client) |
-| <a name="output_service_account_credentials"></a> [service\_account\_credentials](#output\_service\_account\_credentials) | Map of service account names to their credentials |
-| <a name="output_sso_credentials"></a> [sso\_credentials](#output\_sso\_credentials) | SSO/Keycloak credentials |
+| Output | Description |
+|--------|-------------|
+| `secrets` | Map of `{ vault_path => { key => value } }` |

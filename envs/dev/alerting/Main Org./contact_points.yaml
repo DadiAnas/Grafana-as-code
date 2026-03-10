@@ -1,4 +1,4 @@
-# Imported from http://localhost:3000 on 2026-03-06T20:58:01.116860
+# Imported from http://localhost:3000 on 2026-03-10T04:31:49.589117
 
 contactPoints:
 - name: "email receiver"
@@ -39,19 +39,17 @@ contactPoints:
   receivers:
   - type: "webhook"
     settings:
-      authorization_credentials: "[REDACTED]"
+      authorizationCredentials: "VAULT_SECRET_REQUIRED:testo/main-org/alerting/contact-points/webhook-npr:authorizationCredentials"
+      authorization_credentials: "VAULT_SECRET_REQUIRED:dev/main-org/alerting/contact-points/webhook-npr:authorization_credentials"
       authorization_scheme: "Bearer"
       headers:
         Content-Type: "application/json"
       httpMethod: "POST"
       maxAlerts: 0
-      password: "[REDACTED]"
+      password: "VAULT_SECRET_REQUIRED:dev/main-org/alerting/contact-points/webhook-npr:password"
+      tlsClientCert: "VAULT_SECRET_REQUIRED:testo/main-org/alerting/contact-points/webhook-npr:tlsClientCert"
+      tlsClientKey: "VAULT_SECRET_REQUIRED:testo/main-org/alerting/contact-points/webhook-npr:tlsClientKey"
       url: "https://api.npr.example.com/alerts"
-      tlsClientCert: "VAULT_SECRET_REQUIRED"
-      tlsClientKey: "VAULT_SECRET_REQUIRED"
-      authorizationCredentials: "VAULT_SECRET_REQUIRED"
-    vault_secrets: "grafana/dev/alerting/contact-points/webhook-npr: tlsClientCert,\
-      \ tlsClientKey, authorizationCredentials"
     disableResolveMessage: false
 - name: "empty"
   org: "Main Org."

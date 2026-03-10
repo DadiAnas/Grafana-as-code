@@ -1,0 +1,7 @@
+# Imported from http://localhost:3000 on 2026-03-10T04:27:34.467598
+
+contactPoints:
+- name: "empty"
+  org: "Business Intelligence"
+  orgId: 3
+  receivers: []

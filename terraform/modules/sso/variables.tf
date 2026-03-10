@@ -1,13 +1,6 @@
 variable "sso_config" {
-  description = "SSO configuration from YAML including groups with org_mappings"
+  description = "SSO configuration from YAML (with VAULT_SECRET_REQUIRED sentinels already resolved)"
   type        = any
-}
-
-variable "vault_credentials" {
-  description = "SSO credentials from Vault (client_secret)"
-  type        = map(string)
-  default     = {}
-  sensitive   = true
 }
 
 variable "org_ids" {

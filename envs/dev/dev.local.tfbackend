@@ -1,21 +1,11 @@
 # =============================================================================
 # BACKEND CONFIGURATION — dev
 # =============================================================================
-# File: envs/dev/dev.local.tfbackend
-# The backend type is auto-detected from the filename by "make init".
-#
-# Usage:
-#   make init ENV=dev
-#
-# To switch backend types, create a new file with the naming convention:
-#   <env>.<backend-type>.tfbackend
-#   e.g. dev.s3.tfbackend, dev.azurerm.tfbackend,
-#        dev.http.tfbackend (GitLab), dev.local.tfbackend
+# Usage:  make init ENV=dev
 # =============================================================================
 
 # --- Local Backend ---
 # See: https://developer.hashicorp.com/terraform/language/backend/local
-# =============================================================================
 
 # State file is stored per-environment inside the envs/ directory.
 path = "../envs/dev/terraform.tfstate"

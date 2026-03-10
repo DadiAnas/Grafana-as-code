@@ -2,13 +2,13 @@
 
 | Name | Version |
 |------|---------|
-| <a name="requirement_grafana"></a> [grafana](#requirement\_grafana) | 4.25.0 |
+| <a name="requirement_grafana"></a> [grafana](#requirement\_grafana) | 4.27.0 |
 
 ## Providers
 
 | Name | Version |
 |------|---------|
-| <a name="provider_grafana"></a> [grafana](#provider\_grafana) | 4.25.0 |
+| <a name="provider_grafana"></a> [grafana](#provider\_grafana) | 4.27.0 |
 
 ## Modules
 
@@ -18,8 +18,8 @@ No modules.
 
 | Name | Type |
 |------|------|
-| [grafana_team.teams](https://registry.terraform.io/providers/grafana/grafana/4.25.0/docs/resources/team) | resource |
-| [grafana_team_external_group.team_sync](https://registry.terraform.io/providers/grafana/grafana/4.25.0/docs/resources/team_external_group) | resource |
+| [grafana_team.teams](https://registry.terraform.io/providers/grafana/grafana/4.27.0/docs/resources/team) | resource |
+| [grafana_team_external_group.team_sync](https://registry.terraform.io/providers/grafana/grafana/4.27.0/docs/resources/team_external_group) | resource |
 
 ## Inputs
 

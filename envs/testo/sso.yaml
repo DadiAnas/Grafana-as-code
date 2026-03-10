@@ -1,0 +1,31 @@
+# Imported from Grafana SSO settings
+#
+# This file follows the project format expected by modules/sso.
+# For secrets, use: VAULT_SECRET_REQUIRED:<path>:<key>
+# Example: client_secret: "VAULT_SECRET_REQUIRED:testo/sso/keycloak:client_secret"
+
+sso:
+  enabled: true
+  name: "Keycloak NPR"
+  auth_url: "https://auth.dev.com/realms/grafana-realm/protocol/openid-connect/auth"
+  token_url: "https://auth.dev.com/realms/grafana-realm/protocol/openid-connect/token"
+  api_url: "https://auth.dev.com/realms/grafana-realm/protocol/openid-connect/userinfo"
+  client_id: "grafana"
+  allow_sign_up: true
+  auto_login: false
+  scopes: "openid profile email groups"
+  use_pkce: true
+  use_refresh_token: true
+  role_attribute_strict: false
+  skip_org_role_sync: false
+  groups_attribute_path: "groups[*]"
+  org_attribute_path: "groups[*]"
+  allowed_groups: "grafana-admins,grafana-platform-team,grafana-app-team,grafana-bi-team,grafana-developers,grafana-viewers"
+  groups:
+  - name: "grafana-admins"
+    org_mappings:
+    - orgId: 1
+      role: "Admin"
+  teams_url: "https://auth.dev.com/realms/grafana-realm/protocol/openid-connect/userinfo"
+  team_ids_attribute_path: "groups[*]"
+  signout_redirect_url: "https://auth.dev.com/realms/grafana-realm/protocol/openid-connect/logout"

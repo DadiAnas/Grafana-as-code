@@ -1,0 +1,7 @@
+# Imported from http://localhost:3000 on 2026-03-10T04:27:34.449466
+
+contactPoints:
+- name: "empty"
+  org: "Application Team"
+  orgId: 2
+  receivers: []

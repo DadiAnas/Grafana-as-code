@@ -1,0 +1,14 @@
+# =============================================================================
+# BACKEND CONFIGURATION — testo
+# =============================================================================
+# Usage:  make init ENV=testo
+# =============================================================================
+
+# --- Local Backend ---
+# See: https://developer.hashicorp.com/terraform/language/backend/local
+
+# State file is stored per-environment inside the envs/ directory.
+path = "../envs/testo/terraform.tfstate"
+
+# Workspace directory (optional, uncomment to customise)
+# workspace_dir = "../envs/testo/workspaces"

@@ -1,8 +1,3 @@
-variable "environment" {
-  description = "Environment name (dev, staging, prod, …)"
-  type        = string
-}
-
 variable "vault_mount" {
   description = "KV v2 secrets engine mount path in Vault (engine name only, no leading slash)"
   type        = string
@@ -15,79 +10,8 @@ variable "vault_namespace" {
   default     = ""
 }
 
-# ---------------------------------------------------------------------------
-# Secret path prefixes (relative to vault_mount)
-# Defaults mirror the layout written by import_from_grafana.py.
-# Override in terraform.tfvars to match your Vault topology.
-# Use the literal string {env} to have it replaced with var.environment.
-# ---------------------------------------------------------------------------
-
-variable "vault_path_grafana_auth" {
-  description = "Path within the mount for the Grafana admin auth secret."
-  type        = string
-  default     = "{env}/grafana/auth"
-}
-
-variable "vault_path_datasources" {
-  description = "Prefix within the mount for per-datasource secrets. The datasource name is appended."
-  type        = string
-  default     = "{env}/datasources"
-}
-
-variable "vault_path_contact_points" {
-  description = "Prefix within the mount for contact-point secrets. The contact point name is appended."
-  type        = string
-  default     = "{env}/alerting/contact-points"
-}
-
-variable "vault_path_sso" {
-  description = "Path within the mount for SSO / Keycloak OIDC credentials."
-  type        = string
-  default     = "{env}/sso/keycloak"
-}
-
-variable "vault_path_keycloak" {
-  description = "Path within the mount for Keycloak provider-auth credentials."
-  type        = string
-  default     = "{env}/keycloak/client"
-}
-
-variable "vault_path_service_accounts" {
-  description = "Prefix within the mount for service-account secrets. The account name is appended."
-  type        = string
-  default     = "{env}/service-accounts"
-}
-
-# ---------------------------------------------------------------------------
-# Resource names to fetch
-# ---------------------------------------------------------------------------
-
-variable "datasource_names" {
-  description = "Set of datasource names to fetch credentials for"
+variable "vault_secret_paths" {
+  description = "Set of Vault secret paths to fetch (relative to vault_mount). Automatically discovered from YAML configs by scanning for VAULT_SECRET_REQUIRED sentinels."
   type        = set(string)
   default     = []
-}
-
-variable "contact_point_names" {
-  description = "Set of contact point names to fetch credentials for"
-  type        = set(string)
-  default     = []
-}
-
-variable "service_account_names" {
-  description = "Set of service account names to fetch credentials for"
-  type        = set(string)
-  default     = []
-}
-
-variable "load_sso_secrets" {
-  description = "Whether to load SSO/Keycloak secrets from Vault"
-  type        = bool
-  default     = true
-}
-
-variable "load_keycloak_secrets" {
-  description = "Whether to load Keycloak provider-auth secrets from Vault (only when Terraform manages the Keycloak client)"
-  type        = bool
-  default     = false
 }

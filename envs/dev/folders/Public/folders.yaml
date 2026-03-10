@@ -1,19 +1,5 @@
-# Imported from http://localhost:3000 on 2026-03-06T20:58:00.778979
+# Imported from http://localhost:3000 on 2026-03-10T04:31:49.336146
 # NOTE: Folder UIDs have been slugified from the original random Grafana UIDs
 #       for better readability in both YAML config and directory structure.
 
-folders:
-- title: "Public Overview"
-  uid: "public-overview"
-  _comment_original_uid: "public-overview"
-  org: "Public"
-  orgId: 6
-  permissions:
-  - team: "grafana-viewers"
-    permission: "View"
-- title: "Public Status"
-  uid: "public-status"
-  _comment_original_uid: "public-status"
-  org: "Public"
-  orgId: 6
-  permissions: []
+folders: []

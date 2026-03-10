@@ -27,8 +27,8 @@ def import_sso(ctx: ImportContext) -> None:
         f.write("# Imported from Grafana SSO settings\n")
         f.write("#\n")
         f.write("# This file follows the project format expected by modules/sso.\n")
-        vault_sso_path = ctx.vault_path(ctx.env_name, "sso", "keycloak")
-        f.write(f"# Client secret Vault path: {vault_sso_path}\n\n")
+        f.write(f"# For secrets, use: VAULT_SECRET_REQUIRED:<path>:<key>\n")
+        f.write(f"# Example: client_secret: \"VAULT_SECRET_REQUIRED:{ctx.env_name}/sso/keycloak:client_secret\"\n\n")
 
         if enabled_provider is None:
             f.write(yaml_dump({"sso": {"enabled": False}}))
@@ -75,6 +75,8 @@ def _process_sso_settings(provider: dict[str, Any], org_map: dict[int, str]) -> 
         "token_url": s.get("tokenUrl", ""),
         "api_url": s.get("apiUrl", ""),
         "client_id": s.get("clientId", ""),
+        # client_secret is always redacted by Grafana — leave as empty for user to fill
+        # Users should set: client_secret: "VAULT_SECRET_REQUIRED:<env>/sso/keycloak:client_secret"
         "allow_sign_up": s.get("allowSignUp", True),
         "auto_login": s.get("autoLogin", False),
         "scopes": parse_json_str(s.get("scopes", "openid profile email groups"), " "),
@@ -115,9 +117,9 @@ def _process_org_mapping(org_mapping_str: str, org_map: dict[int, str]) -> list[
         try:
             mappings = [m.strip() for m in json.loads(org_mapping_str) if m.strip()]
         except (json.JSONDecodeError, TypeError):
-            mappings = [m.strip() for m in org_mapping_str.strip().replace("\\n", "\n").split("\n") if m.strip()]
+            mappings = [m.strip() for m in org_mapping_str.strip().replace("\\n", " ").split(" ") if m.strip()]
     else:
-        mappings = [m.strip() for m in org_mapping_str.strip().replace("\\n", "\n").split("\n") if m.strip()]
+        mappings = [m.strip() for m in org_mapping_str.strip().replace("\\n", " ").split(" ") if m.strip()]
 
     org_name_lookup = {str(k): v for k, v in org_map.items()}
     all_org_ids = set(org_name_lookup.keys())

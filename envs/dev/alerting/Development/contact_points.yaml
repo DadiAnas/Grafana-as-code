@@ -1,24 +1,6 @@
-# Imported from http://localhost:3000 on 2026-03-06T20:58:01.054175
+# Imported from http://localhost:3000 on 2026-03-10T04:31:49.563236
 
 contactPoints:
-- name: "email receiver"
-  org: "Development"
-  orgId: 4
-  receivers:
-  - type: "email"
-    settings:
-      addresses: "<example@email.com>"
-      singleEmail: false
-    disableResolveMessage: false
-- name: "grafana-default-email"
-  org: "Development"
-  orgId: 4
-  receivers:
-  - type: "email"
-    settings:
-      addresses: "<example@email.com>"
-      singleEmail: false
-    disableResolveMessage: false
 - name: "empty"
   org: "Development"
   orgId: 4

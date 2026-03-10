@@ -1,25 +1,5 @@
-# Imported from http://localhost:3000 on 2026-03-06T20:58:00.769357
+# Imported from http://localhost:3000 on 2026-03-10T04:31:49.331984
 # NOTE: Folder UIDs have been slugified from the original random Grafana UIDs
 #       for better readability in both YAML config and directory structure.
 
-folders:
-- title: "App Api"
-  uid: "app-api"
-  _comment_original_uid: "app-api"
-  org: "Application Team"
-  orgId: 2
-  permissions:
-  - role: "Viewer"
-    permission: "View"
-- title: "App Backend"
-  uid: "app-backend"
-  _comment_original_uid: "app-backend"
-  org: "Application Team"
-  orgId: 2
-  permissions: []
-- title: "App Frontend"
-  uid: "app-frontend"
-  _comment_original_uid: "app-frontend"
-  org: "Application Team"
-  orgId: 2
-  permissions: []
+folders: []

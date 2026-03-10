@@ -77,6 +77,10 @@ resource "grafana_contact_point" "contact_points" {
       title                     = try(webhook.value.settings.title, null)
       headers                   = try(webhook.value.settings.headers, {})
       disable_resolve_message   = try(webhook.value.disableResolveMessage, webhook.value.disable_resolve_message, false)
+      settings = {
+        for k, v in try(webhook.value.settings, {}) : k => tostring(v)
+        if !contains(["url", "httpMethod", "http_method", "basic_auth_user", "username", "basic_auth_password", "password", "authorization_scheme", "authorization_credentials", "maxAlerts", "max_alerts", "message", "title", "headers", "disableResolveMessage", "disable_resolve_message"], k)
+      }
     }
   }
 

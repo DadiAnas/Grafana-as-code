@@ -11,8 +11,8 @@
 # =============================================================================
 
 .PHONY: help init plan apply destroy fmt validate validate-config clean output state-list \
-        vault-setup vault-verify new-env delete-env list-envs check-env \
-        ci-init ci-plan ci-apply ci-destroy apply-auto \
+        vault-setup vault-verify vault-refresh new-env delete-env list-envs check-env \
+        ci-init ci-plan ci-apply ci-destroy ci-vault-refresh apply-auto \
         dev-up dev-down dev-bootstrap lint import drift backup promote \
         dashboard-diff test dry-run pre-commit-install pre-commit-run
 
@@ -93,14 +93,16 @@ help:
 	@echo "  test           Full local test cycle"
 	@echo ""
 	@echo "  ─── Vault ────────────────────────────────────────────────"
-	@echo "  vault-setup   Create Vault secrets               ENV=staging"
-	@echo "  vault-verify  Verify Vault secrets exist          ENV=staging"
+	@echo "  vault-setup    Create Vault secrets               ENV=staging"
+	@echo "  vault-verify   Verify Vault secrets exist          ENV=staging"
+	@echo "  vault-refresh  Force-refresh resources with Vault  ENV=staging [APPLY=true]"
 	@echo ""
 	@echo "  ─── CI/CD ────────────────────────────────────────────────"
-	@echo "  ci-init       Initialize (non-interactive)"
-	@echo "  ci-plan       Plan (non-interactive)"
-	@echo "  ci-apply      Apply (auto-approve)"
-	@echo "  ci-destroy    Destroy (auto-approve)"
+	@echo "  ci-init         Initialize (non-interactive)"
+	@echo "  ci-plan         Plan (non-interactive)"
+	@echo "  ci-apply        Apply (auto-approve)"
+	@echo "  ci-vault-refresh Force-refresh vault-backed resources (auto-approve)"
+	@echo "  ci-destroy      Destroy (auto-approve)"
 	@echo ""
 	@echo "  ─── Quick Start ──────────────────────────────────────────"
 	@echo "  make new-env NAME=staging GRAFANA_URL=https://grafana.example.com"
@@ -420,6 +422,20 @@ vault-verify:
 	@echo "Verifying Vault secrets for $(ENV)..."
 	python3 scripts/vault/verify_secrets.py $(ENV)
 
+APPLY ?=
+AUTO_APPROVE ?=
+vault-refresh:
+	@echo "Refreshing Vault-backed resources for $(ENV)..."
+	@if [ "$(APPLY)" = "true" ]; then \
+		if [ "$(AUTO_APPROVE)" = "true" ]; then \
+			python3 scripts/vault/vault_refresh.py $(ENV) --apply --auto-approve; \
+		else \
+			python3 scripts/vault/vault_refresh.py $(ENV) --apply; \
+		fi \
+	else \
+		python3 scripts/vault/vault_refresh.py $(ENV) --dry-run; \
+	fi
+
 # =============================================================================
 # CI/CD TARGETS (non-interactive)
 # =============================================================================
@@ -448,3 +464,6 @@ ci-apply:
 
 ci-destroy:
 	terraform -chdir=$(TF_DIR) destroy -var-file=$(TF_VAR_FILE) -input=false -auto-approve
+
+ci-vault-refresh:
+	python3 scripts/vault/vault_refresh.py $(ENV) --apply --auto-approve

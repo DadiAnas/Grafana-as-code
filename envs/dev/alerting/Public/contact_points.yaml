@@ -1,33 +1,6 @@
-# Imported from http://localhost:3000 on 2026-03-06T20:58:01.164354
+# Imported from http://localhost:3000 on 2026-03-10T04:31:49.625387
 
 contactPoints:
-- name: "bi-email"
-  org: "Public"
-  orgId: 6
-  receivers:
-  - type: "email"
-    settings:
-      addresses: "bi-team@example.com;analysts@example.com"
-      singleEmail: false
-    disableResolveMessage: false
-- name: "email receiver"
-  org: "Public"
-  orgId: 6
-  receivers:
-  - type: "email"
-    settings:
-      addresses: "<example@email.com>"
-      singleEmail: false
-    disableResolveMessage: false
-- name: "grafana-default-email"
-  org: "Public"
-  orgId: 6
-  receivers:
-  - type: "email"
-    settings:
-      addresses: "<example@email.com>"
-      singleEmail: false
-    disableResolveMessage: false
 - name: "empty"
   org: "Public"
   orgId: 6

@@ -1,0 +1,75 @@
+# Imported from http://localhost:3000 on 2026-03-10T04:27:34.278669
+# NOTE: Folder UIDs have been slugified from the original random Grafana UIDs
+#       for better readability in both YAML config and directory structure.
+
+folders:
+- title: "2general"
+  uid: "2general"
+  _comment_original_uid: "2general"
+  org: "Main Org."
+  orgId: 1
+  permissions:
+  - role: "Viewer"
+    permission: "View"
+- title: "Alerts"
+  uid: "alerts"
+  _comment_original_uid: "alerts"
+  org: "Main Org."
+  orgId: 1
+  permissions: []
+- title: "App Backend"
+  uid: "app-backend"
+  _comment_original_uid: "app-backend"
+  org: "Main Org."
+  orgId: 1
+  permissions: []
+- title: "Applications"
+  uid: "applications"
+  _comment_original_uid: "applications"
+  org: "Main Org."
+  orgId: 1
+  permissions: []
+- title: "Business"
+  uid: "business"
+  _comment_original_uid: "business"
+  org: "Main Org."
+  orgId: 1
+  permissions: []
+- title: "Infrastructure"
+  uid: "infrastructure"
+  _comment_original_uid: "infrastructure"
+  org: "Main Org."
+  orgId: 1
+  permissions: []
+- title: "Pepo"
+  uid: "pepo"
+  _comment_original_uid: "pepo"
+  org: "Main Org."
+  orgId: 1
+  permissions:
+  - role: "Viewer"
+    permission: "View"
+  - role: "Editor"
+    permission: "Edit"
+- title: "Pepo 2"
+  uid: "pepo-2"
+  _comment_original_uid: "pepo-2"
+  org: "Main Org."
+  orgId: 1
+  permissions:
+  - role: "Viewer"
+    permission: "View"
+  - role: "Editor"
+    permission: "Edit"
+- title: "Slos"
+  uid: "slos"
+  _comment_original_uid: "slos"
+  org: "Main Org."
+  orgId: 1
+  permissions: []
+- title: "Subfolder"
+  uid: "subfolder"
+  _comment_original_uid: "subfolder"
+  org: "Main Org."
+  orgId: 1
+  permissions: []

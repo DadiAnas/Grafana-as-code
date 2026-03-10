@@ -1,5 +1,5 @@
 variable "datasources" {
-  description = "Datasources configuration from YAML"
+  description = "Datasources configuration from YAML (with VAULT_SECRET_REQUIRED sentinels already resolved)"
   type        = any
 }
 
@@ -7,11 +7,4 @@ variable "org_ids" {
   description = "Map of organization names to their IDs"
   type        = map(number)
   default     = {}
-}
-
-variable "vault_credentials" {
-  description = "Map of datasource names to their credentials from Vault"
-  type        = map(map(string))
-  default     = {}
-  sensitive   = true
 }

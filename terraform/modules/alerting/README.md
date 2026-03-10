@@ -2,13 +2,13 @@
 
 | Name | Version |
 |------|---------|
-| <a name="requirement_grafana"></a> [grafana](#requirement\_grafana) | 4.25.0 |
+| <a name="requirement_grafana"></a> [grafana](#requirement\_grafana) | 4.27.0 |
 
 ## Providers
 
 | Name | Version |
 |------|---------|
-| <a name="provider_grafana"></a> [grafana](#provider\_grafana) | 4.25.0 |
+| <a name="provider_grafana"></a> [grafana](#provider\_grafana) | 4.27.0 |
 
 ## Modules
 
@@ -18,9 +18,9 @@ No modules.
 
 | Name | Type |
 |------|------|
-| [grafana_contact_point.contact_points](https://registry.terraform.io/providers/grafana/grafana/4.25.0/docs/resources/contact_point) | resource |
-| [grafana_notification_policy.policy](https://registry.terraform.io/providers/grafana/grafana/4.25.0/docs/resources/notification_policy) | resource |
-| [grafana_rule_group.rule_groups](https://registry.terraform.io/providers/grafana/grafana/4.25.0/docs/resources/rule_group) | resource |
+| [grafana_contact_point.contact_points](https://registry.terraform.io/providers/grafana/grafana/4.27.0/docs/resources/contact_point) | resource |
+| [grafana_notification_policy.policy](https://registry.terraform.io/providers/grafana/grafana/4.27.0/docs/resources/notification_policy) | resource |
+| [grafana_rule_group.rule_groups](https://registry.terraform.io/providers/grafana/grafana/4.27.0/docs/resources/rule_group) | resource |
 
 ## Inputs
 
@@ -32,7 +32,6 @@ No modules.
 | <a name="input_mute_timings"></a> [mute\_timings](#input\_mute\_timings) | Mute timings configuration from YAML | `any` | `{ mute_timings = [] }` | no |
 | <a name="input_notification_policies"></a> [notification\_policies](#input\_notification\_policies) | Notification policies configuration from YAML | `any` | n/a | yes |
 | <a name="input_org_ids"></a> [org\_ids](#input\_org\_ids) | Map of organization names to their IDs | `map(string)` | `{}` | no |
-| <a name="input_vault_credentials"></a> [vault\_credentials](#input\_vault\_credentials) | Map of contact point names to their credentials from Vault | `map(map(string))` | `{}` | no |
 
 ## Outputs
 

@@ -1,50 +1,6 @@
-# Imported from http://localhost:3000 on 2026-03-06T20:58:01.008467
+# Imported from http://localhost:3000 on 2026-03-10T04:31:49.523732
 
 contactPoints:
-- name: "app-email"
-  org: "Application Team"
-  orgId: 2
-  receivers:
-  - type: "email"
-    settings:
-      addresses: "app-team@example.com"
-      singleEmail: true
-      subject: "[{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}"
-    disableResolveMessage: false
-- name: "app-webhook-npr"
-  org: "Application Team"
-  orgId: 2
-  receivers:
-  - type: "webhook"
-    settings:
-      httpMethod: "POST"
-      maxAlerts: 0
-      password: "[REDACTED]"
-      url: "https://hooks.app.example.com/npr/alerts"
-      tlsClientCert: "VAULT_SECRET_REQUIRED"
-      tlsClientKey: "VAULT_SECRET_REQUIRED"
-      authorizationCredentials: "VAULT_SECRET_REQUIRED"
-    vault_secrets: "grafana/dev/alerting/contact-points/app-webhook-npr: tlsClientCert,\
-      \ tlsClientKey, authorizationCredentials"
-    disableResolveMessage: false
-- name: "email receiver"
-  org: "Application Team"
-  orgId: 2
-  receivers:
-  - type: "email"
-    settings:
-      addresses: "<example@email.com>"
-      singleEmail: false
-    disableResolveMessage: false
-- name: "grafana-default-email"
-  org: "Application Team"
-  orgId: 2
-  receivers:
-  - type: "email"
-    settings:
-      addresses: "<example@email.com>"
-      singleEmail: false
-    disableResolveMessage: false
 - name: "empty"
   org: "Application Team"
   orgId: 2
