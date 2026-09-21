@@ -1,0 +1,391 @@
+GitLab CI/CD Components — current best practices
+
+A good architecture is to treat each CI/CD component as a small, versioned product with a stable interface, not simply as a shared YAML template. GitLab components are designed specifically for reusable, versioned pipeline building blocks and can be distributed through the CI/CD Catalog. 
+
+gitlab-ci-components/
+├── README.md
+├── .gitlab-ci.yml
+└── templates/
+    ├── build/
+    │   └── template.yml
+    ├── docker-build/
+    │   └── template.yml
+    ├── terraform/
+    │   └── template.yml
+    ├── deploy-k8s/
+    │   └── template.yml
+    ├── security-scan/
+    │   └── template.yml
+    └── release/
+        └── template.yml
+
+The main rules I would apply are:
+
+1. One responsibility per component. Prefer components such as docker-build, terraform-plan, terraform-apply, helm-deploy, sast, container-scan, rather than one giant devops-pipeline component. Components can still be composed into higher-level pipelines.
+
+
+2. Use spec:inputs as the public API. Do not make consumers discover undocumented variables such as DOCKER_BUILD_CONTEXT, DEPLOY_ENV, etc. Inputs are typed, validated during pipeline creation, and give the component an explicit contract. GitLab recommends inputs for reusable configuration; secrets and runtime values remain appropriate as CI/CD variables. 
+
+
+
+For example:
+
+spec:
+  inputs:
+    stage:
+      default: build
+
+    image_name:
+      description: "Container image name"
+
+    dockerfile:
+      default: Dockerfile
+
+    context:
+      default: "."
+
+    push:
+      type: boolean
+      default: true
+
+---
+container-build:
+  stage: $[[ inputs.stage ]]
+  script:
+    - >
+      buildah bud
+      -f "$[[ inputs.dockerfile ]]"
+      -t "$[[ inputs.image_name ]]"
+      "$[[ inputs.context ]]"
+
+    - |
+      if [ "$[[ inputs.push ]]" = "true" ]; then
+        buildah push "$[[ inputs.image_name ]]"
+      fi
+
+Then consumption stays extremely clean:
+
+include:
+  - component: gitlab.example.com/platform/ci-components/docker-build@2.3.1
+    inputs:
+      stage: build
+      image_name: $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA
+
+3. Never hardcode the consumer's pipeline structure. One of the most important examples is stage. Don't assume:
+
+
+
+stage: build
+
+Prefer:
+
+spec:
+  inputs:
+    stage:
+      default: build
+---
+my-job:
+  stage: $[[ inputs.stage ]]
+
+GitLab explicitly recommends replacing hardcoded configuration such as stages with inputs. 
+
+4. Separate configuration from secrets.
+
+
+
+Good:
+
+inputs:
+  environment:
+    options:
+      - dev
+      - staging
+      - production
+
+Secret:
+
+AWS_SECRET_ACCESS_KEY
+VAULT_TOKEN
+SONAR_TOKEN
+
+Keep secrets in GitLab protected/masked variables or, preferably for larger environments, an external secret-management system. 
+
+5. Version components with SemVer.
+
+
+
+1.0.0
+1.1.0
+1.2.0
+2.0.0
+
+Meaning:
+
+PATCH   bug fix
+MINOR   backwards-compatible feature
+MAJOR   breaking interface change
+
+Consumers should normally use something like:
+
+component: gitlab.example.com/platform/components/docker-build@2.3.1
+
+rather than:
+
+@main
+@latest
+
+For especially sensitive pipelines, pinning a commit SHA gives even stronger immutability. GitLab specifically recommends pinned releases or SHAs rather than moving references. 
+
+6. Minimize component dependencies. Avoid chains such as:
+
+
+
+deploy
+  ↓
+helm
+  ↓
+kubernetes-auth
+  ↓
+vault
+  ↓
+aws-auth
+  ↓
+common-shell
+
+Now changing one low-level component risks half of your catalog.
+
+Better:
+
+helm-deploy
+terraform
+container-build
+security-scan
+
+with each reasonably self-contained. GitLab actually says a small amount of duplication can be preferable to introducing unnecessary dependencies. 
+
+7. Avoid privileged runners whenever possible.
+
+
+
+For container builds, instead of automatically requiring:
+
+Docker-in-Docker
+privileged=true
+
+consider tools such as:
+
+Buildah
+Kaniko
+BuildKit rootless
+
+GitLab uses Buildah itself as an example of reducing component privilege requirements. 
+
+8. Make job names collision-resistant. This is often forgotten with reusable components.
+
+
+
+Bad:
+
+build:
+
+Two components defining build can collide.
+
+Better expose a prefix/name:
+
+spec:
+  inputs:
+    job_name:
+      default: container-build
+---
+"$[[ inputs.job_name ]]":
+  script:
+    - ...
+
+For more complex components:
+
+myservice:build
+myservice:scan
+myservice:publish
+
+9. Don't expose 40 inputs. Think of inputs as an API.
+
+
+
+Bad:
+
+docker_host
+docker_port
+docker_tls
+docker_tls_cert
+docker_tls_path
+docker_platform
+docker_context
+docker_driver
+...
+
+A component becoming infinitely configurable usually means it is trying to solve too many problems.
+
+A good component might expose roughly:
+
+stage
+image
+context
+dockerfile
+target
+platform
+push
+extra_args
+
+while hiding implementation details.
+
+10. Use defaults aggressively for normal cases.
+
+
+
+spec:
+  inputs:
+    stage:
+      default: build
+
+    dockerfile:
+      default: Dockerfile
+
+    context:
+      default: "."
+
+    platform:
+      default: linux/amd64
+
+Then a developer should ideally be able to consume the component with just:
+
+include:
+  - component: gitlab.example.com/platform/components/docker-build@1.4.0
+
+and only override things when necessary.
+
+11. Put policy in components where it makes sense. This is where components become especially valuable for a platform engineering team.
+
+
+
+For example your organization's container component can automatically enforce:
+
+approved base registries
+image scanning
+SBOM generation
+OCI labels
+immutable tags
+registry authentication
+provenance/signing
+cache strategy
+
+Instead of every repository implementing these independently.
+
+A typical organization could therefore have:
+
+platform/ci-components
+
+build/
+  node
+  maven
+  gradle
+  python
+
+container/
+  build
+  scan
+  publish
+  sign
+
+security/
+  sast
+  secret-detection
+  dependency-scan
+  container-scan
+
+iac/
+  terraform-fmt
+  terraform-validate
+  terraform-plan
+  terraform-apply
+  ansible-lint
+
+deployment/
+  helm
+  kubernetes
+  argocd
+  terraform
+
+release/
+  semantic-release
+  changelog
+  gitlab-release
+
+I would not necessarily create one repository per tiny component. GitLab lets one component project contain multiple components that are versioned together; components that need independent release lifecycles are better moved into separate projects. 
+
+A particularly clean structure for a company is:
+
+platform/
+└── ci-components/
+    ├── container
+    ├── terraform
+    ├── kubernetes
+    ├── security
+    └── release
+
+with consumers doing:
+
+include:
+  - component: $CI_SERVER_FQDN/platform/ci-components/container@3.2.0
+    inputs:
+      image_name: $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA
+
+  - component: $CI_SERVER_FQDN/platform/ci-components/security@2.1.0
+    inputs:
+      container_image: $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA
+
+  - component: $CI_SERVER_FQDN/platform/ci-components/kubernetes@4.0.1
+    inputs:
+      environment: staging
+
+The final mental model should be:
+
+GitLab CI Catalog
+                           │
+          ┌────────────────┼────────────────┐
+          │                │                │
+     container         security        terraform
+       v3.x              v2.x             v4.x
+          │                │                │
+          └──────────────┬─┴────────────────┘
+                         │
+                    Application
+                         │
+                  .gitlab-ci.yml
+                         │
+            ┌────────────┼────────────┐
+            │            │            │
+           Build        Scan        Deploy
+
+Your application .gitlab-ci.yml should increasingly become a composition file, rather than containing 500 lines of shell commands.
+
+stages:
+  - build
+  - test
+  - security
+  - deploy
+
+include:
+  - component: $CI_SERVER_FQDN/platform/components/container-build@2.4.0
+    inputs:
+      stage: build
+
+  - component: $CI_SERVER_FQDN/platform/components/container-scan@1.8.0
+    inputs:
+      stage: security
+
+  - component: $CI_SERVER_FQDN/platform/components/helm-deploy@3.1.0
+    inputs:
+      stage: deploy
+      environment: production
+
+That is probably the most important architectural objective: application teams declare intent; the platform team owns implementation.

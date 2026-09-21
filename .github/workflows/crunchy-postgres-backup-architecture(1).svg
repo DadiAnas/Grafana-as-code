@@ -1,0 +1,175 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1480" height="1000" viewBox="0 0 1480 1000" font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif">
+  <defs>
+    <!-- subtle shadow -->
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#0b1f33" flood-opacity="0.18"/>
+    </filter>
+    <!-- arrowheads -->
+    <marker id="repl" markerWidth="12" markerHeight="12" refX="9" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2e7d32"/>
+    </marker>
+    <marker id="wal" markerWidth="12" markerHeight="12" refX="9" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#b25000"/>
+    </marker>
+    <marker id="bkp" markerWidth="12" markerHeight="12" refX="9" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#0f62fe"/>
+    </marker>
+    <!-- blueprint grid -->
+    <pattern id="grid" width="28" height="28" patternUnits="userSpaceOnUse">
+      <path d="M28 0 L0 0 0 28" fill="none" stroke="#e4ebf2" stroke-width="1"/>
+    </pattern>
+  </defs>
+
+  <!-- background -->
+  <rect width="1480" height="1000" fill="#f6f9fc"/>
+  <rect width="1480" height="1000" fill="url(#grid)"/>
+
+  <!-- title -->
+  <text x="40" y="52" font-size="30" font-weight="700" fill="#0b1f33">Crunchy PostgreSQL on OpenShift — HA &amp; Backup Topology</text>
+  <text x="40" y="80" font-size="16" fill="#5a6b7b">PGO-managed cluster · 1 primary + 2 replicas · pgBackRest dual repo (local host volume + IBM Cloud Object Storage)</text>
+
+  <!-- ===================== OPENSHIFT CLUSTER ===================== -->
+  <rect x="40" y="110" width="900" height="830" rx="16" fill="#ffffff" stroke="#ee0000" stroke-width="2.5"/>
+  <rect x="40" y="110" width="900" height="44" rx="16" fill="#ee0000"/>
+  <rect x="40" y="138" width="900" height="16" fill="#ee0000"/>
+  <circle cx="68" cy="132" r="11" fill="#ffffff"/>
+  <text x="88" y="139" font-size="19" font-weight="700" fill="#ffffff">Red Hat OpenShift Cluster</text>
+  <text x="700" y="139" font-size="14" fill="#ffd6d6">namespace: postgres-prod</text>
+
+  <!-- PostgresCluster (PGO) box -->
+  <rect x="70" y="180" width="470" height="720" rx="12" fill="#eef4fb" stroke="#336791" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="92" y="210" font-size="17" font-weight="700" fill="#336791">PostgresCluster (CRD)</text>
+  <text x="92" y="230" font-size="13" fill="#5a6b7b">managed by Crunchy PGO operator</text>
+
+  <!-- PRIMARY -->
+  <g filter="url(#shadow)">
+    <rect x="100" y="250" width="410" height="150" rx="10" fill="#ffffff" stroke="#336791" stroke-width="2.5"/>
+  </g>
+  <rect x="100" y="250" width="410" height="34" rx="10" fill="#336791"/>
+  <rect x="100" y="268" width="410" height="16" fill="#336791"/>
+  <text x="120" y="273" font-size="15" font-weight="700" fill="#ffffff">PRIMARY  ·  read / write</text>
+  <text x="120" y="312" font-size="14" fill="#0b1f33" font-weight="600">Pod: pg-instance-1</text>
+  <text x="120" y="334" font-size="13" fill="#5a6b7b">PostgreSQL + pgBackRest sidecar + Patroni</text>
+  <rect x="120" y="350" width="180" height="34" rx="6" fill="#f0f4f8" stroke="#c4d2df"/>
+  <text x="130" y="372" font-size="12.5" fill="#33475b">PVC · pgdata (block)</text>
+
+  <!-- REPLICA 1 -->
+  <g filter="url(#shadow)">
+    <rect x="100" y="440" width="410" height="135" rx="10" fill="#ffffff" stroke="#5b8db8" stroke-width="2"/>
+  </g>
+  <rect x="100" y="440" width="410" height="30" rx="10" fill="#5b8db8"/>
+  <rect x="100" y="456" width="410" height="14" fill="#5b8db8"/>
+  <text x="120" y="461" font-size="14" font-weight="700" fill="#ffffff">REPLICA 1  ·  read-only / standby</text>
+  <text x="120" y="498" font-size="14" fill="#0b1f33" font-weight="600">Pod: pg-instance-2</text>
+  <text x="120" y="519" font-size="13" fill="#5a6b7b">hot standby · async streaming</text>
+  <rect x="120" y="532" width="180" height="32" rx="6" fill="#f0f4f8" stroke="#c4d2df"/>
+  <text x="130" y="553" font-size="12.5" fill="#33475b">PVC · pgdata</text>
+
+  <!-- REPLICA 2 -->
+  <g filter="url(#shadow)">
+    <rect x="100" y="615" width="410" height="135" rx="10" fill="#ffffff" stroke="#5b8db8" stroke-width="2"/>
+  </g>
+  <rect x="100" y="615" width="410" height="30" rx="10" fill="#5b8db8"/>
+  <rect x="100" y="631" width="410" height="14" fill="#5b8db8"/>
+  <text x="120" y="636" font-size="14" font-weight="700" fill="#ffffff">REPLICA 2  ·  read-only / standby</text>
+  <text x="120" y="673" font-size="14" fill="#0b1f33" font-weight="600">Pod: pg-instance-3</text>
+  <text x="120" y="694" font-size="13" fill="#5a6b7b">hot standby · async streaming</text>
+  <rect x="120" y="707" width="180" height="32" rx="6" fill="#f0f4f8" stroke="#c4d2df"/>
+  <text x="130" y="728" font-size="12.5" fill="#33475b">PVC · pgdata</text>
+
+  <!-- failover note -->
+  <text x="92" y="800" font-size="12.5" fill="#7a8a99">Patroni auto-failover: a replica is</text>
+  <text x="92" y="818" font-size="12.5" fill="#7a8a99">promoted to primary if the primary fails.</text>
+
+  <!-- streaming replication arrows -->
+  <path d="M305 400 C 305 420, 305 420, 305 440" fill="none" stroke="#2e7d32" stroke-width="3" marker-end="url(#repl)"/>
+  <path d="M260 400 C 220 480, 200 540, 260 615" fill="none" stroke="#2e7d32" stroke-width="3" marker-end="url(#repl)"/>
+  <text x="318" y="425" font-size="12" fill="#2e7d32" font-weight="600">WAL stream</text>
+
+  <!-- ===================== pgBackRest repo host ===================== -->
+  <g filter="url(#shadow)">
+    <rect x="585" y="250" width="320" height="200" rx="10" fill="#fff7ef" stroke="#b25000" stroke-width="2.5"/>
+  </g>
+  <rect x="585" y="250" width="320" height="34" rx="10" fill="#b25000"/>
+  <rect x="585" y="268" width="320" height="16" fill="#b25000"/>
+  <text x="605" y="273" font-size="15" font-weight="700" fill="#ffffff">pgBackRest repo host</text>
+  <text x="605" y="312" font-size="13.5" fill="#0b1f33" font-weight="600">Pod: pgbackrest-repo-host</text>
+  <text x="605" y="334" font-size="12.5" fill="#5a6b7b">• WAL archiving (archive_command)</text>
+  <text x="605" y="354" font-size="12.5" fill="#5a6b7b">• full / differential / incremental</text>
+  <text x="605" y="374" font-size="12.5" fill="#5a6b7b">• scheduled via CronJob</text>
+  <text x="605" y="394" font-size="12.5" fill="#5a6b7b">• PITR (point-in-time recovery)</text>
+  <text x="605" y="426" font-size="12" fill="#b25000" font-weight="600">retention &amp; verification per repo</text>
+
+  <!-- WAL + backup arrow primary -> pgbackrest -->
+  <path d="M510 320 C 545 320, 555 330, 585 330" fill="none" stroke="#b25000" stroke-width="3" marker-end="url(#wal)"/>
+  <text x="512" y="312" font-size="11.5" fill="#b25000" font-weight="600">WAL + base</text>
+
+  <!-- ===================== repo1 local host volume ===================== -->
+  <g filter="url(#shadow)">
+    <rect x="585" y="500" width="320" height="170" rx="10" fill="#eef7ee" stroke="#2e7d32" stroke-width="2.5"/>
+  </g>
+  <rect x="585" y="500" width="320" height="34" rx="10" fill="#2e7d32"/>
+  <rect x="585" y="518" width="320" height="16" fill="#2e7d32"/>
+  <text x="605" y="523" font-size="15" font-weight="700" fill="#ffffff">repo1 — Local Host Volume</text>
+  <!-- disk icon -->
+  <ellipse cx="650" cy="572" rx="34" ry="11" fill="#cdebd0" stroke="#2e7d32"/>
+  <rect x="616" y="572" width="68" height="40" fill="#cdebd0" stroke="#2e7d32"/>
+  <ellipse cx="650" cy="612" rx="34" ry="11" fill="#dff3e1" stroke="#2e7d32"/>
+  <text x="700" y="568" font-size="13" fill="#0b1f33" font-weight="600">PVC / hostPath</text>
+  <text x="700" y="588" font-size="12.5" fill="#5a6b7b">fast on-cluster restore</text>
+  <text x="700" y="608" font-size="12.5" fill="#5a6b7b">storage: block / file</text>
+  <text x="605" y="650" font-size="12" fill="#2e7d32" font-weight="600">low RTO · stays inside the datacenter</text>
+
+  <!-- pgbackrest -> repo1 -->
+  <path d="M700 450 C 700 470, 700 480, 700 500" fill="none" stroke="#0f62fe" stroke-width="3" marker-end="url(#bkp)"/>
+  <text x="712" y="478" font-size="11.5" fill="#0f62fe" font-weight="600">store</text>
+
+  <!-- ===================== IBM CLOUD ===================== -->
+  <rect x="1010" y="250" width="430" height="420" rx="16" fill="#ffffff" stroke="#0f62fe" stroke-width="2.5"/>
+  <rect x="1010" y="250" width="430" height="44" rx="16" fill="#0f62fe"/>
+  <rect x="1010" y="278" width="430" height="16" fill="#0f62fe"/>
+  <text x="1034" y="279" font-size="18" font-weight="700" fill="#ffffff">IBM Cloud (off-cluster)</text>
+
+  <!-- COS bucket -->
+  <g filter="url(#shadow)">
+    <rect x="1050" y="330" width="350" height="290" rx="10" fill="#eef3ff" stroke="#0f62fe" stroke-width="2"/>
+  </g>
+  <text x="1072" y="362" font-size="16" font-weight="700" fill="#0f43a8">repo2 — IBM Cloud Object Storage</text>
+  <text x="1072" y="384" font-size="13" fill="#33475b">S3-compatible · cross-region / regional</text>
+
+  <!-- bucket icon -->
+  <path d="M1110 420 L1230 420 L1215 560 L1125 560 Z" fill="#cfe0ff" stroke="#0f62fe" stroke-width="2"/>
+  <ellipse cx="1170" cy="420" rx="60" ry="15" fill="#dfeaff" stroke="#0f62fe" stroke-width="2"/>
+  <text x="1142" y="500" font-size="13" font-weight="700" fill="#0f43a8">COS</text>
+  <text x="1132" y="520" font-size="11" fill="#0f43a8">bucket</text>
+
+  <text x="1260" y="440" font-size="12.5" fill="#5a6b7b">• base backups</text>
+  <text x="1260" y="462" font-size="12.5" fill="#5a6b7b">• archived WAL</text>
+  <text x="1260" y="484" font-size="12.5" fill="#5a6b7b">• lifecycle / expire</text>
+  <text x="1260" y="506" font-size="12.5" fill="#5a6b7b">• encrypted at rest</text>
+  <text x="1072" y="592" font-size="12" fill="#0f62fe" font-weight="600">off-site DR copy · survives cluster loss · high durability</text>
+
+  <!-- pgbackrest -> COS (crosses cluster boundary) -->
+  <path d="M905 340 C 960 340, 980 470, 1050 470" fill="none" stroke="#0f62fe" stroke-width="3" stroke-dasharray="2 0" marker-end="url(#bkp)"/>
+  <text x="940" y="395" font-size="11.5" fill="#0f62fe" font-weight="600">async push</text>
+  <text x="940" y="412" font-size="11" fill="#5a6b7b">HTTPS / S3 API</text>
+
+  <!-- 3-2-1 callout -->
+  <rect x="1010" y="700" width="430" height="170" rx="12" fill="#fffbe8" stroke="#caa42a" stroke-width="2"/>
+  <text x="1034" y="732" font-size="16" font-weight="700" fill="#8a6d00">Why two repos? (3-2-1 backup rule)</text>
+  <text x="1034" y="760" font-size="13" fill="#5a4b00">repo1 (host)  → fast local restore, low RTO</text>
+  <text x="1034" y="784" font-size="13" fill="#5a4b00">repo2 (COS)  → off-site, survives full cluster /</text>
+  <text x="1034" y="804" font-size="13" fill="#5a4b00">datacenter loss, long-term retention</text>
+  <text x="1034" y="834" font-size="13" fill="#5a4b00">Both keep WAL → PITR to any second in time.</text>
+
+  <!-- ===================== LEGEND ===================== -->
+  <rect x="40" y="910" width="900" height="50" rx="10" fill="#ffffff" stroke="#d6e0ea"/>
+  <line x1="70" y1="935" x2="120" y2="935" stroke="#2e7d32" stroke-width="3" marker-end="url(#repl)"/>
+  <text x="130" y="940" font-size="13" fill="#33475b">Streaming replication (primary → replicas)</text>
+
+  <line x1="430" y1="935" x2="480" y2="935" stroke="#b25000" stroke-width="3" marker-end="url(#wal)"/>
+  <text x="490" y="940" font-size="13" fill="#33475b">WAL archive + base backup</text>
+
+  <line x1="730" y1="935" x2="780" y2="935" stroke="#0f62fe" stroke-width="3" marker-end="url(#bkp)"/>
+  <text x="790" y="940" font-size="13" fill="#33475b">Backup store</text>
+</svg>
